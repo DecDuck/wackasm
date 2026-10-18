@@ -1,0 +1,396 @@
+use std::sync::atomic::{AtomicIsize, Ordering};
+
+use anyhow::anyhow;
+use serde::{Deserialize, Serialize};
+use wasmparser::{FuncType, Operator};
+
+use crate::{
+    Value, WackasmModule,
+    blocks::Block,
+    module::{BlockIndex, ExportIndex, FunctionFrame, FunctionIndex, FunctionTypeIndex},
+    stack::OperandStackFns as _,
+};
+
+const MAX_INSTRUCTIONS_IN_LOOP: isize = 100;
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct WackasmExecutor {
+    fuel: AtomicIsize,
+    module: WackasmModule,
+    callstack: Vec<FunctionFrame>,
+    output: Option<Vec<Value>>,
+}
+
+pub enum FunctionScopedResult {
+    OutOfFuel,
+    FunctionReturn,
+    FunctionCall { function_index: u32 },
+}
+
+impl WackasmExecutor {
+    pub fn new(module: WackasmModule) -> Self {
+        Self {
+            fuel: AtomicIsize::new(isize::MAX),
+            module,
+            callstack: Vec::new(),
+            output: None,
+        }
+    }
+
+    pub fn call_export(&mut self, name: &str, arguments: Vec<Value>) -> Result<(), anyhow::Error> {
+        let function = self
+            .module
+            .exports
+            .get(name)
+            .ok_or(anyhow!("function not found"))?;
+        let function = match function {
+            ExportIndex::Func(function_type_index) => function_type_index,
+            _ => return Err(anyhow!("not a function")),
+        };
+
+        self.call_internal(*function, arguments)
+    }
+
+    fn call_internal(
+        &mut self,
+        function_index: FunctionIndex,
+        arguments: Vec<Value>,
+    ) -> Result<(), anyhow::Error> {
+        let function = self
+            .module
+            .init_function_frames
+            .get(&function_index)
+            .ok_or(anyhow!(
+                "internal module corruption: cannot lookup initial function state"
+            ))?;
+        let mut function = function.clone();
+
+        // Get function signature
+        let function_type_index =
+            self.module
+                .function_types
+                .get(&function_index)
+                .ok_or(anyhow!(
+                    "no function type index for function index {:?}",
+                    function_index
+                ))?;
+        let function_type = self
+            .module
+            .function_type_indexes
+            .get(function_type_index)
+            .ok_or(anyhow!(
+                "no function type for function type index {:?}",
+                function_type_index
+            ))?;
+
+        let params = function_type.params();
+        if arguments.len() != params.len() {
+            return Err(anyhow!(
+                "invalid amount of arguments, expected {}, got {}",
+                params.len(),
+                arguments.len()
+            ));
+        }
+
+        // Insert arguments
+        for (index, value) in arguments.into_iter().enumerate() {
+            function.locals.set_checked(index as u32, value)?;
+        }
+
+        self.callstack.push(function);
+
+        Ok(())
+    }
+
+    /// Executes up to [`instructions`] instructions within a single
+    /// function frame. Adds how many were executed to instructions_executed.
+    #[inline]
+    fn incremental_execute_function(
+        &mut self,
+        instructions: usize,
+        instructions_executed: &mut isize,
+    ) -> Result<FunctionScopedResult, anyhow::Error> {
+        let function_frame = self
+            .callstack
+            .last_mut()
+            .ok_or(anyhow!("callstack empty"))?;
+
+        for _ in 0..instructions {
+            *instructions_executed += 1;
+            let mut pc = function_frame.pc.handle();
+            println!("pc {} fn {:?}", pc.inner(), function_frame.function_index);
+            let operator = function_frame.code.get(pc.inner()).unwrap();
+            match operator {
+                // Gets
+                Operator::LocalGet { local_index } => {
+                    let local = *function_frame.locals.get(&local_index)?;
+                    function_frame.operand_stack.push(local)?;
+                }
+                Operator::LocalSet { local_index } => {
+                    let value = function_frame.operand_stack.pop()?;
+                    function_frame.locals.set_checked(local_index, value)?;
+                }
+
+                // Handle function call
+                Operator::Call { function_index } => {
+                    // Add one so we resume to the next instruction
+                    return Ok(FunctionScopedResult::FunctionCall { function_index });
+                }
+
+                // Control flow
+                Operator::If { blockty: _ } => {
+                    let block_index = BlockIndex(pc.inner() as u32);
+                    let block = function_frame
+                        .block_lookup
+                        .get(&block_index)
+                        .ok_or_else(|| anyhow!("no block for pc {}", pc.inner()))?
+                        .clone();
+
+                    let condition = function_frame.operand_stack.pop_i32()?;
+                    let condition = condition != 0;
+
+                    let (start, else_block, end) = block.if_block()?;
+                    let mut start_block = false;
+
+                    if condition {
+                        println!("if evaluated to true");
+                        // Jump to next instruction
+                        pc.set_pc(start + 1);
+                        start_block = true;
+                    } else {
+                        println!("if evaluated to false");
+                        if let Some(else_block) = else_block {
+                            start_block = true;
+                            // Jump after else instruction
+                            pc.set_pc(else_block + 1);
+                        } else {
+                            // Jump after end
+                            pc.set_pc(end + 1);
+                        }
+                    }
+
+                    if start_block {
+                        self.module.start_block(
+                            &mut function_frame.operand_stack,
+                            &block,
+                            &block_index,
+                        )?;
+                    }
+                }
+
+                // Jump to end block if we hit an else
+                Operator::Else => {
+                    let block_index = function_frame
+                        .operand_stack
+                        .peek_block()
+                        .ok_or(anyhow!("hit else op not in block"))?;
+                    let block = function_frame
+                        .block_lookup
+                        .get(block_index)
+                        .ok_or(anyhow!("no block for current block index?"))?;
+
+                    let (_, _, end) = block.if_block()?;
+                    // Jump to end block which will handle block frame cleanup
+                    pc.set_pc(end);
+                }
+
+                Operator::Block { blockty: _ } | Operator::Loop { blockty: _ } => {
+                    let block_index = BlockIndex(pc.inner() as u32);
+                    let block = function_frame
+                        .block_lookup
+                        .get(&block_index)
+                        .ok_or_else(|| anyhow!("no block for pc {}", pc.inner()))?
+                        .clone();
+
+                    self.module.start_block(
+                        &mut function_frame.operand_stack,
+                        &block,
+                        &block_index,
+                    )?;
+                }
+
+                Operator::BrIf { relative_depth } => {
+                    let condition = function_frame.operand_stack.pop_i32()?;
+                    let branching = condition != 0;
+
+                    if !branching {
+                        continue;
+                    }
+
+                    for _ in 0..relative_depth {
+                        let _ = function_frame
+                            .operand_stack
+                            .pop_block()
+                            .ok_or(anyhow!("no block to escape when br_if"))?;
+                    }
+
+                    // Based on top block, either jump back to start of loop or jump to end of block
+                    let last_block_idx = function_frame.operand_stack.peek_block().ok_or_else(|| anyhow!("no block for br_if"))?;
+                    let last_block = function_frame.block_lookup.get(last_block_idx).ok_or_else(|| anyhow!("no block for block index"))?;
+
+                    match last_block {
+                        Block::Loop { start, .. } => {
+                            pc.set_pc(*start + 1);
+                        },
+                        Block::If { end, .. } |  Block::Block { end, .. } => {
+                            pc.set_pc(*end);
+                        },
+                    }
+                }
+
+                // Handle block/function return
+                Operator::End => {
+                    // Block return
+                    if let Some((block_idx, mut leftover)) =
+                        function_frame.operand_stack.pop_block()
+                    {
+                        let block = function_frame
+                            .block_lookup
+                            .get(&block_idx)
+                            .expect("we can't have exited from a block that doesn't exist");
+                        let return_params = match block.ty() {
+                            wasmparser::BlockType::Empty => None,
+                            wasmparser::BlockType::Type(val_type) => Some(vec![val_type.clone()]),
+                            wasmparser::BlockType::FuncType(func_type) => {
+                                let func_type_index = FunctionTypeIndex(*func_type); // This is right, don't change this.
+                                let func_type =
+                                    self.module.function_type_idx_type(&func_type_index)?;
+                                Some(func_type.results().to_vec())
+                            }
+                        };
+                        if let Some(return_params) = return_params {
+                            let return_params =
+                                leftover.pull_reversed_from_stack(&return_params)?;
+                            function_frame
+                                .operand_stack
+                                .push_reversed_all(return_params)?;
+                        }
+                    }
+                    // Function return
+                    else {
+                        return Ok(FunctionScopedResult::FunctionReturn);
+                    }
+                }
+
+                // Maths
+                Operator::I32Add => {
+                    let a = function_frame.operand_stack.pop_i32()?;
+                    let b = function_frame.operand_stack.pop_i32()?;
+                    let c = a + b;
+                    function_frame.operand_stack.push(Value::I32(c))?;
+                }
+                Operator::I32Const { value } => {
+                    function_frame.operand_stack.push(Value::I32(value))?;
+                }
+                Operator::I32Mul => {
+                    let a = function_frame.operand_stack.pop_i32()?;
+                    let b = function_frame.operand_stack.pop_i32()?;
+                    let c = a * b;
+                    function_frame.operand_stack.push(Value::I32(c))?;
+                }
+
+                // Comparators
+                Operator::I32GtS => {
+                    let rhs = function_frame.operand_stack.pop_i32()?;
+                    let lhs = function_frame.operand_stack.pop_i32()?;
+                    let c = if lhs > rhs { 1 } else { 0 };
+                    function_frame.operand_stack.push(Value::I32(c))?;
+                }
+                Operator::I32Eqz => {
+                    let a = function_frame.operand_stack.pop_i32()?;
+                    let result = if a == 0 { 1 } else { 0 };
+                    function_frame.operand_stack.push(Value::I32(result))?;
+                }
+                _ => return Err(anyhow!("unsupported operator: {:?}", operator)),
+            }
+        }
+
+        return Ok(FunctionScopedResult::OutOfFuel);
+    }
+
+    // runs X instructions, decrementing fuel
+    #[inline]
+    fn incremental_execute(&mut self, instructions: usize) -> Result<isize, anyhow::Error> {
+        let mut instructions_executed = 0;
+
+        let function_result =
+            self.incremental_execute_function(instructions, &mut instructions_executed)?;
+
+        match function_result {
+            FunctionScopedResult::OutOfFuel => {} // nothing, just continue
+            FunctionScopedResult::FunctionReturn => {
+                // Now we get to pop the function frame and push the results to
+                let mut function_frame = self
+                    .callstack
+                    .pop()
+                    .expect("incremental_execute_function would have errored by now");
+
+                let function_type = self
+                    .module
+                    .function_idx_type(&function_frame.function_index)?;
+
+                let result_types = function_type.results();
+                let results = function_frame
+                    .operand_stack
+                    .pull_reversed_from_stack(result_types)?;
+
+                if let Some(mut next_frame) = self.callstack.peek_mut() {
+                    next_frame.operand_stack.push_reversed_all(results)?;
+                } else {
+                    let mut results = results;
+                    results.reverse();
+                    self.output = Some(results);
+                }
+            }
+            FunctionScopedResult::FunctionCall { function_index } => {
+                let function_index = FunctionIndex(function_index);
+
+                let mut new_frame = self
+                    .module
+                    .init_function_frames
+                    .get(&function_index)
+                    .ok_or(anyhow!("no function for {:?}", function_index))?
+                    .clone();
+
+                let function_type = self.module.function_idx_type(&function_index)?.clone();
+                let mut calling_operands = {
+                    let mut calling_frame = self.callstack.peek_mut().expect("no calling frame?");
+                    let calling_operands_types = function_type.params();
+                    calling_frame
+                        .operand_stack
+                        .pull_reversed_from_stack(calling_operands_types)?
+                };
+                calling_operands.reverse();
+
+                for (index, value) in calling_operands.into_iter().enumerate() {
+                    new_frame.locals.set_checked(index as u32, value)?;
+                }
+
+                self.callstack.push(new_frame);
+            }
+        }
+
+        Ok(instructions_executed)
+    }
+
+    pub fn set_fuel(&self, fuel: isize) {
+        self.fuel.store(fuel, Ordering::Relaxed);
+    }
+
+    pub fn execute(&mut self) -> Result<(), anyhow::Error> {
+        while self.callstack.len() > 0 {
+            let remaining_fuel = self.fuel.load(Ordering::Relaxed);
+            let target_fuel = remaining_fuel.min(MAX_INSTRUCTIONS_IN_LOOP);
+            if target_fuel == 0 {
+                break;
+            }
+            let executed = self.incremental_execute(target_fuel.try_into()?)?;
+            self.fuel.fetch_sub(executed, Ordering::Relaxed);
+        }
+        Ok(())
+    }
+
+    pub fn get_result(&self) -> Option<&Vec<Value>> {
+        self.output.as_ref()
+    }
+}
