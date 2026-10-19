@@ -26,6 +26,9 @@ codegen-units = 1
 debug = true
 strip = "none"
 
+[profile.bench]
+debug = true
+
 [package.metadata.patch]
 crates = ["wasmparser"]
 

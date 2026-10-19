@@ -86,8 +86,8 @@ impl PartialBlock {
 
 pub(crate) fn lookahead_find_blocks(
     code: &OperatorView,
-) -> Result<HashMap<BlockIndex, Block>, anyhow::Error> {
-    let mut results = HashMap::new();
+) -> Result<BlockManager, anyhow::Error> {
+    let mut results = BlockManager::new();
     let mut stack = Vec::new();
     for (position, operator) in code.read().enumerate() {
         match operator {
@@ -113,7 +113,7 @@ pub(crate) fn lookahead_find_blocks(
             Operator::Else => {
                 let mut top = stack
                     .peek_mut()
-                    .ok_or(anyhow!("empty stack when hitting an else"))?;
+                    .ok_or_else(|| anyhow!("empty stack when hitting an else"))?;
                 match &mut *top {
                     PartialBlock::If { start, r#else, ty } if r#else.is_none() => {
                         *r#else = Some(position);
@@ -139,4 +139,36 @@ pub(crate) fn lookahead_find_blocks(
     }
 
     Ok(results)
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct BlockManager {
+    pub(crate) blocks: Vec<Option<Block>>,
+}
+
+impl BlockManager {
+    pub fn new() -> Self {
+        Self { blocks: Vec::new() }
+    }
+
+    pub fn get(&self, block_index: &BlockIndex) -> Result<&Block, anyhow::Error> {
+        self.blocks
+            .get(block_index.0 as usize)
+            .flatten_ref()
+            .ok_or_else(|| anyhow!("no block for block_index {:?}", block_index))
+    }
+
+    pub fn insert(&mut self, block_index: BlockIndex, block: Block) {
+        let target_length = usize::max((block_index.0 + 1) as usize, self.blocks.len());
+        let to_extend = target_length - self.blocks.len();
+        if to_extend > 0 {
+            self.blocks.resize(target_length, None);
+        }
+        
+        self.blocks[block_index.0 as usize] = Some(block);
+    }
+
+    pub fn len(&self) -> usize {
+        self.blocks.iter().filter(|v| v.is_some()).count()
+    }
 }

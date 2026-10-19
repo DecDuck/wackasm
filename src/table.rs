@@ -76,7 +76,7 @@ impl TableManager {
                     let table_value = self
                         .tables
                         .get_mut(&table_index)
-                        .ok_or(anyhow!("table for index {:?} not found", table_index))?;
+                        .ok_or_else(|| anyhow!("table for index {:?} not found", table_index))?;
 
                     match element.items {
                         ElementItems::Functions(fn_indexes) => {
