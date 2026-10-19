@@ -20,7 +20,7 @@ use crate::{
     stack::{BlockAwareOperandStack, OperandStackFns as _},
 };
 
-const MAX_INSTRUCTIONS_IN_LOOP: isize = 100;
+const MAX_INSTRUCTIONS_IN_LOOP: isize = 250;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct WackasmExecutor {
@@ -118,9 +118,9 @@ impl WackasmExecutor {
         relative_depth: u32,
     ) -> Result<(), anyhow::Error> {
         for _ in 0..relative_depth {
-            let _ = operand_stack
-                .pop_block()
-                .ok_or(anyhow!("no block to escape when br_if"))?;
+            operand_stack
+                .pop_block_no_stack()
+                .ok_or_else(|| anyhow!("no block to escape when br_if"))?;
         }
 
         // Based on top block, either jump back to start of loop or jump to end of block
@@ -145,7 +145,6 @@ impl WackasmExecutor {
 
     /// Executes up to [`instructions`] instructions within a single
     /// function frame. Adds how many were executed to instructions_executed.
-    #[inline]
     fn incremental_execute_function(
         &mut self,
         instructions: usize,
@@ -168,33 +167,33 @@ impl WackasmExecutor {
                 }
                 Operator::LocalSet { local_index } => {
                     let value = function_frame.stack.pop()?;
-                    function_frame.locals.set_checked(local_index, value)?;
+                    function_frame.locals.set_checked(*local_index, value)?;
                 }
                 Operator::LocalTee { local_index } => {
                     let value = function_frame.stack.peek()?;
                     function_frame
                         .locals
-                        .set_checked(local_index, value.clone())?;
+                        .set_checked(*local_index, value.clone())?;
                 }
                 Operator::GlobalGet { global_index } => {
-                    let global = self.module.globals.get(&GlobalIndex(global_index))?;
+                    let global = self.module.globals.get(&GlobalIndex(*global_index))?;
                     function_frame.stack.push(global.inner.clone())?;
                 }
                 Operator::GlobalSet { global_index } => {
                     let value = function_frame.stack.pop()?;
-                    self.module.globals.set(&GlobalIndex(global_index), value)?;
+                    self.module.globals.set(&GlobalIndex(*global_index), value)?;
                 }
 
                 Operator::MemoryGrow { mem } => {
                     let amount = function_frame.stack.pop_i32()?;
-                    let result = self.module.memories.grow(mem, amount)?;
+                    let result = self.module.memories.grow(*mem, amount)?;
                     function_frame.stack.push(Value::I32(result))?;
                 }
                 Operator::MemoryFill { mem } => {
                     let amount = function_frame.stack.pop_i32()? as u32 as usize;
                     let value = function_frame.stack.pop_i32()? as u8;
                     let offset = function_frame.stack.pop_i32()? as u32 as usize;
-                    self.module.memories.fill(mem, offset, amount, value)?;
+                    self.module.memories.fill(*mem, offset, amount, value)?;
                 }
 
                 // Memory
@@ -214,7 +213,7 @@ impl WackasmExecutor {
                 // Handle function call
                 Operator::Call { function_index } => {
                     // Add one so we resume to the next instruction
-                    return Ok(FunctionScopedResult::FunctionCall { function_index });
+                    return Ok(FunctionScopedResult::FunctionCall { function_index: *function_index });
                 }
                 Operator::CallIndirect {
                     type_index: _,
@@ -224,7 +223,7 @@ impl WackasmExecutor {
                     let table = self
                         .module
                         .tables
-                        .get(&TableIndex(table_index))
+                        .get(&TableIndex(*table_index))
                         .ok_or_else(|| anyhow!("no table for index {}", table_index))?;
 
                     let table_value = table
@@ -257,12 +256,10 @@ impl WackasmExecutor {
                     let mut start_block = false;
 
                     if condition {
-                        println!("if evaluated to true");
                         // Jump to next instruction
                         pc.set_pc(start + 1);
                         start_block = true;
                     } else {
-                        println!("if evaluated to false");
                         if let Some(else_block) = else_block {
                             start_block = true;
                             // Jump after else instruction
@@ -319,7 +316,7 @@ impl WackasmExecutor {
                         &mut function_frame.stack,
                         &function_frame.block_lookup,
                         &mut pc,
-                        relative_depth,
+                        *relative_depth,
                     )?;
                 }
 
@@ -328,7 +325,7 @@ impl WackasmExecutor {
                         &mut function_frame.stack,
                         &function_frame.block_lookup,
                         &mut pc,
-                        relative_depth,
+                        *relative_depth,
                     )?;
                 }
 
@@ -355,6 +352,8 @@ impl WackasmExecutor {
                                 leftover.pull_reversed_from_stack(&return_params)?;
                             function_frame.stack.push_reversed_all(return_params)?;
                         }
+
+                        function_frame.stack.recycle_stack(leftover);
                     }
                     // Function return
                     else {
@@ -367,10 +366,10 @@ impl WackasmExecutor {
 
                 // i32 maths
                 Operator::I32Const { value } => {
-                    function_frame.stack.push(Value::I32(value))?;
+                    function_frame.stack.push(Value::I32(*value))?;
                 }
                 Operator::I64Const { value } => {
-                    function_frame.stack.push(Value::I64(value))?;
+                    function_frame.stack.push(Value::I64(*value))?;
                 }
 
                 Operator::I32Add => {

@@ -144,7 +144,7 @@ impl MemoryManager {
 
     pub fn load_i32<const SIZE: usize>(
         &self,
-        memarg: MemArg,
+        memarg: &MemArg,
         address: u32,
     ) -> Result<i32, anyhow::Error> {
         let memory = self
@@ -172,7 +172,7 @@ impl MemoryManager {
 
     pub fn store_i32<const SIZE: usize>(
         &mut self,
-        memarg: MemArg,
+        memarg: &MemArg,
         address: u32,
         value: i32,
     ) -> Result<(), anyhow::Error> {

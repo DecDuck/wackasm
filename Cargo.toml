@@ -10,6 +10,14 @@ serde = { version = "1.0.229", features = ["derive", "rc"] }
 self_cell = "1.2"
 wasmparser = "0.262.0"
 human_bytes = "0.4.3"
+pprof = { version = "0.15", features = ["flamegraph"] }
+
+[profile.release]
+opt-level = 3
+lto = "fat"
+codegen-units = 1
+debug = true
+strip = "none"
 
 [package.metadata.patch]
 crates = ["wasmparser"]
