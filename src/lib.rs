@@ -6,6 +6,7 @@ mod stack;
 mod blocks;
 mod operator;
 mod pc;
+mod const_expr;
 pub use module::WackasmModule;
 pub use executor::WackasmExecutor;
 use serde::{Deserialize, Serialize};

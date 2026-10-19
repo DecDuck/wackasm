@@ -2,11 +2,15 @@ use std::{collections::HashMap, sync::Arc};
 
 use anyhow::anyhow;
 use serde::{Deserialize, Serialize};
-use wasmparser::{ExternalKind, FuncType, FunctionBody, Operator, Payload, SubType, ValType};
+use wasmparser::{
+    ElementItems, ElementKind, ExternalKind, FuncType, FunctionBody, Operator, Payload, SubType,
+    TableInit, ValType,
+};
 
 use crate::{
     Value,
     blocks::{Block, lookahead_find_blocks},
+    const_expr::{ConstValue, resolve_const_expr},
     operator::OperatorView,
     pc::ProgramCounter,
     stack::{BlockAwareOperandStack, LocalStore, OperandStack, OperandStackFns},
@@ -41,6 +45,12 @@ pub(crate) enum ExportIndex {
     Tag(TagIndex),
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone, Copy)]
+pub(crate) enum TableValue {
+    NullRef,
+    FuncRef(FunctionIndex),
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub(crate) struct FunctionFrame {
     pub(crate) function_index: FunctionIndex,
@@ -58,6 +68,7 @@ pub struct WackasmModule {
     pub(crate) function_types: HashMap<FunctionIndex, FunctionTypeIndex>,
     pub(crate) exports: HashMap<String, ExportIndex>,
     pub(crate) init_function_frames: HashMap<FunctionIndex, FunctionFrame>,
+    pub(crate) tables: HashMap<TableIndex, Vec<TableValue>>,
 }
 
 impl WackasmModule {
@@ -201,7 +212,8 @@ impl WackasmModule {
         let mut function_type_indexes = HashMap::new();
         let mut function_types = HashMap::new();
         let mut exports = HashMap::new();
-        let mut initial_function_states = Vec::new();
+        let mut init_function_frames = Vec::new();
+        let mut tables = HashMap::new();
 
         for payload in payloads {
             match payload {
@@ -233,6 +245,74 @@ impl WackasmModule {
                             FunctionIndex(function_index as u32),
                             FunctionTypeIndex(function_type),
                         );
+                    }
+                }
+                Payload::TableSection(raw_tables) => {
+                    for (index, table) in raw_tables.into_iter().enumerate() {
+                        let table = table?;
+                        let index = TableIndex(index as u32);
+
+                        let init_value = match table.init {
+                            TableInit::RefNull => TableValue::NullRef,
+                            TableInit::Expr(const_expr) => {
+                                let value = resolve_const_expr(const_expr)?;
+                                match value {
+                                    ConstValue::FuncRef(function_index) => {
+                                        TableValue::FuncRef(function_index)
+                                    }
+                                    _ => {
+                                        return Err(anyhow!(
+                                            "value {:?} not supported for table init",
+                                            value
+                                        ));
+                                    }
+                                }
+                            }
+                        };
+                        let table_values = vec![init_value; table.ty.initial as usize];
+                        tables.insert(index, table_values);
+                    }
+                }
+                Payload::ElementSection(raw_elements) => {
+                    for element in raw_elements {
+                        let element = element?;
+                        match element.kind {
+                            ElementKind::Active {
+                                table_index,
+                                offset_expr,
+                            } => {
+                                let table_index = TableIndex(table_index.unwrap_or(0));
+                                let offset = resolve_const_expr(offset_expr)?;
+                                let offset = match offset {
+                                    ConstValue::ConstI32(value) => value,
+                                    _ => {
+                                        return Err(anyhow!(
+                                            "const value {:?} not supported for element table offset",
+                                            offset
+                                        ));
+                                    }
+                                };
+
+                                let table_value = tables.get_mut(&table_index).ok_or(anyhow!(
+                                    "table for index {:?} not found",
+                                    table_index
+                                ))?;
+
+                                match element.items {
+                                    ElementItems::Functions(fn_indexes) => {
+                                        for (local_offset, fn_index) in fn_indexes.into_iter().enumerate() {
+                                            let fn_index = fn_index?;
+                                            let true_offset = offset as usize + local_offset;
+                                            table_value[true_offset] = TableValue::FuncRef(FunctionIndex(fn_index))
+                                        }
+                                    },
+                                    ElementItems::Expressions(ref_type, section_limited) => todo!(),
+                                }
+                            }
+
+                            ElementKind::Passive => todo!(),
+                            ElementKind::Declared => todo!(),
+                        }
                     }
                 }
                 Payload::ExportSection(raw_exports) => {
@@ -267,7 +347,7 @@ impl WackasmModule {
                 Payload::CodeSectionEntry(code_section) => {
                     WackasmModule::parse_function_block(
                         code_section,
-                        &mut initial_function_states,
+                        &mut init_function_frames,
                         &function_type_indexes,
                         &function_types,
                     )?;
@@ -277,7 +357,7 @@ impl WackasmModule {
             }
         }
 
-        let initial_function_states = initial_function_states
+        let init_function_frames = init_function_frames
             .into_iter()
             .enumerate()
             .map(|(index, function)| (FunctionIndex(index as u32), function))
@@ -287,7 +367,8 @@ impl WackasmModule {
             function_type_indexes,
             function_types,
             exports,
-            init_function_frames: initial_function_states,
+            init_function_frames,
+            tables,
         })
     }
 }
