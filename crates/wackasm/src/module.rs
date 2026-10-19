@@ -23,7 +23,7 @@ macro_rules! type_indexes {
         $(
         #[repr(transparent)]
         #[derive(Hash, PartialEq, Eq, Debug, Clone, Copy, Serialize, Deserialize)]
-        pub(crate) struct $x(pub(crate) u32);
+        pub struct $x(pub(crate) u32);
         )*
     };
 }
@@ -82,7 +82,7 @@ impl WackasmModule {
             wasmparser::ValType::I64 => Value::I64(i64::default()),
             wasmparser::ValType::F32 => Value::F32(f32::default()),
             wasmparser::ValType::F64 => Value::F64(f64::default()),
-            wasmparser::ValType::V128 => todo!(), // Value::V128(u128::default()),
+            wasmparser::ValType::V128 => Value::V128(u128::default()),
             wasmparser::ValType::Ref(ref_type) => {
                 if ref_type.is_func_ref() {
                     return Value::FuncRef(FunctionIndex(u32::MAX));
@@ -211,10 +211,12 @@ impl WackasmModule {
         let function_type = self
             .function_type_indexes
             .get(function_type_index)
-            .ok_or_else(|| anyhow!(
-                "no function type for function type index {:?}",
-                function_type_index
-            ))?;
+            .ok_or_else(|| {
+                anyhow!(
+                    "no function type for function type index {:?}",
+                    function_type_index
+                )
+            })?;
 
         Ok(function_type)
     }
@@ -235,12 +237,8 @@ impl WackasmModule {
 
         for payload in payloads {
             match payload {
-                Payload::Version {
-                    num,
-                    encoding,
-                    range,
-                } => {
-                    println!("version {num:?} {encoding:?} {range:?}")
+                Payload::Version { .. } => {
+                    // todo
                 }
                 Payload::TypeSection(types) => {
                     let type_groups = types

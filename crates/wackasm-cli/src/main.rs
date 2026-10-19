@@ -28,11 +28,12 @@ pub fn main() -> Result<(), anyhow::Error> {
 
     let consumed_fuel = isize::MAX - executor.get_fuel();
 
-    let fpms = consumed_fuel as f64 / time.as_millis() as f64;
+    let time = time.as_millis() as f64;
+    let fpms = consumed_fuel as f64 / time;
     let fps = fpms * 1000f64;
 
     println!("finish: {:?}", executor.get_result());
-    println!("fps: {:.0}", fps);
+    println!("fps: {:.0}, total: {}s", fps, time / 1000.0f64);
 
     Ok(())
 }

@@ -1,10 +1,7 @@
-use std::{collections::HashMap, mem::discriminant};
-
-use anyhow::anyhow;
 use serde::{Deserialize, Serialize};
 use wasmparser::ValType;
 
-use crate::{Value, blocks::Block, module::BlockIndex, stack::{MAX_OPERAND_STACK_SIZE, MAX_STACK_POOL, OperandStackFns, basic::OperandStack}};
+use crate::{Value, module::BlockIndex, stack::{MAX_OPERAND_STACK_SIZE, MAX_STACK_POOL, OperandStackFns, basic::OperandStack}};
 
 
 
@@ -116,4 +113,17 @@ impl OperandStackFns for BlockAwareOperandStack {
     fn pop_i64(&mut self) -> Result<i64, anyhow::Error> {
         self.get_current_stack().pop_i64()
     }
+    
+    fn pop_f32(&mut self) -> Result<f32, anyhow::Error> {
+        self.get_current_stack().pop_f32()
+    }
+    
+    fn pop_f64(&mut self) -> Result<f64, anyhow::Error> {
+        self.get_current_stack().pop_f64()
+    }
+    
+    fn pop_v128(&mut self) -> Result<u128, anyhow::Error> {
+        self.get_current_stack().pop_v128()
+    }
+    
 }

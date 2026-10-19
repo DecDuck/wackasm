@@ -29,8 +29,15 @@ pub enum Value {
     /// The value type is f64.
     F64(f64),
     /// The value type is v128.
-    // V128(u128),
+    V128(u128),
     /// The value type is a reference.
     FuncRef(FunctionIndex),
     Unknown,
+}
+
+impl Value {
+    /// Returns whether this value contains a non-null function reference.
+    pub fn is_func_ref(&self) -> bool {
+        matches!(self, Self::FuncRef(_))
+    }
 }

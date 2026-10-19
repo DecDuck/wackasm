@@ -1,0 +1,11 @@
+[package]
+name = "wackasm-spec-tests"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+anyhow = "1.0.104"
+clap = { version = "4.5", features = ["derive"] }
+wackasm = { path = "../wackasm" }
+wasmparser = "0.262.0"
+wast = "262.0.0"

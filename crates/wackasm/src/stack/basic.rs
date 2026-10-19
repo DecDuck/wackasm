@@ -86,10 +86,10 @@ impl OperandStackFns for OperandStack {
             results.push(match rtn {
                 ValType::I32 => Value::I32(self.pop_i32()?),
                 ValType::I64 => Value::I64(self.pop_i64()?),
-                ValType::F32 => todo!(),
-                ValType::F64 => todo!(),
-                ValType::V128 => todo!(),
-                ValType::Ref(ref_type) => todo!(),
+                ValType::F32 => Value::F32(self.pop_f32()?),
+                ValType::F64 => Value::F64(self.pop_f64()?),
+                ValType::V128 => Value::V128(self.pop_v128()?),
+                ValType::Ref(_) => self.pop()?, // todo proper validation
             });
         }
 
@@ -129,6 +129,30 @@ impl OperandStackFns for OperandStack {
         match value {
             Value::I64(v) => Ok(v),
             _ => Err(anyhow!("invalid type, expected i64")),
+        }
+    }
+
+    fn pop_f32(&mut self) -> Result<f32, anyhow::Error> {
+        let value = self.pop()?;
+        match value {
+            Value::F32(v) => Ok(v),
+            _ => Err(anyhow!("invalid type, expected f32")),
+        }
+    }
+
+    fn pop_f64(&mut self) -> Result<f64, anyhow::Error> {
+        let value = self.pop()?;
+        match value {
+            Value::F64(v) => Ok(v),
+            _ => Err(anyhow!("invalid type, expected f64")),
+        }
+    }
+
+    fn pop_v128(&mut self) -> Result<u128, anyhow::Error> {
+        let value = self.pop()?;
+        match value {
+            Value::V128(v) => Ok(v),
+            _ => Err(anyhow!("invalid type, expected v128")),
         }
     }
 }
@@ -181,5 +205,41 @@ mod tests {
         assert!(matches!(stack.pop(), Ok(Value::I32(2))));
         assert!(matches!(stack.pop(), Ok(Value::I32(1))));
         assert!(stack.pop().is_err());
+    }
+
+    #[test]
+    fn pull_reversed_from_stack_extracts_float_and_vector_results() {
+        let mut stack = OperandStack::new(4);
+        stack.push(Value::F32(-0.0)).unwrap();
+        stack.push(Value::F64(1.5)).unwrap();
+        stack.push(Value::V128(0x1234)).unwrap();
+        stack.push(Value::I32(7)).unwrap();
+
+        let results = stack
+            .pull_reversed_from_stack(&[
+                wasmparser::ValType::F32,
+                wasmparser::ValType::F64,
+                wasmparser::ValType::V128,
+                wasmparser::ValType::I32,
+            ])
+            .unwrap();
+
+        assert!(matches!(results[0], Value::I32(7)));
+        assert!(matches!(results[1], Value::V128(0x1234)));
+        assert!(matches!(results[2], Value::F64(value) if value == 1.5));
+        assert!(matches!(results[3], Value::F32(value) if value.to_bits() == (-0.0f32).to_bits()));
+        assert!(stack.pop().is_err());
+    }
+
+    #[test]
+    fn pull_reversed_from_stack_rejects_mismatched_typed_results() {
+        let mut stack = OperandStack::new(1);
+        stack.push(Value::I32(7)).unwrap();
+
+        assert!(
+            stack
+                .pull_reversed_from_stack(&[wasmparser::ValType::F32])
+                .is_err()
+        );
     }
 }

@@ -6,6 +6,36 @@ use wasmparser::{Data, DataKind, MemArg, MemoryType, SectionLimited};
 
 use crate::{Value, const_expr::resolve_const_expr, module::MemoryIndex};
 
+pub(crate) trait MemoryNumber: Copy {
+    const SIZE: usize;
+
+    fn from_le_slice(bytes: &[u8]) -> Result<Self, anyhow::Error>;
+    fn write_le_slice(self, bytes: &mut [u8]);
+}
+
+macro_rules! impl_memory_number {
+    ($($number:ty),* $(,)?) => {
+        $(
+            impl MemoryNumber for $number {
+                const SIZE: usize = ::core::mem::size_of::<$number>();
+
+                fn from_le_slice(bytes: &[u8]) -> Result<Self, anyhow::Error> {
+                    let bytes: [u8; ::core::mem::size_of::<$number>()] = bytes
+                        .try_into()
+                        .map_err(|_| anyhow!("invalid byte width for {}", stringify!($number)))?;
+                    Ok(<$number>::from_le_bytes(bytes))
+                }
+
+                fn write_le_slice(self, bytes: &mut [u8]) {
+                    bytes.copy_from_slice(&self.to_le_bytes());
+                }
+            }
+        )*
+    };
+}
+
+impl_memory_number!(u8, i8, u16, i16, u32, i32, u64, i64, u128, i128, usize, isize, f32, f64);
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub(crate) struct LinearMemory {
     pub(crate) buffer: Vec<u8>,
@@ -141,11 +171,11 @@ impl MemoryManager {
         Ok(())
     }
 
-    pub fn load_i32<const SIZE: usize>(
+    pub(crate) fn load<T: MemoryNumber>(
         &self,
         memarg: &MemArg,
         address: u32,
-    ) -> Result<i32, anyhow::Error> {
+    ) -> Result<T, anyhow::Error> {
         let memory = self
             .memories
             .get(memarg.memory as usize)
@@ -155,25 +185,21 @@ impl MemoryManager {
             .checked_add(usize::try_from(memarg.offset)?)
             .ok_or_else(|| anyhow!("i32.load address overflow"))?;
         let end = start
-            .checked_add(SIZE)
+            .checked_add(T::SIZE)
             .ok_or_else(|| anyhow!("i32.load address overflow"))?;
         let bytes = memory
             .buffer
             .get(start..end)
             .ok_or_else(|| anyhow!("i32.load out of bounds"))?;
 
-        let mut fixed_size = [0u8; 4];
-        fixed_size[..bytes.len()].copy_from_slice(bytes);
-        let value = i32::from_le_bytes(fixed_size);
-
-        Ok(value)
+        T::from_le_slice(bytes)
     }
 
-    pub fn store_i32<const SIZE: usize>(
+    pub(crate) fn store<T: MemoryNumber>(
         &mut self,
         memarg: &MemArg,
         address: u32,
-        value: i32,
+        value: T,
     ) -> Result<(), anyhow::Error> {
         let memory = self
             .memories
@@ -184,16 +210,14 @@ impl MemoryManager {
             .checked_add(usize::try_from(memarg.offset)?)
             .ok_or_else(|| anyhow!("i32.load address overflow"))?;
         let end = start
-            .checked_add(SIZE)
+            .checked_add(T::SIZE)
             .ok_or_else(|| anyhow!("i32.load address overflow"))?;
-
-        let encoded = value.to_le_bytes();
 
         let destination = memory
             .buffer
             .get_mut(start..end)
             .ok_or_else(|| anyhow!("failed to get memory slice"))?;
-        destination.copy_from_slice(&encoded[0..SIZE]);
+        value.write_le_slice(destination);
 
         Ok(())
     }

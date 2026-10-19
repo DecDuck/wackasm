@@ -1,5 +1,5 @@
 [workspace]
-members = ["crates/wackasm", "crates/wackasm-cli"]
+members = ["crates/wackasm", "crates/wackasm-cli", "crates/wackasm-spec-tests"]
 resolver = "3"
 
 [profile.release]
