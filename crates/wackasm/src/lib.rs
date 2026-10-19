@@ -29,7 +29,7 @@ pub enum Value {
     /// The value type is f64.
     F64(f64),
     /// The value type is v128.
-    V128(u128),
+    // V128(u128),
     /// The value type is a reference.
     FuncRef(FunctionIndex),
     Unknown,

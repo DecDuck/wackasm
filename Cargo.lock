@@ -609,11 +609,20 @@ dependencies = [
  "anyhow",
  "bitcode",
  "criterion",
- "human_bytes",
  "self_cell",
  "serde",
  "serde_arrays",
  "wasmparser",
+]
+
+[[package]]
+name = "wackasm-cli"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "bitcode",
+ "human_bytes",
+ "wackasm",
 ]
 
 [[package]]

@@ -82,7 +82,7 @@ impl WackasmModule {
             wasmparser::ValType::I64 => Value::I64(i64::default()),
             wasmparser::ValType::F32 => Value::F32(f32::default()),
             wasmparser::ValType::F64 => Value::F64(f64::default()),
-            wasmparser::ValType::V128 => Value::V128(u128::default()),
+            wasmparser::ValType::V128 => todo!(), // Value::V128(u128::default()),
             wasmparser::ValType::Ref(ref_type) => {
                 if ref_type.is_func_ref() {
                     return Value::FuncRef(FunctionIndex(u32::MAX));
