@@ -18,6 +18,40 @@ macro_rules! i32_binop {
 
 pub(crate) use i32_binop;
 
+/// Like [`i32_binop`] but for i64 operands, pushing an i64 result.
+///
+/// ```ignore
+/// i64_binop!(stack, i64, |lhs, rhs| lhs.wrapping_add(rhs));
+/// ```
+macro_rules! i64_binop {
+    ($stack:expr, $ty:ty, |$lhs:ident, $rhs:ident| $body:expr) => {{
+        use $crate::stack::OperandStackFns as _;
+        let stack = &mut $stack;
+        let $rhs = stack.pop_i64()? as $ty;
+        let $lhs = stack.pop_i64()? as $ty;
+        stack.push($crate::Value::I64(($body) as i64))?;
+    }};
+}
+
+pub(crate) use i64_binop;
+
+/// i64 comparison; wasm pushes the result as an i32.
+///
+/// ```ignore
+/// i64_cmp!(stack, u64, |lhs, rhs| lhs < rhs);
+/// ```
+macro_rules! i64_cmp {
+    ($stack:expr, $ty:ty, |$lhs:ident, $rhs:ident| $body:expr) => {{
+        use $crate::stack::OperandStackFns as _;
+        let stack = &mut $stack;
+        let $rhs = stack.pop_i64()? as $ty;
+        let $lhs = stack.pop_i64()? as $ty;
+        stack.push($crate::Value::I32(($body) as i32))?;
+    }};
+}
+
+pub(crate) use i64_cmp;
+
 /// Pops an address, loads `size_of::<$width>()` bytes from memory, and pushes the i32.
 ///
 /// ```ignore

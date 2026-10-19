@@ -101,13 +101,45 @@ impl MemoryManager {
 
         let prev = memory.current;
         let new = prev + amount as u64;
-        if let Some(max) = memory.max && new > max {
+        if let Some(max) = memory.max
+            && new > max
+        {
             return Ok(-1);
         }
 
         memory.buffer.resize(new as usize * memory.page_size, 0);
+        memory.current = new;
 
         Ok(prev.try_into()?)
+    }
+
+    pub fn fill(
+        &mut self,
+        mem: u32,
+        start: usize,
+        length: usize,
+        value: u8,
+    ) -> Result<(), anyhow::Error> {
+        let memory = self
+            .memories
+            .get_mut(&MemoryIndex(mem))
+            .ok_or_else(|| anyhow!("memory not found for index {}", mem))?;
+
+        let end = start
+            .checked_add(length)
+            .ok_or_else(|| anyhow!("memory.fill out of bounds"))?;
+
+        let destination = memory
+            .buffer
+            .get_mut(start..end)
+            .ok_or(anyhow!(
+                "failed to get memory region at {} for {} bytes",
+                start,
+                length
+            ))?;
+        destination.fill(value);
+
+        Ok(())
     }
 
     pub fn load_i32<const SIZE: usize>(
