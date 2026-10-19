@@ -3,13 +3,13 @@ use std::time::Instant;
 use wackasm::{Value, WackasmExecutor, WackasmModule};
 
 pub fn main() -> Result<(), anyhow::Error> {
-    let contents = std::fs::read("./examples/table.wasm")?;
+    let contents = std::fs::read("./compute/target/wasm32-unknown-unknown/release/compute.wasm")?;
     let module = WackasmModule::new(&contents)?;
     let mut executor = WackasmExecutor::new(module);
 
-    executor.call_export("apply", vec![Value::I32(1), Value::I32(4)])?;
+    executor.call_export("run_prime_benchmark", vec![Value::I32(i32::MAX), Value::I32(10)])?;
 
-    executor.set_fuel(3);
+    executor.set_fuel(500);
     executor.execute()?;
 
     println!("before serialize: {:?}", executor.get_result());

@@ -37,6 +37,7 @@ pub(crate) trait OperandStackFns {
     ) -> Result<Vec<Value>, anyhow::Error>;
     fn pop(&mut self) -> Result<Value, anyhow::Error>;
     fn pop_i32(&mut self) -> Result<i32, anyhow::Error>;
+    fn peek(&mut self) -> Result<&Value, anyhow::Error>;
 }
 
 impl OperandStack {
@@ -90,6 +91,12 @@ impl OperandStackFns for OperandStack {
         self.inner.pop().ok_or_else(|| anyhow!("no value in stack"))
     }
 
+    fn peek(&mut self) -> Result<&Value, anyhow::Error> {
+        self.inner
+            .last()
+            .ok_or_else(|| anyhow!("no value in stack"))
+    }
+
     fn pop_i32(&mut self) -> Result<i32, anyhow::Error> {
         let value = self.pop()?;
         match value {
@@ -103,7 +110,7 @@ struct BlockFrame {
     block_idx: BlockIndex,
     live: OperandStack,
     original: OperandStack,
-} 
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct BlockAwareOperandStack {
@@ -127,7 +134,11 @@ impl BlockAwareOperandStack {
         }
     }
 
-    pub fn push_block(&mut self, block_idx: BlockIndex, reversed_parameters: Option<Vec<Value>>) -> Result<(), anyhow::Error> {
+    pub fn push_block(
+        &mut self,
+        block_idx: BlockIndex,
+        reversed_parameters: Option<Vec<Value>>,
+    ) -> Result<(), anyhow::Error> {
         let mut stack = OperandStack::new();
         if let Some(reversed_parameters) = reversed_parameters {
             stack.push_reversed_all(reversed_parameters)?;
@@ -159,6 +170,10 @@ impl OperandStackFns for BlockAwareOperandStack {
         returns: &[ValType],
     ) -> Result<Vec<Value>, anyhow::Error> {
         self.get_current_stack().pull_reversed_from_stack(returns)
+    }
+
+    fn peek(&mut self) -> Result<&Value, anyhow::Error> {
+        self.get_current_stack().peek()
     }
 
     fn pop(&mut self) -> Result<Value, anyhow::Error> {

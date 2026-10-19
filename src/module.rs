@@ -3,17 +3,19 @@ use std::{collections::HashMap, sync::Arc};
 use anyhow::anyhow;
 use serde::{Deserialize, Serialize};
 use wasmparser::{
-    ElementItems, ElementKind, ExternalKind, FuncType, FunctionBody, Operator, Payload, SubType,
-    TableInit, ValType,
+    ElementItems, ElementKind, ExternalKind, FuncType, FunctionBody, Payload, TableInit, ValType,
 };
 
 use crate::{
     Value,
     blocks::{Block, lookahead_find_blocks},
-    const_expr::{ConstValue, resolve_const_expr},
+    const_expr::resolve_const_expr,
+    globals::{Global, GlobalManager},
+    memory::{LinearMemory, MemoryManager},
     operator::OperatorView,
     pc::ProgramCounter,
-    stack::{BlockAwareOperandStack, LocalStore, OperandStack, OperandStackFns},
+    stack::{BlockAwareOperandStack, LocalStore, OperandStackFns},
+    table::TableManager,
 };
 
 macro_rules! type_indexes {
@@ -58,7 +60,7 @@ pub(crate) struct FunctionFrame {
     pub(crate) locals: LocalStore,
     pub(crate) code: OperatorView,
 
-    pub(crate) operand_stack: BlockAwareOperandStack,
+    pub(crate) stack: BlockAwareOperandStack,
     pub(crate) pc: ProgramCounter,
 }
 
@@ -68,7 +70,9 @@ pub struct WackasmModule {
     pub(crate) function_types: HashMap<FunctionIndex, FunctionTypeIndex>,
     pub(crate) exports: HashMap<String, ExportIndex>,
     pub(crate) init_function_frames: HashMap<FunctionIndex, FunctionFrame>,
-    pub(crate) tables: HashMap<TableIndex, Vec<TableValue>>,
+    pub(crate) tables: TableManager,
+    pub(crate) memories: MemoryManager,
+    pub(crate) globals: GlobalManager,
 }
 
 impl WackasmModule {
@@ -79,7 +83,13 @@ impl WackasmModule {
             wasmparser::ValType::F32 => Value::F32(f32::default()),
             wasmparser::ValType::F64 => Value::F64(f64::default()),
             wasmparser::ValType::V128 => Value::V128(u128::default()),
-            wasmparser::ValType::Ref(ref_type) => Value::Ref(0),
+            wasmparser::ValType::Ref(ref_type) => {
+                if ref_type.is_func_ref() {
+                    return Value::FuncRef(FunctionIndex(u32::MAX));
+                }
+
+                Value::Unknown
+            }
         }
     }
 
@@ -97,7 +107,7 @@ impl WackasmModule {
             block_lookup: Arc::new(HashMap::new()),
 
             // Runtime state
-            operand_stack: BlockAwareOperandStack::new(0),
+            stack: BlockAwareOperandStack::new(0),
             pc: ProgramCounter::new(),
         };
 
@@ -137,7 +147,7 @@ impl WackasmModule {
         function_state.code = OperatorView::new(code_section)?;
         function_state.block_lookup = Arc::new(lookahead_find_blocks(&function_state.code)?);
         // reinit block stack for performance
-        function_state.operand_stack =
+        function_state.stack =
             BlockAwareOperandStack::new(function_state.block_lookup.len());
 
         initial_function_states.push(function_state);
@@ -213,7 +223,10 @@ impl WackasmModule {
         let mut function_types = HashMap::new();
         let mut exports = HashMap::new();
         let mut init_function_frames = Vec::new();
-        let mut tables = HashMap::new();
+
+        let mut tables = TableManager::new();
+        let mut memories = MemoryManager::new();
+        let mut globals = GlobalManager::new();
 
         for payload in payloads {
             match payload {
@@ -248,72 +261,10 @@ impl WackasmModule {
                     }
                 }
                 Payload::TableSection(raw_tables) => {
-                    for (index, table) in raw_tables.into_iter().enumerate() {
-                        let table = table?;
-                        let index = TableIndex(index as u32);
-
-                        let init_value = match table.init {
-                            TableInit::RefNull => TableValue::NullRef,
-                            TableInit::Expr(const_expr) => {
-                                let value = resolve_const_expr(const_expr)?;
-                                match value {
-                                    ConstValue::FuncRef(function_index) => {
-                                        TableValue::FuncRef(function_index)
-                                    }
-                                    _ => {
-                                        return Err(anyhow!(
-                                            "value {:?} not supported for table init",
-                                            value
-                                        ));
-                                    }
-                                }
-                            }
-                        };
-                        let table_values = vec![init_value; table.ty.initial as usize];
-                        tables.insert(index, table_values);
-                    }
+                    tables.process_table_section(raw_tables)?;
                 }
                 Payload::ElementSection(raw_elements) => {
-                    for element in raw_elements {
-                        let element = element?;
-                        match element.kind {
-                            ElementKind::Active {
-                                table_index,
-                                offset_expr,
-                            } => {
-                                let table_index = TableIndex(table_index.unwrap_or(0));
-                                let offset = resolve_const_expr(offset_expr)?;
-                                let offset = match offset {
-                                    ConstValue::ConstI32(value) => value,
-                                    _ => {
-                                        return Err(anyhow!(
-                                            "const value {:?} not supported for element table offset",
-                                            offset
-                                        ));
-                                    }
-                                };
-
-                                let table_value = tables.get_mut(&table_index).ok_or(anyhow!(
-                                    "table for index {:?} not found",
-                                    table_index
-                                ))?;
-
-                                match element.items {
-                                    ElementItems::Functions(fn_indexes) => {
-                                        for (local_offset, fn_index) in fn_indexes.into_iter().enumerate() {
-                                            let fn_index = fn_index?;
-                                            let true_offset = offset as usize + local_offset;
-                                            table_value[true_offset] = TableValue::FuncRef(FunctionIndex(fn_index))
-                                        }
-                                    },
-                                    ElementItems::Expressions(ref_type, section_limited) => todo!(),
-                                }
-                            }
-
-                            ElementKind::Passive => todo!(),
-                            ElementKind::Declared => todo!(),
-                        }
-                    }
+                    tables.process_element_section(raw_elements)?;
                 }
                 Payload::ExportSection(raw_exports) => {
                     let raw_exports = raw_exports.into_iter().collect::<Result<Vec<_>, _>>()?;
@@ -352,6 +303,15 @@ impl WackasmModule {
                         &function_types,
                     )?;
                 }
+                Payload::MemorySection(raw_memories) => {
+                    memories.process_memory_section(raw_memories)?;
+                }
+                Payload::GlobalSection(raw_globals) => {
+                    globals.process_globals_section(raw_globals)?;
+                }
+                Payload::DataSection(raw_data) => {
+                    memories.process_data_section(raw_data)?;
+                }
                 Payload::CustomSection(_) | Payload::End(_) => {}
                 _ => return Err(anyhow!("unsupported section: {:?}", payload)),
             }
@@ -369,6 +329,8 @@ impl WackasmModule {
             exports,
             init_function_frames,
             tables,
+            memories,
+            globals,
         })
     }
 }

@@ -5,14 +5,15 @@ use std::{
 
 use anyhow::{Ok, anyhow};
 use serde::{Deserialize, Serialize};
-use wasmparser::{FuncType, Operator};
+use wasmparser::Operator;
 
 use crate::{
     Value, WackasmModule,
     blocks::Block,
+    macros::{i32_binop, i32_load, i32_store},
     module::{
-        BlockIndex, ExportIndex, FunctionFrame, FunctionIndex, FunctionTypeIndex, TableIndex,
-        TableValue,
+        BlockIndex, ExportIndex, FunctionFrame, FunctionIndex, FunctionTypeIndex, GlobalIndex,
+        TableIndex, TableValue,
     },
     pc::ProgramCounterHandle,
     stack::{BlockAwareOperandStack, OperandStackFns as _},
@@ -157,17 +158,50 @@ impl WackasmExecutor {
         for _ in 0..instructions {
             *instructions_executed += 1;
             let mut pc = function_frame.pc.handle();
-            println!("pc {} fn {:?}", pc.inner(), function_frame.function_index);
             let operator = function_frame.code.get(pc.inner()).unwrap();
             match operator {
                 // Gets
                 Operator::LocalGet { local_index } => {
                     let local = *function_frame.locals.get(&local_index)?;
-                    function_frame.operand_stack.push(local)?;
+                    function_frame.stack.push(local)?;
                 }
                 Operator::LocalSet { local_index } => {
-                    let value = function_frame.operand_stack.pop()?;
+                    let value = function_frame.stack.pop()?;
                     function_frame.locals.set_checked(local_index, value)?;
+                }
+                Operator::LocalTee { local_index } => {
+                    let value = function_frame.stack.peek()?;
+                    function_frame
+                        .locals
+                        .set_checked(local_index, value.clone())?;
+                }
+                Operator::GlobalGet { global_index } => {
+                    let global = self.module.globals.get(&GlobalIndex(global_index))?;
+                    function_frame.stack.push(global.inner.clone())?;
+                }
+                Operator::GlobalSet { global_index } => {
+                    let value = function_frame.stack.pop()?;
+                    self.module.globals.set(&GlobalIndex(global_index), value)?;
+                }
+
+                Operator::MemoryGrow { mem } => {
+                    let amount = function_frame.stack.pop_i32()?;
+                    let result = self.module.memories.grow(mem, amount)?;
+                    function_frame.stack.push(Value::I32(result))?;
+                }
+
+                // Memory
+                Operator::I32Load { memarg } => {
+                    i32_load!(function_frame.stack, self.module.memories, memarg, i32)
+                }
+                Operator::I32Load8U { memarg } => {
+                    i32_load!(function_frame.stack, self.module.memories, memarg, u8)
+                }
+                Operator::I32Store8 { memarg } => {
+                    i32_store!(function_frame.stack, self.module.memories, memarg, u8)
+                }
+                Operator::I32Store { memarg } => {
+                    i32_store!(function_frame.stack, self.module.memories, memarg, i32)
                 }
 
                 // Handle function call
@@ -179,7 +213,7 @@ impl WackasmExecutor {
                     type_index: _,
                     table_index,
                 } => {
-                    let func_index_index = function_frame.operand_stack.pop_i32()?;
+                    let func_index_index = function_frame.stack.pop_i32()?;
                     let table = self
                         .module
                         .tables
@@ -209,7 +243,7 @@ impl WackasmExecutor {
                         .ok_or_else(|| anyhow!("no block for pc {}", pc.inner()))?
                         .clone();
 
-                    let condition = function_frame.operand_stack.pop_i32()?;
+                    let condition = function_frame.stack.pop_i32()?;
                     let condition = condition != 0;
 
                     let (start, else_block, end) = block.if_block()?;
@@ -233,18 +267,15 @@ impl WackasmExecutor {
                     }
 
                     if start_block {
-                        self.module.start_block(
-                            &mut function_frame.operand_stack,
-                            &block,
-                            &block_index,
-                        )?;
+                        self.module
+                            .start_block(&mut function_frame.stack, &block, &block_index)?;
                     }
                 }
 
                 // Jump to end block if we hit an else
                 Operator::Else => {
                     let block_index = function_frame
-                        .operand_stack
+                        .stack
                         .peek_block()
                         .ok_or(anyhow!("hit else op not in block"))?;
                     let block = function_frame
@@ -265,15 +296,12 @@ impl WackasmExecutor {
                         .ok_or_else(|| anyhow!("no block for pc {}", pc.inner()))?
                         .clone();
 
-                    self.module.start_block(
-                        &mut function_frame.operand_stack,
-                        &block,
-                        &block_index,
-                    )?;
+                    self.module
+                        .start_block(&mut function_frame.stack, &block, &block_index)?;
                 }
 
                 Operator::BrIf { relative_depth } => {
-                    let condition = function_frame.operand_stack.pop_i32()?;
+                    let condition = function_frame.stack.pop_i32()?;
                     let branching = condition != 0;
 
                     if !branching {
@@ -281,7 +309,7 @@ impl WackasmExecutor {
                     }
 
                     WackasmExecutor::block_break(
-                        &mut function_frame.operand_stack,
+                        &mut function_frame.stack,
                         &function_frame.block_lookup,
                         &mut pc,
                         relative_depth,
@@ -290,7 +318,7 @@ impl WackasmExecutor {
 
                 Operator::Br { relative_depth } => {
                     WackasmExecutor::block_break(
-                        &mut function_frame.operand_stack,
+                        &mut function_frame.stack,
                         &function_frame.block_lookup,
                         &mut pc,
                         relative_depth,
@@ -300,9 +328,7 @@ impl WackasmExecutor {
                 // Handle block/function return
                 Operator::End => {
                     // Block return
-                    if let Some((block_idx, mut leftover)) =
-                        function_frame.operand_stack.pop_block()
-                    {
+                    if let Some((block_idx, mut leftover)) = function_frame.stack.pop_block() {
                         let block = function_frame
                             .block_lookup
                             .get(&block_idx)
@@ -320,9 +346,7 @@ impl WackasmExecutor {
                         if let Some(return_params) = return_params {
                             let return_params =
                                 leftover.pull_reversed_from_stack(&return_params)?;
-                            function_frame
-                                .operand_stack
-                                .push_reversed_all(return_params)?;
+                            function_frame.stack.push_reversed_all(return_params)?;
                         }
                     }
                     // Function return
@@ -330,41 +354,74 @@ impl WackasmExecutor {
                         return Ok(FunctionScopedResult::FunctionReturn);
                     }
                 }
+                Operator::Return => {
+                    return Ok(FunctionScopedResult::FunctionReturn);
+                }
 
                 // Maths
-                Operator::I32Add => {
-                    let a = function_frame.operand_stack.pop_i32()?;
-                    let b = function_frame.operand_stack.pop_i32()?;
-                    let c = a + b;
-                    function_frame.operand_stack.push(Value::I32(c))?;
-                }
                 Operator::I32Const { value } => {
-                    function_frame.operand_stack.push(Value::I32(value))?;
+                    function_frame.stack.push(Value::I32(value))?;
+                }
+                Operator::I64Const { value } => {
+                    function_frame.stack.push(Value::I64(value))?;
+                }
+
+                Operator::I32Add => {
+                    i32_binop!(function_frame.stack, i32, |lhs, rhs| lhs.wrapping_add(rhs))
                 }
                 Operator::I32Mul => {
-                    let a = function_frame.operand_stack.pop_i32()?;
-                    let b = function_frame.operand_stack.pop_i32()?;
-                    let c = a * b;
-                    function_frame.operand_stack.push(Value::I32(c))?;
+                    i32_binop!(function_frame.stack, i32, |lhs, rhs| lhs.wrapping_mul(rhs))
                 }
                 Operator::I32Sub => {
-                    let rhs = function_frame.operand_stack.pop_i32()?;
-                    let lhs = function_frame.operand_stack.pop_i32()?;
-                    let c = lhs - rhs;
-                    function_frame.operand_stack.push(Value::I32(c))?;
+                    i32_binop!(function_frame.stack, i32, |lhs, rhs| lhs.wrapping_sub(rhs))
+                }
+                Operator::I32ShrU => {
+                    i32_binop!(function_frame.stack, u32, |lhs, rhs| lhs.wrapping_shr(rhs))
+                }
+                Operator::I32Shl => {
+                    i32_binop!(function_frame.stack, u32, |lhs, rhs| lhs.wrapping_shl(rhs))
+                }
+                Operator::I32And => {
+                    i32_binop!(function_frame.stack, i32, |lhs, rhs| lhs & rhs)
                 }
 
                 // Comparators
                 Operator::I32GtS => {
-                    let rhs = function_frame.operand_stack.pop_i32()?;
-                    let lhs = function_frame.operand_stack.pop_i32()?;
-                    let c = if lhs > rhs { 1 } else { 0 };
-                    function_frame.operand_stack.push(Value::I32(c))?;
+                    i32_binop!(function_frame.stack, i32, |lhs, rhs| lhs > rhs)
+                }
+                Operator::I32LtU => {
+                    i32_binop!(function_frame.stack, u32, |lhs, rhs| lhs < rhs)
+                }
+                Operator::I32GtU => {
+                    i32_binop!(function_frame.stack, u32, |lhs, rhs| lhs > rhs)
+                }
+                Operator::I32LeU => {
+                    i32_binop!(function_frame.stack, u32, |lhs, rhs| lhs <= rhs)
+                }
+                Operator::I32Ne => {
+                    i32_binop!(function_frame.stack, i32, |a, b| a != b)
                 }
                 Operator::I32Eqz => {
-                    let a = function_frame.operand_stack.pop_i32()?;
+                    let a = function_frame.stack.pop_i32()?;
                     let result = if a == 0 { 1 } else { 0 };
-                    function_frame.operand_stack.push(Value::I32(result))?;
+                    function_frame.stack.push(Value::I32(result))?;
+                }
+                Operator::I32Eq => {
+                    i32_binop!(function_frame.stack, i32, |a, b| a == b)
+                }
+                Operator::I32GeU => {
+                    i32_binop!(function_frame.stack, u32, |lhs, rhs| lhs >= rhs)
+                }
+                Operator::Select => {
+                    let cond = function_frame.stack.pop_i32()?;
+                    let val2 = function_frame.stack.pop()?;
+                    let val1 = function_frame.stack.pop()?;
+
+                    if cond == 0 {
+                        function_frame.stack.push(val2)?;
+                    } else {
+                        function_frame.stack.push(val1)?;
+                    }
                 }
                 _ => return Err(anyhow!("unsupported operator: {:?}", operator)),
             }
@@ -396,11 +453,11 @@ impl WackasmExecutor {
 
                 let result_types = function_type.results();
                 let results = function_frame
-                    .operand_stack
+                    .stack
                     .pull_reversed_from_stack(result_types)?;
 
                 if let Some(mut next_frame) = self.callstack.peek_mut() {
-                    next_frame.operand_stack.push_reversed_all(results)?;
+                    next_frame.stack.push_reversed_all(results)?;
                 } else {
                     let mut results = results;
                     results.reverse();
@@ -422,7 +479,7 @@ impl WackasmExecutor {
                     let mut calling_frame = self.callstack.peek_mut().expect("no calling frame?");
                     let calling_operands_types = function_type.params();
                     calling_frame
-                        .operand_stack
+                        .stack
                         .pull_reversed_from_stack(calling_operands_types)?
                 };
                 calling_operands.reverse();
