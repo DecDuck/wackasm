@@ -27,13 +27,13 @@ impl LinearMemory {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct MemoryManager {
-    memories: HashMap<MemoryIndex, LinearMemory>,
+    memories: Vec<LinearMemory>,
 }
 
 impl MemoryManager {
     pub fn new() -> Self {
         Self {
-            memories: HashMap::new(),
+            memories: Vec::new(),
         }
     }
 
@@ -41,13 +41,13 @@ impl MemoryManager {
         &mut self,
         raw_memories: SectionLimited<MemoryType>,
     ) -> Result<(), anyhow::Error> {
-        for (memory_idx, memory) in raw_memories.into_iter().enumerate() {
+        for memory in raw_memories {
             let memory = memory?;
-            let memory_idx = MemoryIndex(memory_idx as u32);
-            self.memories.insert(
-                memory_idx,
-                LinearMemory::new(memory.page_size() as usize, memory.initial, memory.maximum),
-            );
+            self.memories.push(LinearMemory::new(
+                memory.page_size() as usize,
+                memory.initial,
+                memory.maximum,
+            ));
         }
 
         Ok(())
@@ -72,7 +72,7 @@ impl MemoryManager {
 
                     let linear_memory = self
                         .memories
-                        .get_mut(&MemoryIndex(memory_index))
+                        .get_mut(memory_index as usize)
                         .ok_or(anyhow!("no linear memory for index {}", memory_index))?;
 
                     let start = usize::try_from(offset_value as u32)?;
@@ -96,7 +96,7 @@ impl MemoryManager {
     pub fn grow(&mut self, mem: u32, amount: i32) -> Result<i32, anyhow::Error> {
         let memory = self
             .memories
-            .get_mut(&MemoryIndex(mem))
+            .get_mut(mem as usize)
             .ok_or_else(|| anyhow!("memory not found for index {}", mem))?;
 
         let prev = memory.current;
@@ -122,21 +122,18 @@ impl MemoryManager {
     ) -> Result<(), anyhow::Error> {
         let memory = self
             .memories
-            .get_mut(&MemoryIndex(mem))
+            .get_mut(mem as usize)
             .ok_or_else(|| anyhow!("memory not found for index {}", mem))?;
 
         let end = start
             .checked_add(length)
             .ok_or_else(|| anyhow!("memory.fill out of bounds"))?;
 
-        let destination = memory
-            .buffer
-            .get_mut(start..end)
-            .ok_or(anyhow!(
-                "failed to get memory region at {} for {} bytes",
-                start,
-                length
-            ))?;
+        let destination = memory.buffer.get_mut(start..end).ok_or(anyhow!(
+            "failed to get memory region at {} for {} bytes",
+            start,
+            length
+        ))?;
         destination.fill(value);
 
         Ok(())
@@ -149,7 +146,7 @@ impl MemoryManager {
     ) -> Result<i32, anyhow::Error> {
         let memory = self
             .memories
-            .get(&MemoryIndex(memarg.memory))
+            .get(memarg.memory as usize)
             .ok_or_else(|| anyhow!("no linear memory for index {}", memarg.memory))?;
 
         let start = usize::try_from(address)?
@@ -178,7 +175,7 @@ impl MemoryManager {
     ) -> Result<(), anyhow::Error> {
         let memory = self
             .memories
-            .get_mut(&MemoryIndex(memarg.memory))
+            .get_mut(memarg.memory as usize)
             .ok_or_else(|| anyhow!("no linear memory for index {}", memarg.memory))?;
 
         let start = usize::try_from(address)?
@@ -193,7 +190,7 @@ impl MemoryManager {
         let destination = memory
             .buffer
             .get_mut(start..end)
-            .ok_or(anyhow!("failed to get memory slice"))?;
+            .ok_or_else(|| anyhow!("failed to get memory slice"))?;
         destination.copy_from_slice(&encoded[0..SIZE]);
 
         Ok(())

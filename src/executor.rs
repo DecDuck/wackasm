@@ -20,7 +20,7 @@ use crate::{
     stack::{BlockAwareOperandStack, OperandStackFns as _},
 };
 
-const MAX_INSTRUCTIONS_IN_LOOP: isize = 250;
+const MAX_INSTRUCTIONS_IN_LOOP: isize = 500;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct WackasmExecutor {
@@ -181,7 +181,9 @@ impl WackasmExecutor {
                 }
                 Operator::GlobalSet { global_index } => {
                     let value = function_frame.stack.pop()?;
-                    self.module.globals.set(&GlobalIndex(*global_index), value)?;
+                    self.module
+                        .globals
+                        .set(&GlobalIndex(*global_index), value)?;
                 }
 
                 Operator::MemoryGrow { mem } => {
@@ -213,7 +215,9 @@ impl WackasmExecutor {
                 // Handle function call
                 Operator::Call { function_index } => {
                     // Add one so we resume to the next instruction
-                    return Ok(FunctionScopedResult::FunctionCall { function_index: *function_index });
+                    return Ok(FunctionScopedResult::FunctionCall {
+                        function_index: *function_index,
+                    });
                 }
                 Operator::CallIndirect {
                     type_index: _,
