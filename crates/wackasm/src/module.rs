@@ -3,20 +3,11 @@ use std::{collections::HashMap, sync::Arc};
 use anyhow::anyhow;
 use serde::{Deserialize, Serialize};
 use wasmparser::{
-    ElementItems, ElementKind, ExternalKind, FuncType, FunctionBody, Payload, TableInit, ValType,
+    ExternalKind, FuncType, FunctionBody, Payload, ValType,
 };
 
 use crate::{
-    HaltError, Value,
-    blocks::{Block, BlockManager, lookahead_find_blocks},
-    const_expr::resolve_const_expr,
-    globals::{Global, GlobalManager},
-    macros::unsupported,
-    memory::{LinearMemory, MemoryManager},
-    operator::OperatorView,
-    pc::ProgramCounter,
-    stack::{BlockAwareOperandStack, LocalStore, OperandStackFns},
-    table::TableManager,
+    HaltError, Value, blocks::{Block, BlockManager, lookahead_find_blocks}, globals::GlobalManager, macros::unsupported, memory::MemoryManager, operator::OperatorView, pc::ProgramCounter, stack::{BlockAwareStack, FrameOperandStack, LocalStore}, table::TableManager,
 };
 
 macro_rules! type_indexes {
@@ -61,7 +52,7 @@ pub(crate) struct FunctionFrame {
     pub(crate) locals: LocalStore,
     pub(crate) code: OperatorView,
 
-    pub(crate) stack: BlockAwareOperandStack,
+    pub(crate) stack: FrameOperandStack,
     pub(crate) pc: ProgramCounter,
 }
 
@@ -109,7 +100,7 @@ impl WackasmModule {
             block_lookup: Arc::new(BlockManager::new()),
 
             // Runtime state
-            stack: BlockAwareOperandStack::new(0),
+            stack: FrameOperandStack::new(0),
             pc: ProgramCounter::new(),
         };
 
@@ -151,7 +142,7 @@ impl WackasmModule {
         function_state.code = OperatorView::new(code_section)?;
         function_state.block_lookup = Arc::new(lookahead_find_blocks(&function_state.code)?);
         // reinit block stack for performance
-        function_state.stack = BlockAwareOperandStack::new(function_state.block_lookup.len());
+        function_state.stack = FrameOperandStack::new(function_state.block_lookup.len());
 
         initial_function_states.push(function_state);
         Ok(())
@@ -159,7 +150,7 @@ impl WackasmModule {
 
     pub(crate) fn start_block(
         &mut self,
-        operand_stack: &mut BlockAwareOperandStack,
+        operand_stack: &mut FrameOperandStack,
         block: &Block,
         idx: &BlockIndex,
     ) -> Result<(), HaltError> {

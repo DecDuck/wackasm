@@ -1,9 +1,11 @@
 use serde::{Deserialize, Serialize};
 use wasmparser::ValType;
 
-use crate::{HaltError, Value, module::BlockIndex, stack::{MAX_OPERAND_STACK_SIZE, MAX_STACK_POOL, OperandStackFns, basic::OperandStack}};
-
-
+use crate::{
+    HaltError, Value,
+    module::BlockIndex,
+    stack::{BlockAwareStack, MAX_OPERAND_STACK_SIZE, MAX_STACK_POOL, basic::OperandStack},
+};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct BlockAwareOperandStack {
@@ -40,42 +42,14 @@ impl BlockAwareOperandStack {
         OperandStack::new(MAX_OPERAND_STACK_SIZE)
     }
 
-    pub fn recycle_stack(&mut self, stack: OperandStack) {
+    fn recycle_stack(&mut self, stack: OperandStack) {
         if self.stack_pool.len() < MAX_STACK_POOL {
             self.stack_pool.push(stack);
         }
     }
-
-    pub fn push_block(
-        &mut self,
-        block_idx: BlockIndex,
-        reversed_parameters: Option<Vec<Value>>,
-    ) -> Result<(), HaltError> {
-        let mut stack = self.new_stack();
-        if let Some(reversed_parameters) = reversed_parameters {
-            stack.push_reversed_all(reversed_parameters)?;
-        }
-        self.blocks.push((block_idx, stack));
-        Ok(())
-    }
-
-    pub fn pop_block_no_stack(&mut self) -> Option<()> {
-        let (_, stack) = self.pop_block()?;
-        self.recycle_stack(stack);
-
-        Some(())
-    }
-
-    pub fn pop_block(&mut self) -> Option<(BlockIndex, OperandStack)> {
-        self.blocks.pop()
-    }
-
-    pub fn peek_block(&self) -> Option<&BlockIndex> {
-        self.blocks.last().map(|v| &v.0)
-    }
 }
 
-impl OperandStackFns for BlockAwareOperandStack {
+impl BlockAwareStack for BlockAwareOperandStack {
     #[inline]
     fn push(&mut self, value: Value) -> Result<(), HaltError> {
         self.get_current_stack().push(value)
@@ -87,10 +61,7 @@ impl OperandStackFns for BlockAwareOperandStack {
     }
 
     #[inline]
-    fn pull_reversed_from_stack(
-        &mut self,
-        returns: &[ValType],
-    ) -> Result<Vec<Value>, HaltError> {
+    fn pull_reversed_from_stack(&mut self, returns: &[ValType]) -> Result<Vec<Value>, HaltError> {
         self.get_current_stack().pull_reversed_from_stack(returns)
     }
 
@@ -104,26 +75,35 @@ impl OperandStackFns for BlockAwareOperandStack {
         self.get_current_stack().pop()
     }
 
-    #[inline]
-    fn pop_i32(&mut self) -> Result<i32, HaltError> {
-        self.get_current_stack().pop_i32()
+    fn push_block(
+        &mut self,
+        block_idx: BlockIndex,
+        reversed_parameters: Option<Vec<Value>>,
+    ) -> Result<(), HaltError> {
+        let mut stack = self.new_stack();
+        if let Some(reversed_parameters) = reversed_parameters {
+            stack.push_reversed_all(reversed_parameters)?;
+        }
+        self.blocks.push((block_idx, stack));
+        Ok(())
     }
 
-    #[inline]
-    fn pop_i64(&mut self) -> Result<i64, HaltError> {
-        self.get_current_stack().pop_i64()
+    fn peek_block(&self) -> Option<&BlockIndex> {
+        self.blocks.last().map(|v| &v.0)
     }
-    
-    fn pop_f32(&mut self) -> Result<f32, HaltError> {
-        self.get_current_stack().pop_f32()
+
+    fn return_block(&mut self, preserve: &[ValType]) -> Result<Option<BlockIndex>, HaltError> {
+        let Some((index, mut stack)) = self.blocks.pop() else {
+            return Ok(None);
+        };
+
+        if preserve.len() > 0 {
+            let values = stack.pull_reversed_from_stack(preserve)?;
+            self.get_current_stack().push_reversed_all(values)?;
+        }
+
+        self.recycle_stack(stack);
+
+        Ok(Some(index))
     }
-    
-    fn pop_f64(&mut self) -> Result<f64, HaltError> {
-        self.get_current_stack().pop_f64()
-    }
-    
-    fn pop_v128(&mut self) -> Result<u128, HaltError> {
-        self.get_current_stack().pop_v128()
-    }
-    
 }

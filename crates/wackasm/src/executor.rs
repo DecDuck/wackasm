@@ -20,7 +20,7 @@ use crate::{
         TableIndex, TableValue,
     },
     pc::ProgramCounterHandle,
-    stack::{BlockAwareOperandStack, OperandStackFns as _},
+    stack::{BlockAwareStack as _, FrameOperandStack},
 };
 
 const MAX_INSTRUCTIONS_IN_LOOP: isize = 500;
@@ -129,14 +129,14 @@ impl WackasmExecutor {
     }
 
     fn block_break(
-        operand_stack: &mut BlockAwareOperandStack,
+        operand_stack: &mut FrameOperandStack,
         block_lookup: &BlockManager,
         pc: &mut ProgramCounterHandle<'_>,
         relative_depth: u32,
     ) -> Result<(), HaltError> {
         for _ in 0..relative_depth {
             operand_stack
-                .pop_block_no_stack()
+                .return_block(&[])?
                 .ok_or_else(|| anyhow!("no block to escape when br_if"))?;
         }
 
@@ -430,7 +430,7 @@ impl WackasmExecutor {
                 // Handle block/function return
                 Operator::End => {
                     // Block return
-                    if let Some((block_idx, mut leftover)) = function_frame.stack.pop_block() {
+                    if let Some(block_idx) = function_frame.stack.peek_block() {
                         let block = function_frame
                             .block_lookup
                             .get(&block_idx)
@@ -445,13 +445,11 @@ impl WackasmExecutor {
                                 Some(func_type.results().to_vec())
                             }
                         };
-                        if let Some(return_params) = return_params {
-                            let return_params =
-                                leftover.pull_reversed_from_stack(&return_params)?;
-                            function_frame.stack.push_reversed_all(return_params)?;
-                        }
 
-                        function_frame.stack.recycle_stack(leftover);
+                        function_frame
+                            .stack
+                            .return_block(&return_params.unwrap_or(Vec::new()))?
+                            .ok_or_else(|| anyhow!("no block to end from"))?;
                     }
                     // Function return
                     else {

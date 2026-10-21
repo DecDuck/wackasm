@@ -29,7 +29,7 @@ fn execute(serialized: &[u8]) -> isize {
     executor.set_fuel(isize::MAX);
     executor.execute().expect("execute benchmark workload");
 
-    black_box(isize::MAX - executor.get_fuel())
+    isize::MAX - executor.get_fuel()
 }
 
 fn fuel_per_second(criterion: &mut Criterion) {
@@ -37,7 +37,7 @@ fn fuel_per_second(criterion: &mut Criterion) {
     let fuel_per_iteration = execute(&serialized) as u64;
 
     let mut group = criterion.benchmark_group("fuel_per_second");
-    group.sample_size(10);
+    group.sample_size(20);
     group.throughput(Throughput::Elements(fuel_per_iteration));
     group.bench_function("run_prime_benchmark", |bencher| {
         bencher.iter_batched(
@@ -45,10 +45,12 @@ fn fuel_per_second(criterion: &mut Criterion) {
                 bitcode::deserialize::<WackasmExecutor>(&serialized)
                     .expect("deserialize suspended executor")
             },
-            |mut executor| {
+            |executor| {
+                let mut executor = black_box(executor);
                 executor.set_fuel(isize::MAX);
                 executor.execute().expect("execute benchmark workload");
-                black_box(isize::MAX - executor.get_fuel());
+                // Returned so criterion black-boxes it and drops it outside the timed region.
+                executor
             },
             BatchSize::SmallInput,
         );
