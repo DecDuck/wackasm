@@ -9,13 +9,18 @@ use serde::{Deserialize, Serialize};
 use wasmparser::Operator;
 
 use crate::{
-    HaltError, Value, WackasmModule, blocks::{Block, BlockManager}, macros::{
+    HaltError, Value, WackasmModule,
+    blocks::{Block, BlockManager},
+    macros::{
         f32_load, f32_store, f64_load, f64_store, i32_binop, i32_load, i32_store, i64_binop,
         i64_cmp, i64_load, i64_store, trap, unsupported, v128_load, v128_store,
-    }, module::{
+    },
+    module::{
         BlockIndex, ExportIndex, FunctionFrame, FunctionIndex, FunctionTypeIndex, GlobalIndex,
         TableIndex, TableValue,
-    }, pc::ProgramCounterHandle, stack::{BlockAwareOperandStack, OperandStackFns as _},
+    },
+    pc::ProgramCounterHandle,
+    stack::{BlockAwareOperandStack, OperandStackFns as _},
 };
 
 const MAX_INSTRUCTIONS_IN_LOOP: isize = 500;
@@ -170,7 +175,7 @@ impl WackasmExecutor {
             let mut pc = function_frame.pc.handle();
             let operator = function_frame.code.get(pc.inner()).unwrap();
             match operator {
-                Operator::Nop => {},
+                Operator::Nop => {}
                 // Gets
                 Operator::LocalGet { local_index } => {
                     let local = *function_frame.locals.get(&local_index)?;
@@ -330,7 +335,7 @@ impl WackasmExecutor {
                 // Control flow
                 Operator::If { blockty: _ } => {
                     let block_index = BlockIndex(pc.inner() as u32);
-                    let block = function_frame.block_lookup.get(&block_index)?.clone();
+                    let block = function_frame.block_lookup.get(&block_index)?;
 
                     let condition = function_frame.stack.pop_i32()?;
                     let condition = condition != 0;
@@ -374,7 +379,7 @@ impl WackasmExecutor {
 
                 Operator::Block { blockty: _ } | Operator::Loop { blockty: _ } => {
                     let block_index = BlockIndex(pc.inner() as u32);
-                    let block = function_frame.block_lookup.get(&block_index)?.clone();
+                    let block = function_frame.block_lookup.get(&block_index)?;
 
                     self.module
                         .start_block(&mut function_frame.stack, &block, &block_index)?;
@@ -410,7 +415,9 @@ impl WackasmExecutor {
                     let target = if decider >= targets.len() {
                         targets.default()
                     } else {
-                        decider
+                        targets.targets().nth(decider as usize).ok_or_else(|| {
+                            trap!("no function for index {} in br_table args", decider)
+                        })??
                     };
                     WackasmExecutor::block_break(
                         &mut function_frame.stack,
@@ -478,7 +485,9 @@ impl WackasmExecutor {
                 Operator::I32DivU => {
                     i32_binop!(function_frame.stack, u32, |lhs, rhs| lhs
                         .checked_div(rhs)
-                        .ok_or_else(|| trap!("integer divide by zero"))?)
+                        .ok_or_else(
+                        || trap!("integer divide by zero")
+                    )?)
                 }
                 Operator::I32Sub => {
                     i32_binop!(function_frame.stack, i32, |lhs, rhs| lhs.wrapping_sub(rhs))
