@@ -379,6 +379,21 @@ impl WackasmExecutor {
                     )?;
                 }
 
+                Operator::BrTable { targets } => {
+                    let decider = function_frame.stack.pop_i32()? as u32;
+                    let target = if decider >= targets.len() {
+                        targets.default()
+                    } else {
+                        decider
+                    };
+                    WackasmExecutor::block_break(
+                        &mut function_frame.stack,
+                        &function_frame.block_lookup,
+                        &mut pc,
+                        target,
+                    )?;
+                }
+
                 // Handle block/function return
                 Operator::End => {
                     // Block return

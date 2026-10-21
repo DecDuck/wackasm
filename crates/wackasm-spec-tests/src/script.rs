@@ -128,23 +128,13 @@ fn run_directive(runner: &mut ScriptRunner, directive: WastDirective<'_>) -> Out
         WastDirective::AssertMalformed { mut module, .. }
         | WastDirective::AssertMalformedCustom { mut module, .. } => match module.encode() {
             Err(_) => Outcome::Passed,
-            Ok(bytes)
-                if wasmparser::Parser::new(0)
-                    .parse_all(&bytes)
-                    .collect::<Result<Vec<_>, _>>()
-                    .is_err() =>
-            {
-                Outcome::Passed
-            }
+            Ok(bytes) if decode_module(&bytes).is_err() => Outcome::Passed,
             Ok(_) => Outcome::Failed("module was not malformed".to_owned()),
         },
         WastDirective::AssertInvalid { mut module, .. }
         | WastDirective::AssertInvalidCustom { mut module, .. } => match module.encode() {
             Err(error) => Outcome::Failed(error.to_string()),
-            Ok(bytes) => match wasmparser::Parser::new(0)
-                .parse_all(&bytes)
-                .collect::<Result<Vec<_>, _>>()
-            {
+            Ok(bytes) => match decode_module(&bytes) {
                 Err(error) => Outcome::Failed(format!("module is malformed, not invalid: {error}")),
                 Ok(_) if wasmparser::Validator::new().validate_all(&bytes).is_err() => {
                     Outcome::Passed
@@ -168,6 +158,47 @@ fn run_directive(runner: &mut ScriptRunner, directive: WastDirective<'_>) -> Out
             Outcome::Unsupported("thread directives are not implemented".to_owned())
         }
     }
+}
+
+/// Decodes every section item and function body, since `parse_all` alone leaves section contents unread.
+fn decode_module(bytes: &[u8]) -> wasmparser::Result<()> {
+    use wasmparser::{ElementItems, Payload};
+
+    fn drain<T>(items: impl IntoIterator<Item = wasmparser::Result<T>>) -> wasmparser::Result<()> {
+        items.into_iter().try_for_each(|item| item.map(drop))
+    }
+
+    for payload in wasmparser::Parser::new(0).parse_all(bytes) {
+        match payload? {
+            Payload::TypeSection(section) => drain(section)?,
+            Payload::ImportSection(section) => drain(section)?,
+            Payload::FunctionSection(section) => drain(section)?,
+            Payload::TableSection(section) => drain(section)?,
+            Payload::MemorySection(section) => drain(section)?,
+            Payload::TagSection(section) => drain(section)?,
+            Payload::GlobalSection(section) => drain(section)?,
+            Payload::ExportSection(section) => drain(section)?,
+            Payload::DataSection(section) => drain(section)?,
+            Payload::ElementSection(section) => {
+                for element in section {
+                    match element?.items {
+                        ElementItems::Functions(items) => drain(items)?,
+                        ElementItems::Expressions(_, items) => drain(items)?,
+                    }
+                }
+            }
+            Payload::CodeSectionEntry(body) => {
+                drain(body.get_locals_reader()?)?;
+                let mut operators = body.get_operators_reader()?;
+                while !operators.eof() {
+                    operators.read()?;
+                }
+                operators.finish()?;
+            }
+            _ => {}
+        }
+    }
+    Ok(())
 }
 
 fn validate_module(bytes: &[u8]) -> Result<(), String> {
