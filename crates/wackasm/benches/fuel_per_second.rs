@@ -12,7 +12,7 @@ fn suspended_executor() -> anyhow::Result<Vec<u8>> {
 
     executor.call_export(
         "run_prime_benchmark",
-        vec![Value(100_000), Value(80)],
+        vec![Value(10_000), Value(1000)],
     )?;
     executor.set_fuel(0);
     executor.execute()?;

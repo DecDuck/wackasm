@@ -12,6 +12,7 @@ mod operator;
 mod pc;
 mod stack;
 mod table;
+mod functions;
 
 pub use executor::WackasmExecutor;
 pub use module::WackasmModule;

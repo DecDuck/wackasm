@@ -2,9 +2,7 @@ use anyhow::anyhow;
 use serde::{Deserialize, Serialize};
 use wasmparser::ValType;
 
-use crate::{
-    HaltError, Value, macros::trap, module::BlockIndex, stack::BlockAwareStack,
-};
+use crate::{HaltError, Value, macros::trap, module::BlockIndex, stack::BlockAwareStack};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub(crate) struct OperandStack {
@@ -49,10 +47,7 @@ impl BlockAwareStack for OperandStack {
         Ok(())
     }
 
-    fn pull_reversed_from_stack(
-        &mut self,
-        returns: &[ValType],
-    ) -> Result<Vec<Value>, HaltError> {
+    fn pull_reversed_from_stack(&mut self, returns: &[ValType]) -> Result<Vec<Value>, HaltError> {
         let mut results = Vec::with_capacity(returns.len());
 
         for rtn in returns.iter().rev() {
@@ -79,26 +74,21 @@ impl BlockAwareStack for OperandStack {
         }
         Ok(&self.inner[self.len - 1])
     }
-    
+
     // We don't implement block functions
     fn push_block(
         &mut self,
         block_idx: crate::module::BlockIndex,
-        reversed_parameters: Option<Vec<Value>>,
+        pull_from_parent: Option<&[ValType]>,
     ) -> Result<(), HaltError> {
         todo!()
     }
-    fn return_block(
-        &mut self,
-        preserve: &[ValType],
-    ) -> Result<Option<BlockIndex>, HaltError> {
+    fn return_block(&mut self, preserve: &[ValType]) -> Result<Option<BlockIndex>, HaltError> {
         todo!()
     }
     fn peek_block(&self) -> Option<&crate::module::BlockIndex> {
         todo!()
     }
-
-
 }
 
 impl OperandStack {

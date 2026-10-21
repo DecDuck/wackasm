@@ -78,10 +78,11 @@ impl BlockAwareStack for BlockAwareOperandStack {
     fn push_block(
         &mut self,
         block_idx: BlockIndex,
-        reversed_parameters: Option<Vec<Value>>,
+        pull_from_parenet: Option<&[ValType]>,
     ) -> Result<(), HaltError> {
         let mut stack = self.new_stack();
-        if let Some(reversed_parameters) = reversed_parameters {
+        if let Some(types) = pull_from_parenet {
+            let reversed_parameters = self.get_current_stack().pull_reversed_from_stack(types)?;
             stack.push_reversed_all(reversed_parameters)?;
         }
         self.blocks.push((block_idx, stack));
