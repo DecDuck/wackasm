@@ -139,6 +139,23 @@ macro_rules! i32_store {
 
 pub(crate) use i32_store;
 
+/// Like [`i32_store`] but pops an i64 value.
+///
+/// ```ignore
+/// i64_store!(stack, memories, memarg, u32);
+/// ```
+macro_rules! i64_store {
+    ($stack:expr, $memories:expr, $memarg:expr, $width:ty) => {{
+        use $crate::stack::OperandStackFns as _;
+        let stack = &mut $stack;
+        let value = stack.pop_i64()?;
+        let address = stack.pop_i32()? as u32;
+        $memories.store($memarg, address, value as $width)?;
+    }};
+}
+
+pub(crate) use i64_store;
+
 macro_rules! f32_store {
     ($stack:expr, $memories:expr, $memarg:expr) => {{
         use $crate::stack::OperandStackFns as _;

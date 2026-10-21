@@ -161,42 +161,66 @@ fn run_directive(runner: &mut ScriptRunner, directive: WastDirective<'_>) -> Out
 }
 
 /// Decodes every section item and function body, since `parse_all` alone leaves section contents unread.
-fn decode_module(bytes: &[u8]) -> wasmparser::Result<()> {
-    use wasmparser::{ElementItems, Payload};
+fn decode_module(bytes: &[u8]) -> Result<(), String> {
+    use wasmparser::{ElementItems, Operator, Payload};
 
     fn drain<T>(items: impl IntoIterator<Item = wasmparser::Result<T>>) -> wasmparser::Result<()> {
         items.into_iter().try_for_each(|item| item.map(drop))
     }
 
-    for payload in wasmparser::Parser::new(0).parse_all(bytes) {
-        match payload? {
-            Payload::TypeSection(section) => drain(section)?,
-            Payload::ImportSection(section) => drain(section)?,
-            Payload::FunctionSection(section) => drain(section)?,
-            Payload::TableSection(section) => drain(section)?,
-            Payload::MemorySection(section) => drain(section)?,
-            Payload::TagSection(section) => drain(section)?,
-            Payload::GlobalSection(section) => drain(section)?,
-            Payload::ExportSection(section) => drain(section)?,
-            Payload::DataSection(section) => drain(section)?,
-            Payload::ElementSection(section) => {
-                for element in section {
-                    match element?.items {
-                        ElementItems::Functions(items) => drain(items)?,
-                        ElementItems::Expressions(_, items) => drain(items)?,
+    let mut unknown_section = None;
+    let mut has_data_count = false;
+    let mut uses_data_index = false;
+    let mut decode = || -> wasmparser::Result<()> {
+        for payload in wasmparser::Parser::new(0).parse_all(bytes) {
+            match payload? {
+                // wasmparser tolerates unknown section ids, but the spec treats them as malformed.
+                Payload::UnknownSection { id, .. } => {
+                    unknown_section = unknown_section.or(Some(id))
+                }
+                Payload::DataCountSection { .. } => has_data_count = true,
+                Payload::TypeSection(section) => drain(section)?,
+                Payload::ImportSection(section) => drain(section)?,
+                Payload::FunctionSection(section) => drain(section)?,
+                Payload::TableSection(section) => drain(section)?,
+                Payload::MemorySection(section) => drain(section)?,
+                Payload::TagSection(section) => drain(section)?,
+                Payload::GlobalSection(section) => drain(section)?,
+                Payload::ExportSection(section) => drain(section)?,
+                Payload::DataSection(section) => drain(section)?,
+                Payload::ElementSection(section) => {
+                    for element in section {
+                        match element?.items {
+                            ElementItems::Functions(items) => drain(items)?,
+                            ElementItems::Expressions(_, items) => drain(items)?,
+                        }
                     }
                 }
-            }
-            Payload::CodeSectionEntry(body) => {
-                drain(body.get_locals_reader()?)?;
-                let mut operators = body.get_operators_reader()?;
-                while !operators.eof() {
-                    operators.read()?;
+                Payload::CodeSectionEntry(body) => {
+                    drain(body.get_locals_reader()?)?;
+                    let mut operators = body.get_operators_reader()?;
+                    while !operators.eof() {
+                        if let Operator::MemoryInit { .. } | Operator::DataDrop { .. } =
+                            operators.read()?
+                        {
+                            uses_data_index = true;
+                        }
+                    }
+                    operators.finish()?;
                 }
-                operators.finish()?;
+                _ => {}
             }
-            _ => {}
         }
+        Ok(())
+    };
+    decode().map_err(|error| error.to_string())?;
+
+    if let Some(id) = unknown_section {
+        return Err(format!("malformed section id {id}"));
+    }
+    // `OperatorsReader::finish` does not enforce this binary-format rule.
+    if uses_data_index && !has_data_count {
+        return Err("data count section required".to_owned());
     }
     Ok(())
 }
