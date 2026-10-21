@@ -4,7 +4,7 @@ use anyhow::anyhow;
 use serde::{Deserialize, Serialize};
 use wasmparser::{Global as WASMPARSERGlobal, SectionLimited};
 
-use crate::{Value, const_expr::resolve_const_expr, module::GlobalIndex};
+use crate::{HaltError, Value, const_expr::resolve_const_expr, module::GlobalIndex};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub(crate) struct Global {
@@ -28,7 +28,7 @@ impl GlobalManager {
     pub fn process_globals_section(
         &mut self,
         raw_globals: SectionLimited<WASMPARSERGlobal>,
-    ) -> Result<(), anyhow::Error> {
+    ) -> Result<(), HaltError> {
         for (global_idx, global) in raw_globals.into_iter().enumerate() {
             let global = global?;
             let init_value = resolve_const_expr(global.init_expr)?;
@@ -44,17 +44,17 @@ impl GlobalManager {
         Ok(())
     }
 
-    pub fn get(&self, global_index: &GlobalIndex) -> Result<&Global, anyhow::Error> {
+    pub fn get(&self, global_index: &GlobalIndex) -> Result<&Global, HaltError> {
         self.globals
             .get(global_index)
-            .ok_or_else(|| anyhow!("no global for index {:?}", global_index))
+            .ok_or_else(|| anyhow!("no global for index {:?}", global_index).into())
     }
 
     pub fn set(
         &mut self,
         global_index: &GlobalIndex,
         new_value: Value,
-    ) -> Result<(), anyhow::Error> {
+    ) -> Result<(), HaltError> {
         let value = self
             .globals
             .get_mut(global_index)
@@ -62,7 +62,7 @@ impl GlobalManager {
 
         // Check discriminate
         if mem::discriminant(&value.inner) != mem::discriminant(&new_value) {
-            return Err(anyhow!("global value types mismatched"));
+            return Err(anyhow!("global value types mismatched").into());
         }
 
         value.inner = new_value;

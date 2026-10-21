@@ -7,10 +7,11 @@ use wasmparser::{
 };
 
 use crate::{
-    Value,
+    HaltError, Value,
     blocks::{Block, BlockManager, lookahead_find_blocks},
     const_expr::resolve_const_expr,
     globals::{Global, GlobalManager},
+    macros::unsupported,
     memory::{LinearMemory, MemoryManager},
     operator::OperatorView,
     pc::ProgramCounter,
@@ -99,7 +100,7 @@ impl WackasmModule {
         initial_function_states: &mut Vec<FunctionFrame>,
         function_type_indexes: &HashMap<FunctionTypeIndex, FuncType>,
         function_types: &HashMap<FunctionIndex, FunctionTypeIndex>,
-    ) -> Result<(), anyhow::Error> {
+    ) -> Result<(), HaltError> {
         let mut function_state = FunctionFrame {
             // Stuff that needs to be initialised
             function_index: FunctionIndex(u32::MAX),
@@ -161,7 +162,7 @@ impl WackasmModule {
         operand_stack: &mut BlockAwareOperandStack,
         block: &Block,
         idx: &BlockIndex,
-    ) -> Result<(), anyhow::Error> {
+    ) -> Result<(), HaltError> {
         let block_params = match block.ty() {
             wasmparser::BlockType::Empty => None,
             wasmparser::BlockType::Type(_) => None,
@@ -185,7 +186,7 @@ impl WackasmModule {
     pub(crate) fn function_idx_type(
         &self,
         function_index: &FunctionIndex,
-    ) -> Result<&FuncType, anyhow::Error> {
+    ) -> Result<&FuncType, HaltError> {
         let function_type_index = self.function_types.get(function_index).ok_or_else(|| {
             anyhow!(
                 "no function type index for function index {:?}",
@@ -208,7 +209,7 @@ impl WackasmModule {
     pub(crate) fn function_type_idx_type(
         &self,
         function_type_index: &FunctionTypeIndex,
-    ) -> Result<&FuncType, anyhow::Error> {
+    ) -> Result<&FuncType, HaltError> {
         let function_type = self
             .function_type_indexes
             .get(function_type_index)
@@ -222,7 +223,7 @@ impl WackasmModule {
         Ok(function_type)
     }
 
-    pub fn new(data: &[u8]) -> Result<Self, anyhow::Error> {
+    pub fn new(data: &[u8]) -> Result<Self, HaltError> {
         let payloads = wasmparser::Parser::new(0)
             .parse_all(data)
             .collect::<Result<Vec<_>, _>>()?;
@@ -322,7 +323,7 @@ impl WackasmModule {
                     memories.process_data_section(raw_data)?;
                 }
                 Payload::CustomSection(_) | Payload::End(_) => {}
-                _ => return Err(anyhow!("unsupported section: {:?}", payload)),
+                _ => return Err(unsupported!("unsupported section: {:?}", payload)),
             }
         }
 

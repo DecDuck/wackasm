@@ -5,6 +5,8 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer, de::Error as _};
 use self_cell::self_cell;
 use wasmparser::{BinaryReader, FunctionBody, Operator, OperatorsReader};
 
+use crate::HaltError;
+
 type ParsedOperators<'a> = Vec<Operator<'a>>;
 
 self_cell!(
@@ -29,7 +31,7 @@ impl OperatorView {
         Self::from_raw(Vec::new()).expect("empty operator sequence is valid")
     }
 
-    pub fn new(code: FunctionBody<'_>) -> Result<Self, anyhow::Error> {
+    pub fn new(code: FunctionBody<'_>) -> Result<Self, HaltError> {
         let reader = code.get_binary_reader_for_operators()?;
         let operator_start = usize::try_from(reader.original_position() - code.range().start)?;
         let operators_raw = code
@@ -40,7 +42,7 @@ impl OperatorView {
         Self::from_raw(operators_raw)
     }
 
-    fn from_raw(operators_raw: Vec<u8>) -> Result<Self, anyhow::Error> {
+    fn from_raw(operators_raw: Vec<u8>) -> Result<Self, HaltError> {
         let cell = OperatorViewCell::try_new(operators_raw, |bytes| {
             let reader = BinaryReader::new(bytes, 0);
             OperatorsReader::new(reader).into_iter().collect()

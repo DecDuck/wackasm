@@ -6,7 +6,7 @@ use wast::{
 
 use crate::{
     Outcome, Summary,
-    runtime::{RuntimeError, ScriptRunner, classify_runtime_error, is_trap_error},
+    runtime::{RuntimeError, ScriptRunner, classify_runtime_error},
     values::{convert_expected, value_matches},
 };
 
@@ -101,7 +101,7 @@ fn run_directive(runner: &mut ScriptRunner, directive: WastDirective<'_>) -> Out
                     runner.register(name.to_owned(), instance);
                     Outcome::Passed
                 }
-                Err(error) => Outcome::Unsupported(error),
+                Err(error) => Outcome::Unsupported(error.into_message()),
             }
         }
         WastDirective::Invoke(invoke) => match runner.invoke(
@@ -237,21 +237,11 @@ fn run_execute(
     exec: WastExecute<'_>,
 ) -> Result<Vec<Value>, RuntimeError> {
     match exec {
-        WastExecute::Invoke(invoke) => runner
-            .invoke(
-                invoke.module.map(|name| name.name()),
-                invoke.name,
-                &invoke.args,
-            )
-            .map_err(|error| {
-                if error.contains("not implemented") || error.contains("unsupported operator") {
-                    RuntimeError::Unsupported(error)
-                } else if is_trap_error(&error) {
-                    RuntimeError::Trap(error)
-                } else {
-                    RuntimeError::Failed(error)
-                }
-            }),
+        WastExecute::Invoke(invoke) => runner.invoke(
+            invoke.module.map(|name| name.name()),
+            invoke.name,
+            &invoke.args,
+        ),
         WastExecute::Get { .. } => Err(RuntimeError::Unsupported(
             "global.get assertions need a global access API".to_owned(),
         )),

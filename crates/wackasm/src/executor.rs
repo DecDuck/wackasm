@@ -4,23 +4,18 @@ use std::{
     sync::atomic::{AtomicIsize, Ordering},
 };
 
-use anyhow::{Ok, anyhow};
+use anyhow::anyhow;
 use serde::{Deserialize, Serialize};
 use wasmparser::Operator;
 
 use crate::{
-    Value, WackasmModule,
-    blocks::{Block, BlockManager},
-    macros::{
+    HaltError, Value, WackasmModule, blocks::{Block, BlockManager}, macros::{
         f32_load, f32_store, f64_load, f64_store, i32_binop, i32_load, i32_store, i64_binop,
-        i64_cmp, i64_load, i64_store, v128_load, v128_store,
-    },
-    module::{
+        i64_cmp, i64_load, i64_store, trap, unsupported, v128_load, v128_store,
+    }, module::{
         BlockIndex, ExportIndex, FunctionFrame, FunctionIndex, FunctionTypeIndex, GlobalIndex,
         TableIndex, TableValue,
-    },
-    pc::ProgramCounterHandle,
-    stack::{BlockAwareOperandStack, OperandStackFns as _},
+    }, pc::ProgramCounterHandle, stack::{BlockAwareOperandStack, OperandStackFns as _},
 };
 
 const MAX_INSTRUCTIONS_IN_LOOP: isize = 500;
@@ -40,7 +35,7 @@ pub enum FunctionScopedResult {
 }
 
 impl WackasmExecutor {
-    pub fn new(module: WackasmModule) -> Result<Self, anyhow::Error> {
+    pub fn new(module: WackasmModule) -> Result<Self, HaltError> {
         let mut me = Self {
             fuel: AtomicIsize::new(isize::MAX),
             module,
@@ -56,7 +51,7 @@ impl WackasmExecutor {
     }
 
     /// Resets the executor and queues the function for running
-    pub fn call_export(&mut self, name: &str, arguments: Vec<Value>) -> Result<(), anyhow::Error> {
+    pub fn call_export(&mut self, name: &str, arguments: Vec<Value>) -> Result<(), HaltError> {
         self.output.take();
         self.callstack.clear();
 
@@ -67,7 +62,7 @@ impl WackasmExecutor {
             .ok_or_else(|| anyhow!("function not found"))?;
         let function = match function {
             ExportIndex::Func(function_type_index) => function_type_index,
-            _ => return Err(anyhow!("not a function")),
+            _ => return Err(HaltError::Error(anyhow!("not a function"))),
         };
 
         self.call_internal(*function, arguments)
@@ -77,7 +72,7 @@ impl WackasmExecutor {
         &mut self,
         function_index: FunctionIndex,
         arguments: Vec<Value>,
-    ) -> Result<(), anyhow::Error> {
+    ) -> Result<(), HaltError> {
         let function = self
             .module
             .init_function_frames
@@ -111,11 +106,11 @@ impl WackasmExecutor {
 
         let params = function_type.params();
         if arguments.len() != params.len() {
-            return Err(anyhow!(
+            return Err(HaltError::Error(anyhow!(
                 "invalid amount of arguments, expected {}, got {}",
                 params.len(),
                 arguments.len()
-            ));
+            )));
         }
 
         // Insert arguments
@@ -133,7 +128,7 @@ impl WackasmExecutor {
         block_lookup: &BlockManager,
         pc: &mut ProgramCounterHandle<'_>,
         relative_depth: u32,
-    ) -> Result<(), anyhow::Error> {
+    ) -> Result<(), HaltError> {
         for _ in 0..relative_depth {
             operand_stack
                 .pop_block_no_stack()
@@ -164,7 +159,7 @@ impl WackasmExecutor {
         &mut self,
         instructions: usize,
         instructions_executed: &mut isize,
-    ) -> Result<FunctionScopedResult, anyhow::Error> {
+    ) -> Result<FunctionScopedResult, HaltError> {
         let function_frame = self
             .callstack
             .last_mut()
@@ -320,11 +315,11 @@ impl WackasmExecutor {
 
                     let table_value = table
                         .get(func_index_index as u32 as usize)
-                        .ok_or_else(|| anyhow!("no function index for {:?}", func_index_index))?;
+                        .ok_or_else(|| trap!("undefined element {}", func_index_index as u32))?;
 
                     let func_index = match table_value {
                         TableValue::FuncRef(items) => items,
-                        _ => return Err(anyhow!("referenced table must be a funcref table")),
+                        TableValue::NullRef => return Err(trap!("uninitialized element")),
                     };
 
                     return Ok(FunctionScopedResult::FunctionCall {
@@ -483,9 +478,7 @@ impl WackasmExecutor {
                 Operator::I32DivU => {
                     i32_binop!(function_frame.stack, u32, |lhs, rhs| lhs
                         .checked_div(rhs)
-                        .ok_or_else(
-                        || anyhow!("divide by 0")
-                    )?)
+                        .ok_or_else(|| trap!("integer divide by zero"))?)
                 }
                 Operator::I32Sub => {
                     i32_binop!(function_frame.stack, i32, |lhs, rhs| lhs.wrapping_sub(rhs))
@@ -603,7 +596,7 @@ impl WackasmExecutor {
                     let value = value as i32;
                     function_frame.stack.push(Value::I32(value))?;
                 }
-                _ => return Err(anyhow!("unsupported operator: {:?}", operator)),
+                _ => return Err(unsupported!("unsupported operator: {:?}", operator)),
             }
         }
 
@@ -612,7 +605,7 @@ impl WackasmExecutor {
 
     // runs X instructions, decrementing fuel
     #[inline]
-    fn incremental_execute(&mut self, instructions: usize) -> Result<isize, anyhow::Error> {
+    fn incremental_execute(&mut self, instructions: usize) -> Result<isize, HaltError> {
         let mut instructions_executed = 0;
 
         let function_result =
@@ -683,14 +676,14 @@ impl WackasmExecutor {
         self.fuel.load(Ordering::Relaxed)
     }
 
-    pub fn execute(&mut self) -> Result<(), anyhow::Error> {
+    pub fn execute(&mut self) -> Result<(), HaltError> {
         while self.callstack.len() > 0 {
             let remaining_fuel = self.fuel.load(Ordering::Relaxed);
             let target_fuel = remaining_fuel.min(MAX_INSTRUCTIONS_IN_LOOP);
             if target_fuel == 0 {
                 break;
             }
-            let executed = self.incremental_execute(target_fuel.try_into()?)?;
+            let executed = self.incremental_execute(target_fuel as usize)?;
             self.fuel.fetch_sub(executed, Ordering::Relaxed);
         }
         Ok(())

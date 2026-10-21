@@ -1,5 +1,6 @@
 [workspace]
 members = ["crates/wackasm", "crates/wackasm-cli", "crates/wackasm-spec-tests"]
+exclude = ["compute"]
 resolver = "3"
 
 [profile.release]

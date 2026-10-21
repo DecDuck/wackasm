@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use wasmparser::ValType;
 
-use crate::{Value, module::BlockIndex, stack::{MAX_OPERAND_STACK_SIZE, MAX_STACK_POOL, OperandStackFns, basic::OperandStack}};
+use crate::{HaltError, Value, module::BlockIndex, stack::{MAX_OPERAND_STACK_SIZE, MAX_STACK_POOL, OperandStackFns, basic::OperandStack}};
 
 
 
@@ -50,7 +50,7 @@ impl BlockAwareOperandStack {
         &mut self,
         block_idx: BlockIndex,
         reversed_parameters: Option<Vec<Value>>,
-    ) -> Result<(), anyhow::Error> {
+    ) -> Result<(), HaltError> {
         let mut stack = self.new_stack();
         if let Some(reversed_parameters) = reversed_parameters {
             stack.push_reversed_all(reversed_parameters)?;
@@ -77,12 +77,12 @@ impl BlockAwareOperandStack {
 
 impl OperandStackFns for BlockAwareOperandStack {
     #[inline]
-    fn push(&mut self, value: Value) -> Result<(), anyhow::Error> {
+    fn push(&mut self, value: Value) -> Result<(), HaltError> {
         self.get_current_stack().push(value)
     }
 
     #[inline]
-    fn push_reversed_all(&mut self, values: Vec<Value>) -> Result<(), anyhow::Error> {
+    fn push_reversed_all(&mut self, values: Vec<Value>) -> Result<(), HaltError> {
         self.get_current_stack().push_reversed_all(values)
     }
 
@@ -90,39 +90,39 @@ impl OperandStackFns for BlockAwareOperandStack {
     fn pull_reversed_from_stack(
         &mut self,
         returns: &[ValType],
-    ) -> Result<Vec<Value>, anyhow::Error> {
+    ) -> Result<Vec<Value>, HaltError> {
         self.get_current_stack().pull_reversed_from_stack(returns)
     }
 
     #[inline]
-    fn peek(&mut self) -> Result<&Value, anyhow::Error> {
+    fn peek(&mut self) -> Result<&Value, HaltError> {
         self.get_current_stack().peek()
     }
 
     #[inline]
-    fn pop(&mut self) -> Result<Value, anyhow::Error> {
+    fn pop(&mut self) -> Result<Value, HaltError> {
         self.get_current_stack().pop()
     }
 
     #[inline]
-    fn pop_i32(&mut self) -> Result<i32, anyhow::Error> {
+    fn pop_i32(&mut self) -> Result<i32, HaltError> {
         self.get_current_stack().pop_i32()
     }
 
     #[inline]
-    fn pop_i64(&mut self) -> Result<i64, anyhow::Error> {
+    fn pop_i64(&mut self) -> Result<i64, HaltError> {
         self.get_current_stack().pop_i64()
     }
     
-    fn pop_f32(&mut self) -> Result<f32, anyhow::Error> {
+    fn pop_f32(&mut self) -> Result<f32, HaltError> {
         self.get_current_stack().pop_f32()
     }
     
-    fn pop_f64(&mut self) -> Result<f64, anyhow::Error> {
+    fn pop_f64(&mut self) -> Result<f64, HaltError> {
         self.get_current_stack().pop_f64()
     }
     
-    fn pop_v128(&mut self) -> Result<u128, anyhow::Error> {
+    fn pop_v128(&mut self) -> Result<u128, HaltError> {
         self.get_current_stack().pop_v128()
     }
     
