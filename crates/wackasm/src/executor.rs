@@ -208,7 +208,7 @@ impl WackasmExecutor {
                 Operator::MemoryGrow { mem } => {
                     let amount = function_frame.stack.pop_i32()?;
                     let result = self.module.memories.grow(*mem, amount)?;
-                    function_frame.stack.push(Value::I32(result))?;
+                    function_frame.stack.push(Value(result as u64))?;
                 }
                 Operator::MemoryFill { mem } => {
                     let amount = function_frame.stack.pop_i32()? as u32 as usize;
@@ -462,16 +462,16 @@ impl WackasmExecutor {
 
                 // i32 maths
                 Operator::I32Const { value } => {
-                    function_frame.stack.push(Value::I32(*value))?;
+                    function_frame.stack.push(Value((*value) as u64))?;
                 }
                 Operator::I64Const { value } => {
-                    function_frame.stack.push(Value::I64(*value))?;
+                    function_frame.stack.push(Value((*value) as u64))?;
                 }
                 Operator::F32Const { value } => {
-                    function_frame.stack.push(Value::F32((*value).into()))?;
+                    function_frame.stack.push(Value(value.bits() as u64))?;
                 }
                 Operator::F64Const { value } => {
-                    function_frame.stack.push(Value::F64((*value).into()))?;
+                    function_frame.stack.push(Value(value.bits()))?;
                 }
 
                 Operator::I32Add => {
@@ -522,7 +522,7 @@ impl WackasmExecutor {
                 Operator::I32Eqz => {
                     let a = function_frame.stack.pop_i32()?;
                     let result = if a == 0 { 1 } else { 0 };
-                    function_frame.stack.push(Value::I32(result))?;
+                    function_frame.stack.push(Value(result as u64))?;
                 }
                 Operator::I32Eq => {
                     i32_binop!(function_frame.stack, i32, |a, b| a == b)
@@ -580,7 +580,7 @@ impl WackasmExecutor {
                 }
                 Operator::I64Eqz => {
                     let a = function_frame.stack.pop_i64()?;
-                    function_frame.stack.push(Value::I32((a == 0) as i32))?;
+                    function_frame.stack.push(Value((a == 0) as u64))?;
                 }
                 Operator::Select => {
                     let cond = function_frame.stack.pop_i32()?;
@@ -596,12 +596,12 @@ impl WackasmExecutor {
                 Operator::I64ExtendI32U => {
                     let value = function_frame.stack.pop_i32()?;
                     let new_value = value as u32 as i64;
-                    function_frame.stack.push(Value::I64(new_value))?;
+                    function_frame.stack.push(Value(new_value as u64))?;
                 }
                 Operator::I32WrapI64 => {
                     let value = function_frame.stack.pop_i64()?;
                     let value = value as i32;
-                    function_frame.stack.push(Value::I32(value))?;
+                    function_frame.stack.push(Value(value as u64))?;
                 }
                 _ => return Err(unsupported!("unsupported operator: {:?}", operator)),
             }

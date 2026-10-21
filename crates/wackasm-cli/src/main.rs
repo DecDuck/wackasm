@@ -7,7 +7,7 @@ pub fn main() -> Result<(), anyhow::Error> {
     let module = WackasmModule::new(&contents)?;
     let mut executor = WackasmExecutor::new(module)?;
 
-    executor.call_export("run_prime_benchmark", vec![Value::I32(1000000), Value::I32(80)])?;
+    executor.call_export("run_prime_benchmark", vec![Value::from_i32(1000000), Value::from_i32(80)])?;
 
     executor.set_fuel(10);
     executor.execute()?;

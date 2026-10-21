@@ -71,18 +71,8 @@ pub struct WackasmModule {
 impl WackasmModule {
     fn val_type_to_value(val_type: &ValType) -> Value {
         match val_type {
-            wasmparser::ValType::I32 => Value::I32(i32::default()),
-            wasmparser::ValType::I64 => Value::I64(i64::default()),
-            wasmparser::ValType::F32 => Value::F32(f32::default()),
-            wasmparser::ValType::F64 => Value::F64(f64::default()),
-            wasmparser::ValType::V128 => Value::V128(u128::default()),
-            wasmparser::ValType::Ref(ref_type) => {
-                if ref_type.is_func_ref() {
-                    return Value::FuncRef(FunctionIndex(u32::MAX));
-                }
-
-                Value::Unknown
-            }
+            ValType::Ref(_) => Value::NULL_REF,
+            _ => Value(0),
         }
     }
 
@@ -215,6 +205,8 @@ impl WackasmModule {
     }
 
     pub fn new(data: &[u8]) -> Result<Self, HaltError> {
+        wasmparser::Validator::new().validate_all(data)?;
+
         let payloads = wasmparser::Parser::new(0)
             .parse_all(data)
             .collect::<Result<Vec<_>, _>>()?;

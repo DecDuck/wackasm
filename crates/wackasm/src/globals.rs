@@ -60,11 +60,6 @@ impl GlobalManager {
             .get_mut(global_index)
             .ok_or_else(|| anyhow!("no global for index {:?}", global_index))?;
 
-        // Check discriminate
-        if mem::discriminant(&value.inner) != mem::discriminant(&new_value) {
-            return Err(anyhow!("global value types mismatched").into());
-        }
-
         value.inner = new_value;
 
         Ok(())

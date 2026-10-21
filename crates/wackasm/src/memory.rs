@@ -99,22 +99,13 @@ impl MemoryManager {
                     offset_expr,
                 } => {
                     let offset_value = resolve_const_expr(offset_expr)?;
-                    let offset_value = match offset_value {
-                        Value::I32(v) => v,
-                        _ => {
-                            return Err(unsupported!(
-                                "offset value {:?} not supported for data segments",
-                                offset_value
-                            ));
-                        }
-                    };
 
                     let linear_memory = self
                         .memories
                         .get_mut(memory_index as usize)
                         .ok_or_else(|| anyhow!("no linear memory for index {}", memory_index))?;
 
-                    let start = usize::try_from(offset_value as u32)?;
+                    let start = usize::try_from(offset_value.0 as i32 as u32)?;
                     let end = start
                         .checked_add(data.data.len())
                         .ok_or_else(|| trap!("out of bounds memory access"))?;

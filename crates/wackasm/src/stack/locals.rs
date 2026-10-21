@@ -23,7 +23,7 @@ impl LocalStore {
     #[inline]
     pub fn insert(&mut self, index: u32, value: Value) {
         let index = index as usize;
-        self.inner.resize_with(index + 1, || Value::Unknown);
+        self.inner.resize_with(index + 1, || Value(u64::MAX));
         self.inner[index] = value;
     }
 
@@ -33,14 +33,7 @@ impl LocalStore {
             .inner
             .get_mut(index as usize)
             .ok_or_else(|| anyhow!("no local for index {}", index))?;
-        if discriminant(&value) != discriminant(local) {
-            return Err(anyhow!(
-                "invalid type for argument {}, expected {:?}",
-                index,
-                local
-            )
-            .into());
-        }
+
         *local = value;
         Ok(())
     }
