@@ -35,7 +35,7 @@ impl ScriptRunner {
             .map_err(|error| error.to_string())?;
         self.definitions.insert(name.clone(), bytes);
         self.instances
-            .insert(name.clone(), WackasmExecutor::new(module));
+            .insert(name.clone(), WackasmExecutor::new(module).map_err(|e| e.to_string())?);
         self.current_definition = Some(name.clone());
         self.current_instance = Some(name);
         Ok(())
@@ -50,7 +50,7 @@ impl ScriptRunner {
             .map_err(runtime_panic)?
             .map_err(|error| error.to_string())?;
         self.instances
-            .insert(instance.clone(), WackasmExecutor::new(module));
+            .insert(instance.clone(), WackasmExecutor::new(module).map_err(|e| e.to_string())?);
         self.current_definition = Some(definition.to_owned());
         self.current_instance = Some(instance);
         Ok(())

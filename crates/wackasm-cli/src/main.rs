@@ -5,7 +5,7 @@ use wackasm::{Value, WackasmExecutor, WackasmModule};
 pub fn main() -> Result<(), anyhow::Error> {
     let contents = std::fs::read("./compute/target/wasm32-unknown-unknown/release/compute.wasm")?;
     let module = WackasmModule::new(&contents)?;
-    let mut executor = WackasmExecutor::new(module);
+    let mut executor = WackasmExecutor::new(module)?;
 
     executor.call_export("run_prime_benchmark", vec![Value::I32(1000000), Value::I32(80)])?;
 

@@ -10,6 +10,7 @@ pub(crate) fn resolve_const_expr(expr: ConstExpr) -> Result<Value, anyhow::Error
         let operand = operand?;
         match operand {
             Operator::I32Const { value } => return Ok(Value::I32(value)),
+            Operator::I64Const { value } => return Ok(Value::I64(value)),
             _ => return Err(anyhow!("operand {:?} not supported for const exprs", operand)),
         }
     }

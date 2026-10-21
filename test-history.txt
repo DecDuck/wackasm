@@ -8,3 +8,5 @@
 - total: 16283 passed, 9202 failed, 39339 unsupported
 - total: 16806 passed, 8824 failed, 39194 unsupported
 - total: 17200 passed, 8697 failed, 38927 unsupported
+- total: 17236 passed, 8723 failed, 38865 unsupported
+- total: 17461 passed, 8721 failed, 38642 unsupported

@@ -40,13 +40,19 @@ pub enum FunctionScopedResult {
 }
 
 impl WackasmExecutor {
-    pub fn new(module: WackasmModule) -> Self {
-        Self {
+    pub fn new(module: WackasmModule) -> Result<Self, anyhow::Error> {
+        let mut me = Self {
             fuel: AtomicIsize::new(isize::MAX),
             module,
             callstack: Vec::new(),
             output: None,
+        };
+
+        if let Some(start_func) = me.module.start_func.take() {
+            me.call_internal(start_func, Vec::new())?;
         }
+
+        Ok(me)
     }
 
     /// Resets the executor and queues the function for running
@@ -169,6 +175,7 @@ impl WackasmExecutor {
             let mut pc = function_frame.pc.handle();
             let operator = function_frame.code.get(pc.inner()).unwrap();
             match operator {
+                Operator::Nop => {},
                 // Gets
                 Operator::LocalGet { local_index } => {
                     let local = *function_frame.locals.get(&local_index)?;
@@ -177,6 +184,9 @@ impl WackasmExecutor {
                 Operator::LocalSet { local_index } => {
                     let value = function_frame.stack.pop()?;
                     function_frame.locals.set_checked(*local_index, value)?;
+                }
+                Operator::Drop => {
+                    function_frame.stack.pop()?;
                 }
                 Operator::LocalTee { local_index } => {
                     let value = function_frame.stack.peek()?;
@@ -257,12 +267,29 @@ impl WackasmExecutor {
                 }
 
                 // memory store
-                Operator::I32Store8 { memarg } => {
-                    i32_store!(function_frame.stack, self.module.memories, memarg, u8)
-                }
                 Operator::I32Store { memarg } => {
                     i32_store!(function_frame.stack, self.module.memories, memarg, i32)
                 }
+                Operator::I32Store8 { memarg } => {
+                    i32_store!(function_frame.stack, self.module.memories, memarg, u8)
+                }
+                Operator::I32Store16 { memarg } => {
+                    i32_store!(function_frame.stack, self.module.memories, memarg, u16)
+                }
+
+                Operator::I64Store { memarg } => {
+                    i64_store!(function_frame.stack, self.module.memories, memarg, i64)
+                }
+                Operator::I64Store8 { memarg } => {
+                    i64_store!(function_frame.stack, self.module.memories, memarg, u8)
+                }
+                Operator::I64Store16 { memarg } => {
+                    i64_store!(function_frame.stack, self.module.memories, memarg, u16)
+                }
+                Operator::I64Store32 { memarg } => {
+                    i64_store!(function_frame.stack, self.module.memories, memarg, u32)
+                }
+
                 Operator::F32Store { memarg } => {
                     f32_store!(function_frame.stack, self.module.memories, memarg)
                 }
@@ -271,15 +298,6 @@ impl WackasmExecutor {
                 }
                 Operator::V128Store { memarg } => {
                     v128_store!(function_frame.stack, self.module.memories, memarg)
-                }
-                Operator::I64Store { memarg } => {
-                    i64_store!(function_frame.stack, self.module.memories, memarg, i64)
-                }
-                Operator::I64Store16 { memarg } => {
-                    i64_store!(function_frame.stack, self.module.memories, memarg, u16)
-                }
-                Operator::I64Store32 { memarg } => {
-                    i64_store!(function_frame.stack, self.module.memories, memarg, u32)
                 }
 
                 // Handle function call
