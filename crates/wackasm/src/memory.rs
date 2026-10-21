@@ -132,14 +132,29 @@ impl MemoryManager {
             .ok_or_else(|| anyhow!("memory not found for index {}", mem))?;
 
         let prev = memory.current;
-        let new = prev + amount as u64;
-        if let Some(max) = memory.max
-            && new > max
+
+        // No more than 4GiB of pages
+        let hard_max_pages = (1u64 << 32) / memory.page_size as u64;
+        
+        let limit = memory
+            .max
+            .map_or(hard_max_pages, |max| max.min(hard_max_pages));
+        let Some(new) = prev
+            .checked_add(amount as u32 as u64)
+            .filter(|new| *new <= limit)
+        else {
+            return Ok(-1);
+        };
+
+        let new_len = new as usize * memory.page_size;
+        if memory
+            .buffer
+            .try_reserve_exact(new_len - memory.buffer.len())
+            .is_err()
         {
             return Ok(-1);
         }
-
-        memory.buffer.resize(new as usize * memory.page_size, 0);
+        memory.buffer.resize(new_len, 0);
         memory.current = new;
 
         Ok(prev.try_into()?)

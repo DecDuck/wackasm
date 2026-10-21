@@ -305,6 +305,15 @@ impl WackasmModule {
                 Payload::DataSection(raw_data) => {
                     memories.process_data_section(raw_data)?;
                 }
+                Payload::ImportSection(import) => {
+                    for import in import {
+                        let import = import?;
+                        for import in import {
+                            let (import_idx, import) = import?;
+                            
+                        }
+                    }
+                }
                 Payload::CustomSection(_) | Payload::End(_) => {}
                 _ => return Err(unsupported!("unsupported section: {:?}", payload)),
             }
