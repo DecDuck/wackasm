@@ -2,10 +2,16 @@ use std::{collections::HashMap, sync::Arc};
 
 use anyhow::anyhow;
 use serde::{Deserialize, Serialize};
-use wasmparser::{FuncType, FunctionBody, RecGroup, SectionLimited};
+use wasmparser::{FuncType, FunctionBody, Import, Imports, RecGroup, SectionLimited};
 
 use crate::{
-    HaltError, Value, WackasmModule, blocks::{BlockManager, lookahead_find_blocks}, macros::trap, module::{FunctionFrame, FunctionIndex, FunctionTypeIndex}, operator::OperatorView, pc::ProgramCounter, stack::{FrameOperandStack, GlobalStack as _, LocalStore, StackSection},
+    HaltError, Value, WackasmModule,
+    blocks::{BlockManager, lookahead_find_blocks},
+    macros::trap,
+    module::{FunctionFrame, FunctionIndex, FunctionTypeIndex},
+    operator::OperatorView,
+    pc::ProgramCounter,
+    stack::{FrameOperandStack, GlobalStack as _, LocalStore, StackSection},
 };
 
 const MAX_CALL_DEPTH: usize = 10_000;
@@ -56,6 +62,13 @@ impl FunctionManager {
 
     fn get_next_function_index(&self) -> FunctionIndex {
         FunctionIndex(self.init_function_frames.len() as u32)
+    }
+
+    pub(crate) fn process_import_section(
+        &mut self,
+        imports: SectionLimited<Imports>,
+    ) -> Result<(), HaltError> {
+        Ok(())
     }
 
     pub(crate) fn process_type_section(

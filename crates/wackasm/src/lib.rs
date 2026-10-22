@@ -10,6 +10,8 @@ mod memory;
 mod module;
 mod operator;
 mod pc;
+#[cfg(feature = "op-profile")]
+pub mod profiling;
 mod stack;
 mod table;
 mod functions;
