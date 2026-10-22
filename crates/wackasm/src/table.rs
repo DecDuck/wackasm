@@ -15,13 +15,13 @@ use crate::{
 
 #[derive(Debug, Serialize, Deserialize)]
 pub(crate) struct TableManager {
-    pub(crate) tables: HashMap<TableIndex, Vec<TableValue>>,
+    pub(crate) tables: Vec<Vec<TableValue>>,
 }
 
 impl TableManager {
     pub fn new() -> Self {
         Self {
-            tables: HashMap::new(),
+            tables: Vec::new(),
         }
     }
 
@@ -41,7 +41,7 @@ impl TableManager {
                 }
             };
             let table_values = vec![init_value; table.ty.initial as usize];
-            self.tables.insert(index, table_values);
+            self.tables.push(table_values);
         }
         Ok(())
     }
@@ -63,7 +63,7 @@ impl TableManager {
 
                     let table_value = self
                         .tables
-                        .get_mut(&table_index)
+                        .get_mut(table_index.0 as usize)
                         .ok_or_else(|| anyhow!("table for index {:?} not found", table_index))?;
 
                     match element.items {
@@ -97,6 +97,6 @@ impl TableManager {
     }
 
     pub fn get(&self, index: &TableIndex) -> Option<&Vec<TableValue>> {
-        self.tables.get(index)
+        self.tables.get(index.0 as usize)
     }
 }

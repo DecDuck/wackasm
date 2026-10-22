@@ -15,13 +15,13 @@ pub(crate) struct Global {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub(crate) struct GlobalManager {
-    pub(crate) globals: HashMap<GlobalIndex, Global>,
+    pub(crate) globals: Vec<Global>,
 }
 
 impl GlobalManager {
     pub fn new() -> Self {
         Self {
-            globals: HashMap::new(),
+            globals: Vec::new(),
         }
     }
 
@@ -29,7 +29,7 @@ impl GlobalManager {
         &mut self,
         raw_globals: SectionLimited<WASMPARSERGlobal>,
     ) -> Result<(), HaltError> {
-        for (global_idx, global) in raw_globals.into_iter().enumerate() {
+        for global in raw_globals {
             let global = global?;
             let init_value = resolve_const_expr(global.init_expr)?;
             let global = Global {
@@ -38,7 +38,7 @@ impl GlobalManager {
                 shared: global.ty.shared,
             };
 
-            self.globals.insert(GlobalIndex(global_idx as u32), global);
+            self.globals.push(global);
         }
 
         Ok(())
@@ -46,7 +46,7 @@ impl GlobalManager {
 
     pub fn get(&self, global_index: &GlobalIndex) -> Result<&Global, HaltError> {
         self.globals
-            .get(global_index)
+            .get(global_index.0 as usize)
             .ok_or_else(|| anyhow!("no global for index {:?}", global_index).into())
     }
 
@@ -57,7 +57,7 @@ impl GlobalManager {
     ) -> Result<(), HaltError> {
         let value = self
             .globals
-            .get_mut(global_index)
+            .get_mut(global_index.0 as usize)
             .ok_or_else(|| anyhow!("no global for index {:?}", global_index))?;
 
         value.inner = new_value;

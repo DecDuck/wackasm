@@ -99,7 +99,7 @@ impl FunctionManager {
             block_lookup: Arc::new(BlockManager::new()),
 
             // Runtime state
-            pc: ProgramCounter::new(),
+            pc: ProgramCounter::default(),
         };
 
         // Check function signature and create parameter locals

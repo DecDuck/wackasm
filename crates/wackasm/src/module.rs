@@ -49,7 +49,6 @@ pub(crate) struct FunctionFrame {
     pub(crate) block_lookup: Arc<BlockManager>,
     pub(crate) locals: LocalStore,
     pub(crate) code: OperatorView,
-
     pub(crate) pc: ProgramCounter,
 }
 

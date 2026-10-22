@@ -17,10 +17,9 @@ use crate::{
         i64_cmp, i64_load, i64_store, trap, unsupported, v128_load, v128_store,
     },
     module::{
-        BlockIndex, ExportIndex, FunctionFrame, FunctionIndex, FunctionTypeIndex, GlobalIndex,
-        TableIndex, TableValue,
+        BlockIndex, ExportIndex, FunctionFrame, FunctionIndex, GlobalIndex, TableIndex, TableValue,
     },
-    pc::ProgramCounterHandle,
+    pc::ProgramCounter,
     stack::{FrameOperandStack, GlobalStack as _, StackSection},
 };
 
@@ -90,7 +89,7 @@ impl WackasmExecutor {
         stack: &mut FrameOperandStack,
         blocks: &BlockManager,
         functions: &FunctionManager,
-        pc: &mut ProgramCounterHandle<'_>,
+        pc: &mut ProgramCounter,
         relative_depth: u32,
     ) -> Result<Option<FunctionScopedResult>, HaltError> {
         let target = stack.len_sections() - 1 - relative_depth as usize;
@@ -105,13 +104,13 @@ impl WackasmExecutor {
                     Block::Block { end, .. } | Block::If { end, .. } => {
                         let return_params = block.return_params(functions)?;
                         stack.return_section(return_params.unwrap_or(&[]), Some(target))?;
-                        pc.set_pc(*end + 1);
+                        *pc = *end + 1;
                     }
                     // Keep the loop's section and skip re-executing the `loop` opcode
                     Block::Loop { start, .. } => {
                         let call_params = block.call_params(functions)?;
                         stack.reset_section(call_params.as_deref().unwrap_or(&[]), target)?;
-                        pc.set_pc(*start + 1);
+                        *pc = *start + 1;
                     }
                 }
             }
@@ -128,8 +127,14 @@ impl WackasmExecutor {
     fn incremental_execute(&mut self, instructions: usize) -> Result<isize, HaltError> {
         let mut instructions_executed = 0;
 
-        let function_result =
+        let (function_result, pc) =
             self.incremental_execute_function(instructions, &mut instructions_executed)?;
+
+        // Update PC
+        self.callstack
+            .last_mut()
+            .ok_or_else(|| anyhow!("callstack empty"))?
+            .pc = pc;
 
         match function_result {
             FunctionScopedResult::OutOfFuel => {} // nothing, just continue
@@ -200,16 +205,17 @@ impl WackasmExecutor {
         &mut self,
         instructions: usize,
         instructions_executed: &mut isize,
-    ) -> Result<FunctionScopedResult, HaltError> {
+    ) -> Result<(FunctionScopedResult, ProgramCounter), HaltError> {
         let function_frame = self
             .callstack
             .last_mut()
             .ok_or_else(|| anyhow!("callstack empty"))?;
 
+        let mut pc = function_frame.pc;
+
         for _ in 0..instructions {
             *instructions_executed += 1;
-            let mut pc = function_frame.pc.handle();
-            let operator = function_frame.code.get(pc.inner()).unwrap();
+            let operator = function_frame.code.get(pc).unwrap();
             match operator {
                 Operator::Nop => {}
                 // Gets
@@ -338,10 +344,13 @@ impl WackasmExecutor {
 
                 // Handle function call
                 Operator::Call { function_index } => {
-                    // Add one so we resume to the next instruction
-                    return Ok(FunctionScopedResult::FunctionCall {
-                        function_index: *function_index,
-                    });
+                    pc += 1;
+                    return Ok((
+                        FunctionScopedResult::FunctionCall {
+                            function_index: *function_index,
+                        },
+                        pc,
+                    ));
                 }
                 Operator::CallIndirect {
                     type_index: _,
@@ -363,14 +372,18 @@ impl WackasmExecutor {
                         TableValue::NullRef => return Err(trap!("uninitialized element")),
                     };
 
-                    return Ok(FunctionScopedResult::FunctionCall {
-                        function_index: func_index.0,
-                    });
+                    pc += 1;
+                    return Ok((
+                        FunctionScopedResult::FunctionCall {
+                            function_index: func_index.0,
+                        },
+                        pc,
+                    ));
                 }
 
                 // Control flow
                 Operator::If { blockty: _ } => {
-                    let block_index = BlockIndex(pc.inner() as u32);
+                    let block_index = BlockIndex(pc as u32);
                     let block = function_frame.block_lookup.get(&block_index)?;
 
                     let condition = self.stack.pop_i32()?;
@@ -381,16 +394,16 @@ impl WackasmExecutor {
 
                     if condition {
                         // Jump to next instruction
-                        pc.set_pc(start + 1);
+                        pc = start + 1;
                         start_block = true;
                     } else {
                         if let Some(else_block) = else_block {
                             start_block = true;
                             // Jump after else instruction
-                            pc.set_pc(else_block + 1);
+                            pc = else_block + 1;
                         } else {
                             // Jump after end
-                            pc.set_pc(end + 1);
+                            pc = end + 1;
                         }
                     }
 
@@ -398,6 +411,9 @@ impl WackasmExecutor {
                         self.module
                             .start_block(&mut self.stack, &block, &block_index)?;
                     }
+
+                    // Skip PC increment
+                    continue;
                 }
 
                 // Jump to end block if we hit an else
@@ -411,11 +427,14 @@ impl WackasmExecutor {
 
                     let (_, _, end) = block.if_block()?;
                     // Jump to end block which will handle block frame cleanup
-                    pc.set_pc(end);
+                    pc = end;
+
+                    // Skip PC incremenet
+                    continue;
                 }
 
                 Operator::Block { blockty: _ } | Operator::Loop { blockty: _ } => {
-                    let block_index = BlockIndex(pc.inner() as u32);
+                    let block_index = BlockIndex(pc as u32);
                     let block = function_frame.block_lookup.get(&block_index)?;
 
                     self.module
@@ -426,18 +445,19 @@ impl WackasmExecutor {
                     let condition = self.stack.pop_i32()?;
                     let branching = condition != 0;
 
-                    if !branching {
-                        continue;
-                    }
+                    if branching {
+                        if let Some(result) = WackasmExecutor::block_break(
+                            &mut self.stack,
+                            &function_frame.block_lookup,
+                            &self.module.functions,
+                            &mut pc,
+                            *relative_depth,
+                        )? {
+                            return Ok((result, pc));
+                        }
 
-                    if let Some(result) = WackasmExecutor::block_break(
-                        &mut self.stack,
-                        &function_frame.block_lookup,
-                        &self.module.functions,
-                        &mut pc,
-                        *relative_depth,
-                    )? {
-                        return Ok(result);
+                        // Skip PC increment
+                        continue;
                     }
                 }
 
@@ -449,8 +469,11 @@ impl WackasmExecutor {
                         &mut pc,
                         *relative_depth,
                     )? {
-                        return Ok(result);
+                        return Ok((result, pc));
                     }
+
+                    // Skip PC increment
+                    continue;
                 }
 
                 Operator::BrTable { targets } => {
@@ -469,8 +492,11 @@ impl WackasmExecutor {
                         &mut pc,
                         target,
                     )? {
-                        return Ok(result);
+                        return Ok((result, pc));
                     }
+
+                    // Skip PC increment
+                    continue;
                 }
 
                 // Handle block/function return
@@ -493,12 +519,12 @@ impl WackasmExecutor {
                                 .ok_or_else(|| anyhow!("no block to end from"))?;
                         }
                         StackSection::Function(_) => {
-                            return Ok(FunctionScopedResult::FunctionReturn);
+                            return Ok((FunctionScopedResult::FunctionReturn, pc));
                         }
                     }
                 }
                 Operator::Return => {
-                    return Ok(FunctionScopedResult::FunctionReturn);
+                    return Ok((FunctionScopedResult::FunctionReturn, pc));
                 }
 
                 // i32 maths
@@ -645,8 +671,10 @@ impl WackasmExecutor {
                 }
                 _ => return Err(unsupported!("unsupported operator: {:?}", operator)),
             }
+
+            pc += 1;
         }
 
-        return Ok(FunctionScopedResult::OutOfFuel);
+        return Ok((FunctionScopedResult::OutOfFuel, pc));
     }
 }
