@@ -7,6 +7,7 @@ use wasmparser::Operator;
 use crate::{
     HaltError, Value, WackasmModule,
     blocks::{Block, BlockManager},
+    compiler::WackasmOperator,
     functions::FunctionManager,
     macros::{
         f32_load, f32_store, f64_load, f64_store, i32_binop, i32_load, i32_store, i64_binop,
@@ -214,46 +215,46 @@ impl WackasmExecutor {
 
         for _ in 0..instructions {
             *instructions_executed += 1;
-            let operator = function_frame.code.get(pc).unwrap();
+            let operator = function_frame.code.get(pc);
             #[cfg(feature = "op-profile")]
             crate::profiling::begin(operator);
             match operator {
-                Operator::Nop => {}
+                WackasmOperator::Nop => {}
                 // Gets
-                Operator::LocalGet { local_index } => {
+                WackasmOperator::LocalGet { local_index } => {
                     let local = *function_frame.locals.get(&local_index)?;
                     self.stack.push(local)?;
                 }
-                Operator::LocalSet { local_index } => {
+                WackasmOperator::LocalSet { local_index } => {
                     let value = self.stack.pop()?;
                     function_frame.locals.set_checked(*local_index, value)?;
                 }
-                Operator::Drop => {
+                WackasmOperator::Drop => {
                     self.stack.pop()?;
                 }
-                Operator::LocalTee { local_index } => {
+                WackasmOperator::LocalTee { local_index } => {
                     let value = self.stack.peek()?;
                     function_frame
                         .locals
                         .set_checked(*local_index, value.clone())?;
                 }
-                Operator::GlobalGet { global_index } => {
+                WackasmOperator::GlobalGet { global_index } => {
                     let global = self.module.globals.get(&GlobalIndex(*global_index))?;
                     self.stack.push(global.inner.clone())?;
                 }
-                Operator::GlobalSet { global_index } => {
+                WackasmOperator::GlobalSet { global_index } => {
                     let value = self.stack.pop()?;
                     self.module
                         .globals
                         .set(&GlobalIndex(*global_index), value)?;
                 }
 
-                Operator::MemoryGrow { mem } => {
+                WackasmOperator::MemoryGrow { mem } => {
                     let amount = self.stack.pop_i32()?;
                     let result = self.module.memories.grow(*mem, amount)?;
                     self.stack.push(Value(result as u64))?;
                 }
-                Operator::MemoryFill { mem } => {
+                WackasmOperator::MemoryFill { mem } => {
                     let amount = self.stack.pop_i32()? as u32 as usize;
                     let value = self.stack.pop_i32()? as u8;
                     let offset = self.stack.pop_i32()? as u32 as usize;
@@ -261,90 +262,90 @@ impl WackasmExecutor {
                 }
 
                 // memory load
-                Operator::I32Load { memarg } => {
+                WackasmOperator::I32Load { memarg } => {
                     i32_load!(self.stack, self.module.memories, memarg, i32)
                 }
-                Operator::I32Load8U { memarg } => {
+                WackasmOperator::I32Load8U { memarg } => {
                     i32_load!(self.stack, self.module.memories, memarg, u8)
                 }
-                Operator::I32Load8S { memarg } => {
+                WackasmOperator::I32Load8S { memarg } => {
                     i32_load!(self.stack, self.module.memories, memarg, i8)
                 }
-                Operator::I32Load16U { memarg } => {
+                WackasmOperator::I32Load16U { memarg } => {
                     i32_load!(self.stack, self.module.memories, memarg, u16)
                 }
-                Operator::I32Load16S { memarg } => {
+                WackasmOperator::I32Load16S { memarg } => {
                     i32_load!(self.stack, self.module.memories, memarg, i16)
                 }
 
-                Operator::I64Load { memarg } => {
+                WackasmOperator::I64Load { memarg } => {
                     i64_load!(self.stack, self.module.memories, memarg, i64);
                 }
-                Operator::I64Load8U { memarg } => {
+                WackasmOperator::I64Load8U { memarg } => {
                     i64_load!(self.stack, self.module.memories, memarg, u8)
                 }
-                Operator::I64Load8S { memarg } => {
+                WackasmOperator::I64Load8S { memarg } => {
                     i64_load!(self.stack, self.module.memories, memarg, i8);
                 }
-                Operator::I64Load16U { memarg } => {
+                WackasmOperator::I64Load16U { memarg } => {
                     i64_load!(self.stack, self.module.memories, memarg, u16);
                 }
-                Operator::I64Load16S { memarg } => {
+                WackasmOperator::I64Load16S { memarg } => {
                     i64_load!(self.stack, self.module.memories, memarg, i16);
                 }
-                Operator::I64Load32U { memarg } => {
+                WackasmOperator::I64Load32U { memarg } => {
                     i64_load!(self.stack, self.module.memories, memarg, u32);
                 }
-                Operator::I64Load32S { memarg } => {
+                WackasmOperator::I64Load32S { memarg } => {
                     i64_load!(self.stack, self.module.memories, memarg, i32);
                 }
 
-                Operator::F32Load { memarg } => {
+                WackasmOperator::F32Load { memarg } => {
                     f32_load!(self.stack, self.module.memories, memarg)
                 }
-                Operator::F64Load { memarg } => {
+                WackasmOperator::F64Load { memarg } => {
                     f64_load!(self.stack, self.module.memories, memarg)
                 }
-                Operator::V128Load { memarg } => {
+                WackasmOperator::V128Load { memarg } => {
                     v128_load!(self.stack, self.module.memories, memarg)
                 }
 
                 // memory store
-                Operator::I32Store { memarg } => {
+                WackasmOperator::I32Store { memarg } => {
                     i32_store!(self.stack, self.module.memories, memarg, i32)
                 }
-                Operator::I32Store8 { memarg } => {
+                WackasmOperator::I32Store8 { memarg } => {
                     i32_store!(self.stack, self.module.memories, memarg, u8)
                 }
-                Operator::I32Store16 { memarg } => {
+                WackasmOperator::I32Store16 { memarg } => {
                     i32_store!(self.stack, self.module.memories, memarg, u16)
                 }
 
-                Operator::I64Store { memarg } => {
+                WackasmOperator::I64Store { memarg } => {
                     i64_store!(self.stack, self.module.memories, memarg, i64)
                 }
-                Operator::I64Store8 { memarg } => {
+                WackasmOperator::I64Store8 { memarg } => {
                     i64_store!(self.stack, self.module.memories, memarg, u8)
                 }
-                Operator::I64Store16 { memarg } => {
+                WackasmOperator::I64Store16 { memarg } => {
                     i64_store!(self.stack, self.module.memories, memarg, u16)
                 }
-                Operator::I64Store32 { memarg } => {
+                WackasmOperator::I64Store32 { memarg } => {
                     i64_store!(self.stack, self.module.memories, memarg, u32)
                 }
 
-                Operator::F32Store { memarg } => {
+                WackasmOperator::F32Store { memarg } => {
                     f32_store!(self.stack, self.module.memories, memarg)
                 }
-                Operator::F64Store { memarg } => {
+                WackasmOperator::F64Store { memarg } => {
                     f64_store!(self.stack, self.module.memories, memarg)
                 }
-                Operator::V128Store { memarg } => {
+                WackasmOperator::V128Store { memarg } => {
                     v128_store!(self.stack, self.module.memories, memarg)
                 }
 
                 // Handle function call
-                Operator::Call { function_index } => {
+                WackasmOperator::Call { function_index } => {
                     pc += 1;
                     return Ok((
                         FunctionScopedResult::FunctionCall {
@@ -353,10 +354,7 @@ impl WackasmExecutor {
                         pc,
                     ));
                 }
-                Operator::CallIndirect {
-                    type_index: _,
-                    table_index,
-                } => {
+                WackasmOperator::CallIndirect { table_index } => {
                     let func_index_index = self.stack.pop_i32()?;
                     let table = self
                         .module
@@ -383,7 +381,7 @@ impl WackasmExecutor {
                 }
 
                 // Control flow
-                Operator::If { blockty: _ } => {
+                WackasmOperator::If => {
                     let block_index = BlockIndex(pc as u32);
                     let block = function_frame.block_lookup.get(&block_index)?;
 
@@ -418,7 +416,7 @@ impl WackasmExecutor {
                 }
 
                 // Jump to end block if we hit an else
-                Operator::Else => {
+                WackasmOperator::Else => {
                     let block_index = self
                         .stack
                         .peek_section(None)
@@ -434,7 +432,7 @@ impl WackasmExecutor {
                     continue;
                 }
 
-                Operator::Block { blockty: _ } | Operator::Loop { blockty: _ } => {
+                WackasmOperator::Block | WackasmOperator::Loop => {
                     let block_index = BlockIndex(pc as u32);
                     let block = function_frame.block_lookup.get(&block_index)?;
 
@@ -442,7 +440,7 @@ impl WackasmExecutor {
                         .start_block(&mut self.stack, &block, &block_index)?;
                 }
 
-                Operator::BrIf { relative_depth } => {
+                WackasmOperator::BrIf { relative_depth } => {
                     let condition = self.stack.pop_i32()?;
                     let branching = condition != 0;
 
@@ -462,7 +460,7 @@ impl WackasmExecutor {
                     }
                 }
 
-                Operator::Br { relative_depth } => {
+                WackasmOperator::Br { relative_depth } => {
                     if let Some(result) = WackasmExecutor::block_break(
                         &mut self.stack,
                         &function_frame.block_lookup,
@@ -477,21 +475,25 @@ impl WackasmExecutor {
                     continue;
                 }
 
-                Operator::BrTable { targets } => {
-                    let decider = self.stack.pop_i32()? as u32;
-                    let target = if decider >= targets.len() {
-                        targets.default()
+                WackasmOperator::BrTable { targets } => {
+                    let decider = self.stack.pop_i32()? as u32 as usize;
+                    let target = if decider >= targets.targets.len() {
+                        &targets.default
                     } else {
-                        targets.targets().nth(decider as usize).ok_or_else(|| {
-                            trap!("no function for index {} in br_table args", decider)
-                        })??
+                        targets
+                            .targets
+                            .iter()
+                            .nth(decider as usize)
+                            .ok_or_else(|| {
+                                trap!("no function for index {} in br_table args", decider)
+                            })?
                     };
                     if let Some(result) = WackasmExecutor::block_break(
                         &mut self.stack,
                         &function_frame.block_lookup,
                         &self.module.functions,
                         &mut pc,
-                        target,
+                        *target,
                     )? {
                         return Ok((result, pc));
                     }
@@ -501,7 +503,7 @@ impl WackasmExecutor {
                 }
 
                 // Handle block/function return
-                Operator::End => {
+                WackasmOperator::End => {
                     let section_idx = self
                         .stack
                         .peek_section(None)
@@ -524,132 +526,132 @@ impl WackasmExecutor {
                         }
                     }
                 }
-                Operator::Return => {
+                WackasmOperator::Return => {
                     return Ok((FunctionScopedResult::FunctionReturn, pc));
                 }
 
                 // i32 maths
-                Operator::I32Const { value } => {
+                WackasmOperator::I32Const { value } => {
                     self.stack.push(Value((*value) as u64))?;
                 }
-                Operator::I64Const { value } => {
+                WackasmOperator::I64Const { value } => {
                     self.stack.push(Value((*value) as u64))?;
                 }
-                Operator::F32Const { value } => {
-                    self.stack.push(Value(value.bits() as u64))?;
+                WackasmOperator::F32Const { value } => {
+                    self.stack.push(Value(value.to_bits() as u64))?;
                 }
-                Operator::F64Const { value } => {
-                    self.stack.push(Value(value.bits()))?;
+                WackasmOperator::F64Const { value } => {
+                    self.stack.push(Value(value.to_bits()))?;
                 }
 
-                Operator::I32Add => {
+                WackasmOperator::I32Add => {
                     i32_binop!(self.stack, i32, |lhs, rhs| lhs.wrapping_add(rhs))
                 }
-                Operator::I32Mul => {
+                WackasmOperator::I32Mul => {
                     i32_binop!(self.stack, i32, |lhs, rhs| lhs.wrapping_mul(rhs))
                 }
-                Operator::I32DivU => {
+                WackasmOperator::I32DivU => {
                     i32_binop!(self.stack, u32, |lhs, rhs| lhs
                         .checked_div(rhs)
                         .ok_or_else(|| trap!("integer divide by zero"))?)
                 }
-                Operator::I32Sub => {
+                WackasmOperator::I32Sub => {
                     i32_binop!(self.stack, i32, |lhs, rhs| lhs.wrapping_sub(rhs))
                 }
-                Operator::I32ShrU => {
+                WackasmOperator::I32ShrU => {
                     i32_binop!(self.stack, u32, |lhs, rhs| lhs.wrapping_shr(rhs))
                 }
-                Operator::I32Shl => {
+                WackasmOperator::I32Shl => {
                     i32_binop!(self.stack, u32, |lhs, rhs| lhs.wrapping_shl(rhs))
                 }
-                Operator::I32And => {
+                WackasmOperator::I32And => {
                     i32_binop!(self.stack, i32, |lhs, rhs| lhs & rhs)
                 }
-                Operator::I32Xor => {
+                WackasmOperator::I32Xor => {
                     i32_binop!(self.stack, i32, |lhs, rhs| lhs ^ rhs)
                 }
 
                 // i32 comparators
-                Operator::I32GtS => {
+                WackasmOperator::I32GtS => {
                     i32_binop!(self.stack, i32, |lhs, rhs| lhs > rhs)
                 }
-                Operator::I32LtU => {
+                WackasmOperator::I32LtU => {
                     i32_binop!(self.stack, u32, |lhs, rhs| lhs < rhs)
                 }
-                Operator::I32GtU => {
+                WackasmOperator::I32GtU => {
                     i32_binop!(self.stack, u32, |lhs, rhs| lhs > rhs)
                 }
-                Operator::I32LeU => {
+                WackasmOperator::I32LeU => {
                     i32_binop!(self.stack, u32, |lhs, rhs| lhs <= rhs)
                 }
-                Operator::I32Ne => {
+                WackasmOperator::I32Ne => {
                     i32_binop!(self.stack, i32, |a, b| a != b)
                 }
-                Operator::I32GeU => {
+                WackasmOperator::I32GeU => {
                     i32_binop!(self.stack, u32, |lhs, rhs| lhs >= rhs)
                 }
-                Operator::I32Eqz => {
+                WackasmOperator::I32Eqz => {
                     let a = self.stack.pop_i32()?;
                     let result = if a == 0 { 1 } else { 0 };
                     self.stack.push(Value(result as u64))?;
                 }
-                Operator::I32Eq => {
+                WackasmOperator::I32Eq => {
                     i32_binop!(self.stack, i32, |a, b| a == b)
                 }
-                Operator::I32Or => {
+                WackasmOperator::I32Or => {
                     i32_binop!(self.stack, i32, |a, b| a | b)
                 }
 
                 // i64 maths
-                Operator::I64Add => {
+                WackasmOperator::I64Add => {
                     i64_binop!(self.stack, i64, |lhs, rhs| lhs.wrapping_add(rhs))
                 }
-                Operator::I64Mul => {
+                WackasmOperator::I64Mul => {
                     i64_binop!(self.stack, i64, |lhs, rhs| lhs.wrapping_mul(rhs))
                 }
-                Operator::I64Sub => {
+                WackasmOperator::I64Sub => {
                     i64_binop!(self.stack, i64, |lhs, rhs| lhs.wrapping_sub(rhs))
                 }
-                Operator::I64ShrU => {
+                WackasmOperator::I64ShrU => {
                     i64_binop!(self.stack, u64, |lhs, rhs| lhs.wrapping_shr(rhs as u32))
                 }
-                Operator::I64Shl => {
+                WackasmOperator::I64Shl => {
                     i64_binop!(self.stack, u64, |lhs, rhs| lhs.wrapping_shl(rhs as u32))
                 }
-                Operator::I64And => {
+                WackasmOperator::I64And => {
                     i64_binop!(self.stack, i64, |lhs, rhs| lhs & rhs)
                 }
-                Operator::I64Or => {
+                WackasmOperator::I64Or => {
                     i64_binop!(self.stack, i64, |lhs, rhs| lhs | rhs)
                 }
 
                 // i64 comparators
-                Operator::I64GtS => {
+                WackasmOperator::I64GtS => {
                     i64_cmp!(self.stack, i64, |lhs, rhs| lhs > rhs)
                 }
-                Operator::I64LtU => {
+                WackasmOperator::I64LtU => {
                     i64_cmp!(self.stack, u64, |lhs, rhs| lhs < rhs)
                 }
-                Operator::I64GtU => {
+                WackasmOperator::I64GtU => {
                     i64_cmp!(self.stack, u64, |lhs, rhs| lhs > rhs)
                 }
-                Operator::I64LeU => {
+                WackasmOperator::I64LeU => {
                     i64_cmp!(self.stack, u64, |lhs, rhs| lhs <= rhs)
                 }
-                Operator::I64GeU => {
+                WackasmOperator::I64GeU => {
                     i64_cmp!(self.stack, u64, |lhs, rhs| lhs >= rhs)
                 }
-                Operator::I64Eq => {
+                WackasmOperator::I64Eq => {
                     i64_cmp!(self.stack, i64, |lhs, rhs| lhs == rhs)
                 }
-                Operator::I64Ne => {
+                WackasmOperator::I64Ne => {
                     i64_cmp!(self.stack, i64, |lhs, rhs| lhs != rhs)
                 }
-                Operator::I64Eqz => {
+                WackasmOperator::I64Eqz => {
                     let a = self.stack.pop_i64()?;
                     self.stack.push(Value((a == 0) as u64))?;
                 }
-                Operator::Select => {
+                WackasmOperator::Select => {
                     let cond = self.stack.pop_i32()?;
                     let val2 = self.stack.pop()?;
                     let val1 = self.stack.pop()?;
@@ -660,17 +662,19 @@ impl WackasmExecutor {
                         self.stack.push(val1)?;
                     }
                 }
-                Operator::I64ExtendI32U => {
+                WackasmOperator::I64ExtendI32U => {
                     let value = self.stack.pop_i32()?;
                     let new_value = value as u32 as i64;
                     self.stack.push(Value(new_value as u64))?;
                 }
-                Operator::I32WrapI64 => {
+                WackasmOperator::I32WrapI64 => {
                     let value = self.stack.pop_i64()?;
                     let value = value as i32;
                     self.stack.push(Value(value as u64))?;
                 }
-                _ => return Err(unsupported!("unsupported operator: {:?}", operator)),
+                WackasmOperator::Unsupported { description } => {
+                    return Err(unsupported!("unsupported operator: {}", description));
+                },
             }
 
             pc += 1;

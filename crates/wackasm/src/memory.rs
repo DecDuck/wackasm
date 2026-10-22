@@ -5,9 +5,7 @@ use serde::{Deserialize, Serialize};
 use wasmparser::{Data, DataKind, MemArg, MemoryType, SectionLimited};
 
 use crate::{
-    HaltError, Value,
-    const_expr::resolve_const_expr,
-    macros::{trap, unsupported},
+    HaltError, Value, compiler::WackasmMemArg, const_expr::resolve_const_expr, macros::{trap, unsupported},
 };
 
 pub(crate) trait MemoryNumber: Copy {
@@ -187,7 +185,7 @@ impl MemoryManager {
 
     pub(crate) fn load<T: MemoryNumber>(
         &self,
-        memarg: &MemArg,
+        memarg: &WackasmMemArg,
         address: u32,
     ) -> Result<T, HaltError> {
         let memory = self
@@ -211,7 +209,7 @@ impl MemoryManager {
 
     pub(crate) fn store<T: MemoryNumber>(
         &mut self,
-        memarg: &MemArg,
+        memarg: &WackasmMemArg,
         address: u32,
         value: T,
     ) -> Result<(), HaltError> {

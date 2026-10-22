@@ -15,6 +15,7 @@ pub mod profiling;
 mod stack;
 mod table;
 mod functions;
+mod compiler;
 
 pub use executor::WackasmExecutor;
 pub use module::WackasmModule;

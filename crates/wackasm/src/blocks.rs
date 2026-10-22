@@ -2,7 +2,7 @@ use std::{collections::HashMap, hash::Hash};
 
 use anyhow::anyhow;
 use serde::{Deserialize, Serialize};
-use wasmparser::{BlockType, Operator, ValType};
+use wasmparser::{BlockType, FunctionBody, Operator, ValType};
 
 use crate::{
     HaltError,
@@ -124,10 +124,11 @@ impl PartialBlock {
     }
 }
 
-pub(crate) fn lookahead_find_blocks(code: &OperatorView) -> Result<BlockManager, HaltError> {
+pub(crate) fn lookahead_find_blocks(code: &FunctionBody) -> Result<BlockManager, HaltError> {
     let mut results = BlockManager::new();
     let mut stack = Vec::new();
-    for (position, operator) in code.read().enumerate() {
+    for (position, operator) in code.get_operators_reader()?.into_iter().enumerate() {
+        let operator = operator?;
         match operator {
             Operator::Block { blockty } => {
                 stack.push(PartialBlock::Block {
