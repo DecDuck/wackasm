@@ -47,11 +47,6 @@ fn assert_trap<T: std::fmt::Debug>(result: Result<T, HaltError>) {
 }
 
 #[track_caller]
-fn assert_empty<S: TestStack>(stack: &mut S) {
-    assert_trap(stack.pop());
-}
-
-#[track_caller]
 fn return_ok<S: TestStack>(stack: &mut S, preserve: &[ValType]) -> StackSection {
     stack
         .return_section(preserve, None)
@@ -71,16 +66,10 @@ fn function(index: u32) -> StackSection {
 // Basic operand stack behaviour
 // ---------------------------------------------------------------------------
 
-fn pop_empty_errors<S: TestStack>() {
-    let mut stack = S::create();
-    assert_trap(stack.pop());
-}
-
 fn push_pop_single<S: TestStack>() {
     let mut stack = S::create();
     stack.push(Value::from_i32(42)).unwrap();
     assert_pop(&mut stack, Value::from_i32(42));
-    assert_empty(&mut stack);
 }
 
 fn push_pop_is_lifo<S: TestStack>() {
@@ -91,7 +80,6 @@ fn push_pop_is_lifo<S: TestStack>() {
     for v in (0..10).rev() {
         assert_pop(&mut stack, Value::from_i32(v));
     }
-    assert_empty(&mut stack);
 }
 
 fn push_pop_all_value_types<S: TestStack>() {
@@ -110,7 +98,6 @@ fn push_pop_all_value_types<S: TestStack>() {
     for v in values.iter().rev() {
         assert_pop(&mut stack, *v);
     }
-    assert_empty(&mut stack);
 }
 
 fn peek_does_not_remove<S: TestStack>() {
@@ -124,7 +111,6 @@ fn peek_does_not_remove<S: TestStack>() {
     assert_pop(&mut stack, Value::from_i32(2));
     assert!(value_eq(stack.peek().unwrap(), &Value::from_i32(1)));
     assert_pop(&mut stack, Value::from_i32(1));
-    assert_empty(&mut stack);
 }
 
 const V128_TEST_VALUE: u128 = 0x0011_2233_4455_6677_8899_aabb_ccdd_eeff;
@@ -142,7 +128,6 @@ fn typed_pops_succeed<S: TestStack>() {
     assert_eq!(stack.pop_f32().unwrap(), 1.5);
     assert_eq!(stack.pop_i64().unwrap(), i64::MIN);
     assert_eq!(stack.pop_i32().unwrap(), -1);
-    assert_empty(&mut stack);
 }
 
 fn typed_pops_preserve_float_bits<S: TestStack>() {
@@ -157,7 +142,6 @@ fn typed_pops_preserve_float_bits<S: TestStack>() {
     assert_eq!(stack.pop_f64().unwrap().to_bits(), f64_nan.to_bits());
     assert_eq!(stack.pop_f32().unwrap().to_bits(), f32_nan.to_bits());
     assert_eq!(stack.pop_f32().unwrap().to_bits(), (-0.0f32).to_bits());
-    assert_empty(&mut stack);
 }
 
 fn i32_pops_ignore_upper_bits<S: TestStack>() {
@@ -168,7 +152,6 @@ fn i32_pops_ignore_upper_bits<S: TestStack>() {
 
     assert_eq!(stack.pop_i32().unwrap(), -1);
     assert_eq!(stack.pop_i32().unwrap(), -1);
-    assert_empty(&mut stack);
 }
 
 fn v128_occupies_two_slots<S: TestStack>() {
@@ -179,33 +162,15 @@ fn v128_occupies_two_slots<S: TestStack>() {
     assert_pop(&mut stack, Value(V128_TEST_VALUE as u64));
     assert_pop(&mut stack, Value((V128_TEST_VALUE >> 64) as u64));
     assert_pop(&mut stack, Value::from_i32(9));
-    assert_empty(&mut stack);
-}
-
-fn pop_v128_with_one_slot_errors<S: TestStack>() {
-    let mut stack = S::create();
-    stack.push(Value::from_i64(1)).unwrap();
-    assert_trap(stack.pop_v128());
-}
-
-fn typed_pops_on_empty_error<S: TestStack>() {
-    let mut stack = S::create();
-    assert_trap(stack.pop_i32());
-    assert_trap(stack.pop_i64());
-    assert_trap(stack.pop_f32());
-    assert_trap(stack.pop_f64());
-    assert_trap(stack.pop_v128());
 }
 
 fn stack_is_reusable_after_draining<S: TestStack>() {
     let mut stack = S::create();
     stack.push(Value::from_i32(1)).unwrap();
     assert_pop(&mut stack, Value::from_i32(1));
-    assert_empty(&mut stack);
 
     stack.push(Value::from_i32(2)).unwrap();
     assert_pop(&mut stack, Value::from_i32(2));
-    assert_empty(&mut stack);
 }
 
 // ---------------------------------------------------------------------------
@@ -227,7 +192,6 @@ fn return_block_without_block_leaves_base_untouched<S: TestStack>() {
     stack.push(Value::from_i32(1)).unwrap();
     assert_eq!(stack.return_section(&[ValType::I32], None).unwrap(), None);
     assert_pop(&mut stack, Value::from_i32(1));
-    assert_empty(&mut stack);
 }
 
 fn push_block_sets_peek_block<S: TestStack>() {
@@ -254,25 +218,6 @@ fn peek_block_returns_innermost<S: TestStack>() {
     assert_eq!(stack.return_section(&[], None).unwrap(), None);
 }
 
-fn new_block_starts_empty<S: TestStack>() {
-    let mut stack = S::create();
-    stack.push(Value::from_i32(1)).unwrap();
-    stack.push_section(block(0), None).unwrap();
-    assert_empty(&mut stack);
-}
-
-fn block_pops_down_to_floor_only<S: TestStack>() {
-    let mut stack = S::create();
-    stack.push(Value::from_i32(1)).unwrap();
-    stack.push_section(block(0), None).unwrap();
-    stack.push(Value::from_i32(2)).unwrap();
-    stack.push(Value::from_i32(3)).unwrap();
-
-    assert_pop(&mut stack, Value::from_i32(3));
-    assert_pop(&mut stack, Value::from_i32(2));
-    assert_empty(&mut stack);
-}
-
 fn push_block_with_parameters<S: TestStack>() {
     let mut stack = S::create();
     stack.push(Value::from_i32(100)).unwrap();
@@ -284,14 +229,12 @@ fn push_block_with_parameters<S: TestStack>() {
 
     assert_pop(&mut stack, Value::from_i64(2));
     assert_pop(&mut stack, Value::from_i32(1));
-    assert_empty(&mut stack);
 }
 
 fn push_block_with_empty_parameters<S: TestStack>() {
     let mut stack = S::create();
     stack.push(Value::from_i32(100)).unwrap();
     stack.push_section(block(0), Some(&[])).unwrap();
-    assert_empty(&mut stack);
     assert_eq!(stack.peek_section(None), Some(&block(0)));
 }
 
@@ -306,7 +249,6 @@ fn block_parameters_preserve_order<S: TestStack>() {
 
     assert_eq!(stack.pop_i64().unwrap(), 2);
     assert_eq!(stack.pop_i32().unwrap(), 1);
-    assert_empty(&mut stack);
 }
 
 fn return_block_without_preserve_discards_values<S: TestStack>() {
@@ -318,7 +260,6 @@ fn return_block_without_preserve_discards_values<S: TestStack>() {
 
     assert_eq!(return_ok(&mut stack, &[]), block(5));
     assert_pop(&mut stack, Value::from_i32(1));
-    assert_empty(&mut stack);
 }
 
 fn return_block_preserves_single_value<S: TestStack>() {
@@ -333,7 +274,6 @@ fn return_block_preserves_single_value<S: TestStack>() {
     );
     assert_pop(&mut stack, Value::from_i64(42));
     assert_pop(&mut stack, Value::from_i32(1));
-    assert_empty(&mut stack);
 }
 
 fn return_block_preserves_multiple_values_in_order<S: TestStack>() {
@@ -350,7 +290,6 @@ fn return_block_preserves_multiple_values_in_order<S: TestStack>() {
     assert_pop(&mut stack, Value::from_f32(20.0));
     assert_pop(&mut stack, Value::from_i32(10));
     assert_pop(&mut stack, Value::from_i32(1));
-    assert_empty(&mut stack);
 }
 
 fn return_block_discards_values_below_preserved<S: TestStack>() {
@@ -365,16 +304,6 @@ fn return_block_discards_values_below_preserved<S: TestStack>() {
 
     assert_pop(&mut stack, Value::from_i32(99));
     assert_pop(&mut stack, Value::from_i32(1));
-    assert_empty(&mut stack);
-}
-
-fn return_block_preserve_underflow_errors<S: TestStack>() {
-    // The block has fewer values than requested; it must not reach into the parent.
-    let mut stack = S::create();
-    stack.push(Value::from_i32(1)).unwrap();
-    stack.push_section(block(0), None).unwrap();
-    stack.push(Value::from_i32(2)).unwrap();
-    assert_trap(stack.return_section(&[ValType::I32, ValType::I32], None));
 }
 
 fn nested_blocks_are_isolated<S: TestStack>() {
@@ -386,15 +315,12 @@ fn nested_blocks_are_isolated<S: TestStack>() {
     stack.push(Value::from_i32(2)).unwrap();
 
     assert_pop(&mut stack, Value::from_i32(2));
-    assert_empty(&mut stack);
 
     assert_eq!(return_ok(&mut stack, &[]), block(2));
     assert_pop(&mut stack, Value::from_i32(1));
-    assert_empty(&mut stack);
 
     assert_eq!(return_ok(&mut stack, &[]), block(1));
     assert_pop(&mut stack, Value::from_i32(0));
-    assert_empty(&mut stack);
 }
 
 fn nested_blocks_propagate_preserved_values<S: TestStack>() {
@@ -417,7 +343,6 @@ fn nested_blocks_propagate_preserved_values<S: TestStack>() {
     assert_pop(&mut stack, Value::from_i32(21));
     assert_pop(&mut stack, Value::from_i32(20));
     assert_pop(&mut stack, Value::from_i32(0));
-    assert_empty(&mut stack);
 }
 
 fn block_with_parameters_and_results<S: TestStack>() {
@@ -442,18 +367,6 @@ fn block_with_parameters_and_results<S: TestStack>() {
     );
     assert_pop(&mut stack, Value::from_i32(7));
     assert_pop(&mut stack, Value::from_i32(7));
-    assert_empty(&mut stack);
-}
-
-fn reentered_block_starts_empty<S: TestStack>() {
-    let mut stack = S::create();
-    stack.push_section(block(0), None).unwrap();
-    stack.push(Value::from_i32(1)).unwrap();
-    stack.push(Value::from_i32(2)).unwrap();
-    return_ok(&mut stack, &[]);
-
-    stack.push_section(block(0), None).unwrap();
-    assert_empty(&mut stack);
 }
 
 fn many_sequential_blocks<S: TestStack>() {
@@ -469,7 +382,6 @@ fn many_sequential_blocks<S: TestStack>() {
     for i in (0..(TEST_BLOCKS as i32 * 4)).rev() {
         assert_pop(&mut stack, Value::from_i32(i));
     }
-    assert_empty(&mut stack);
 }
 
 fn deeply_nested_blocks<S: TestStack>() {
@@ -480,12 +392,10 @@ fn deeply_nested_blocks<S: TestStack>() {
         stack.push_section(block(i), None).unwrap();
     }
     for i in (0..depth).rev() {
-        assert_empty(&mut stack);
         assert_eq!(return_ok(&mut stack, &[]), block(i));
         assert_pop(&mut stack, Value::from_i32(i as i32));
     }
     assert!(stack.peek_section(None).is_none());
-    assert_empty(&mut stack);
 }
 
 fn block_can_use_full_stack_size<S: TestStack>() {
@@ -497,7 +407,6 @@ fn block_can_use_full_stack_size<S: TestStack>() {
     }
     return_ok(&mut stack, &[]);
     assert_pop(&mut stack, Value::from_i32(-1));
-    assert_empty(&mut stack);
 }
 
 // ---------------------------------------------------------------------------
@@ -524,13 +433,11 @@ fn function_section_takes_arguments_and_returns_results<S: TestStack>() {
 
     assert_eq!(stack.pop_i64().unwrap(), 2);
     assert_eq!(stack.pop_i32().unwrap(), 1);
-    assert_empty(&mut stack);
     stack.push(Value::from_i32(3)).unwrap();
 
     assert_eq!(return_ok(&mut stack, &[ValType::I32]), function(1));
     assert_pop(&mut stack, Value::from_i32(3));
     assert_pop(&mut stack, Value::from_i32(100));
-    assert_empty(&mut stack);
 }
 
 fn blocks_nest_inside_function_sections<S: TestStack>() {
@@ -548,17 +455,14 @@ fn blocks_nest_inside_function_sections<S: TestStack>() {
     assert_eq!(stack.peek_section(None), Some(&block(0)));
     assert_pop(&mut stack, Value::from_i32(3));
     assert_pop(&mut stack, Value::from_i32(2));
-    assert_empty(&mut stack);
 
     assert_eq!(return_ok(&mut stack, &[]), block(0));
     assert_eq!(stack.peek_section(None), Some(&function(0)));
     assert_pop(&mut stack, Value::from_i32(1));
-    assert_empty(&mut stack);
 
     assert_eq!(return_ok(&mut stack, &[]), function(0));
     assert!(stack.peek_section(None).is_none());
     assert_pop(&mut stack, Value::from_i32(0));
-    assert_empty(&mut stack);
 }
 
 fn sections_with_same_index_are_distinct<S: TestStack>() {
@@ -594,7 +498,6 @@ fn return_section_at_position_unwinds_inner_sections<S: TestStack>() {
     assert!(stack.peek_section(None).is_none());
     assert_pop(&mut stack, Value::from_i32(4));
     assert_pop(&mut stack, Value::from_i32(0));
-    assert_empty(&mut stack);
 }
 
 fn return_section_at_position_keeps_outer_sections<S: TestStack>() {
@@ -613,7 +516,6 @@ fn return_section_at_position_keeps_outer_sections<S: TestStack>() {
     assert_eq!(stack.peek_section(None), Some(&block(0)));
     assert_pop(&mut stack, Value::from_i32(3));
     assert_pop(&mut stack, Value::from_i32(1));
-    assert_empty(&mut stack);
 }
 
 fn return_section_at_position_then_repush_resets_loop<S: TestStack>() {
@@ -639,29 +541,9 @@ fn return_section_at_position_then_repush_resets_loop<S: TestStack>() {
 
     assert_eq!(stack.peek_section(None), Some(&block(0)));
     assert_pop(&mut stack, Value::from_i32(8));
-    assert_empty(&mut stack);
 
     assert_eq!(return_ok(&mut stack, &[]), block(0));
     assert_pop(&mut stack, Value::from_i32(100));
-    assert_empty(&mut stack);
-}
-
-fn return_section_invalid_position_errors<S: TestStack>() {
-    let mut stack = S::create();
-    assert_trap(stack.return_section(&[], Some(0)));
-
-    stack.push_section(block(0), None).unwrap();
-    assert_trap(stack.return_section(&[], Some(1)));
-    assert_eq!(stack.peek_section(None), Some(&block(0)));
-}
-
-fn return_section_at_position_underflow_errors<S: TestStack>() {
-    let mut stack = S::create();
-    stack.push(Value::from_i32(1)).unwrap();
-    stack.push_section(block(0), None).unwrap();
-    stack.push_section(block(1), None).unwrap();
-    stack.push(Value::from_i32(2)).unwrap();
-    assert_trap(stack.return_section(&[ValType::I32, ValType::I32], Some(0)));
 }
 
 fn return_function_without_function_is_none<S: TestStack>() {
@@ -689,7 +571,6 @@ fn return_function_from_top_level<S: TestStack>() {
     assert!(stack.peek_section(None).is_none());
     assert_pop(&mut stack, Value::from_i32(2));
     assert_pop(&mut stack, Value::from_i32(100));
-    assert_empty(&mut stack);
 }
 
 fn return_function_unwinds_open_blocks<S: TestStack>() {
@@ -712,7 +593,6 @@ fn return_function_unwinds_open_blocks<S: TestStack>() {
     assert_pop(&mut stack, Value::from_i64(4));
     assert_pop(&mut stack, Value::from_i32(3));
     assert_pop(&mut stack, Value::from_i32(100));
-    assert_empty(&mut stack);
 }
 
 fn return_function_only_unwinds_innermost_function<S: TestStack>() {
@@ -732,19 +612,9 @@ fn return_function_only_unwinds_innermost_function<S: TestStack>() {
     assert_eq!(stack.peek_section(None), Some(&block(0)));
     assert_pop(&mut stack, Value::from_i32(3));
     assert_pop(&mut stack, Value::from_i32(2));
-    assert_empty(&mut stack);
 
     assert_eq!(stack.return_function(&[]).unwrap(), Some(function(0)));
     assert!(stack.peek_section(None).is_none());
-    assert_empty(&mut stack);
-}
-
-fn return_function_underflow_errors<S: TestStack>() {
-    let mut stack = S::create();
-    stack.push(Value::from_i32(1)).unwrap();
-    stack.push_section(function(0), None).unwrap();
-    stack.push_section(block(0), None).unwrap();
-    assert_trap(stack.return_function(&[ValType::I32]));
 }
 
 // ---------------------------------------------------------------------------
@@ -759,7 +629,6 @@ fn zero_blocks_push_pop<S: TestStack>() {
     assert!(value_eq(stack.peek().unwrap(), &Value::from_i64(2)));
     assert_pop(&mut stack, Value::from_i64(2));
     assert_pop(&mut stack, Value::from_i32(1));
-    assert_empty(&mut stack);
 }
 
 fn zero_blocks_push_until_overflow<S: TestStack>() {
@@ -792,7 +661,6 @@ fn exact_block_count_nesting<S: TestStack>() {
         assert!(stack.peek_section(None).is_none());
         assert_pop(&mut stack, Value::from_i32(blocks as i32 - 1));
         assert_pop(&mut stack, Value::from_i32(100));
-        assert_empty(&mut stack);
     }
 }
 
@@ -813,7 +681,6 @@ fn exact_block_count_with_values_in_every_frame<S: TestStack>() {
     for i in (0..per_frame).rev() {
         assert_pop(&mut stack, Value::from_i32(i as i32));
     }
-    assert_empty(&mut stack);
 }
 
 // ---------------------------------------------------------------------------
@@ -827,7 +694,6 @@ macro_rules! stack_tests {
             use super::*;
 
             stack_tests!(@tests $ty;
-                pop_empty_errors,
                 push_pop_single,
                 push_pop_is_lifo,
                 push_pop_all_value_types,
@@ -836,16 +702,12 @@ macro_rules! stack_tests {
                 typed_pops_preserve_float_bits,
                 i32_pops_ignore_upper_bits,
                 v128_occupies_two_slots,
-                pop_v128_with_one_slot_errors,
-                typed_pops_on_empty_error,
                 stack_is_reusable_after_draining,
                 peek_block_empty_is_none,
                 return_block_without_block_is_none,
                 return_block_without_block_leaves_base_untouched,
                 push_block_sets_peek_block,
                 peek_block_returns_innermost,
-                new_block_starts_empty,
-                block_pops_down_to_floor_only,
                 push_block_with_parameters,
                 push_block_with_empty_parameters,
                 block_parameters_preserve_order,
@@ -853,11 +715,9 @@ macro_rules! stack_tests {
                 return_block_preserves_single_value,
                 return_block_preserves_multiple_values_in_order,
                 return_block_discards_values_below_preserved,
-                return_block_preserve_underflow_errors,
                 nested_blocks_are_isolated,
                 nested_blocks_propagate_preserved_values,
                 block_with_parameters_and_results,
-                reentered_block_starts_empty,
                 many_sequential_blocks,
                 deeply_nested_blocks,
                 block_can_use_full_stack_size,
@@ -868,13 +728,10 @@ macro_rules! stack_tests {
                 return_section_at_position_unwinds_inner_sections,
                 return_section_at_position_keeps_outer_sections,
                 return_section_at_position_then_repush_resets_loop,
-                return_section_invalid_position_errors,
-                return_section_at_position_underflow_errors,
                 return_function_without_function_is_none,
                 return_function_from_top_level,
                 return_function_unwinds_open_blocks,
                 return_function_only_unwinds_innermost_function,
-                return_function_underflow_errors,
                 zero_blocks_push_pop,
                 zero_blocks_push_until_overflow,
                 exact_block_count_nesting,

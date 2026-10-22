@@ -18,9 +18,9 @@ macro_rules! unsupported {
 
 pub(crate) use unsupported;
 
-/// Pops `rhs` then `lhs` as i32 (cast to `$ty`), evaluates `$body`, and pushes
-/// the result back as an i32. Works for arithmetic (`$ty` result) and
-/// comparisons (`bool` result).
+/// Pops `rhs`, reads `lhs` in-place from the top of the stack (both as i32,
+/// cast to `$ty`), evaluates `$body`, and overwrites `lhs` with the result as an
+/// i32. Works for arithmetic (`$ty` result) and comparisons (`bool` result).
 ///
 /// ```ignore
 /// i32_binop!(stack, i32, |lhs, rhs| lhs.wrapping_add(rhs));
@@ -31,8 +31,9 @@ macro_rules! i32_binop {
         use $crate::stack::GlobalStack as _;
         let stack = &mut $stack;
         let $rhs = stack.pop_i32()? as $ty;
-        let $lhs = stack.pop_i32()? as $ty;
-        stack.push($crate::Value(($body) as u64))?;
+        let slot = stack.peek_mut()?;
+        let $lhs = slot.0 as i32 as $ty;
+        *slot = $crate::Value(($body) as u64);
     }};
 }
 
@@ -48,8 +49,9 @@ macro_rules! i64_binop {
         use $crate::stack::GlobalStack as _;
         let stack = &mut $stack;
         let $rhs = stack.pop_i64()? as $ty;
-        let $lhs = stack.pop_i64()? as $ty;
-        stack.push($crate::Value(($body) as u64))?;
+        let slot = stack.peek_mut()?;
+        let $lhs = slot.0 as i64 as $ty;
+        *slot = $crate::Value(($body) as u64);
     }};
 }
 
@@ -65,8 +67,9 @@ macro_rules! i64_cmp {
         use $crate::stack::GlobalStack as _;
         let stack = &mut $stack;
         let $rhs = stack.pop_i64()? as $ty;
-        let $lhs = stack.pop_i64()? as $ty;
-        stack.push($crate::Value(($body) as u64))?;
+        let slot = stack.peek_mut()?;
+        let $lhs = slot.0 as i64 as $ty;
+        *slot = $crate::Value(($body) as u64);
     }};
 }
 
