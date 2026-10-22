@@ -6,8 +6,9 @@ use wasmparser::{BlockType, Operator, ValType};
 
 use crate::{
     HaltError,
+    functions::FunctionManager,
     macros::unsupported,
-    module::BlockIndex,
+    module::{BlockIndex, FunctionTypeIndex},
     operator::OperatorView,
 };
 
@@ -32,7 +33,7 @@ pub(crate) enum Block {
 }
 
 impl Block {
-    pub fn ty(&self) -> &BlockType {
+    pub fn ty<'a>(&'a self) -> &'a BlockType {
         match self {
             Block::Block { ty, .. } => ty,
             Block::Loop { ty, .. } => ty,
@@ -47,6 +48,40 @@ impl Block {
             } => Ok((*start, r#else.clone(), *end)),
             _ => Err(anyhow!("not an if block").into()),
         }
+    }
+
+    pub fn call_params<'a>(
+        &'a self,
+        functions: &'a FunctionManager,
+    ) -> Result<Option<&'a [ValType]>, HaltError> {
+        let return_params = match self.ty() {
+            wasmparser::BlockType::Empty => None,
+            wasmparser::BlockType::Type(_) => None,
+            wasmparser::BlockType::FuncType(func_type) => {
+                let func_type_index = FunctionTypeIndex(*func_type); // This is right, don't change this.
+                let func_type = functions.function_type_idx_type(&func_type_index)?;
+                Some(func_type.params())
+            }
+        };
+
+        Ok(return_params)
+    }
+
+    pub fn return_params<'a>(
+        &'a self,
+        functions: &'a FunctionManager,
+    ) -> Result<Option<&'a [ValType]>, HaltError> {
+        let return_params = match self.ty() {
+            wasmparser::BlockType::Empty => None,
+            wasmparser::BlockType::Type(val_type) => Some(std::slice::from_ref(val_type)),
+            wasmparser::BlockType::FuncType(func_type) => {
+                let func_type_index = FunctionTypeIndex(*func_type); // This is right, don't change this.
+                let func_type = functions.function_type_idx_type(&func_type_index)?;
+                Some(&*func_type.results())
+            }
+        };
+
+        Ok(return_params)
     }
 }
 
@@ -89,9 +124,7 @@ impl PartialBlock {
     }
 }
 
-pub(crate) fn lookahead_find_blocks(
-    code: &OperatorView,
-) -> Result<BlockManager, HaltError> {
+pub(crate) fn lookahead_find_blocks(code: &OperatorView) -> Result<BlockManager, HaltError> {
     let mut results = BlockManager::new();
     let mut stack = Vec::new();
     for (position, operator) in code.read().enumerate() {
@@ -170,7 +203,7 @@ impl BlockManager {
         if to_extend > 0 {
             self.blocks.resize(target_length, None);
         }
-        
+
         self.blocks[block_index.0 as usize] = Some(block);
     }
 

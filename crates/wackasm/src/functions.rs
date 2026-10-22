@@ -5,13 +5,7 @@ use serde::{Deserialize, Serialize};
 use wasmparser::{FuncType, FunctionBody, RecGroup, SectionLimited};
 
 use crate::{
-    HaltError, Value, WackasmModule,
-    blocks::{BlockManager, lookahead_find_blocks},
-    macros::trap,
-    module::{FunctionFrame, FunctionIndex, FunctionTypeIndex},
-    operator::OperatorView,
-    pc::ProgramCounter,
-    stack::{BlockAwareStack as _, FrameOperandStack, LocalStore},
+    HaltError, Value, WackasmModule, blocks::{BlockManager, lookahead_find_blocks}, macros::trap, module::{FunctionFrame, FunctionIndex, FunctionTypeIndex}, operator::OperatorView, pc::ProgramCounter, stack::{FrameOperandStack, GlobalStack as _, LocalStore, StackSection},
 };
 
 const MAX_CALL_DEPTH: usize = 10_000;
@@ -105,7 +99,6 @@ impl FunctionManager {
             block_lookup: Arc::new(BlockManager::new()),
 
             // Runtime state
-            stack: FrameOperandStack::new(0),
             pc: ProgramCounter::new(),
         };
 
@@ -148,8 +141,6 @@ impl FunctionManager {
         // Save function body for later
         function_state.code = OperatorView::new(code_section)?;
         function_state.block_lookup = Arc::new(lookahead_find_blocks(&function_state.code)?);
-        // reinit block stack for performance
-        function_state.stack = FrameOperandStack::new(function_state.block_lookup.len());
 
         self.init_function_frames.push(function_state);
         Ok(())
@@ -158,6 +149,7 @@ impl FunctionManager {
     pub(crate) fn call_internal(
         &mut self,
         callstack: &mut Vec<FunctionFrame>,
+        stack: &mut FrameOperandStack,
         function_index: FunctionIndex,
         arguments: Option<Vec<Value>>,
     ) -> Result<(), HaltError> {
@@ -204,12 +196,8 @@ impl FunctionManager {
             }
             arguments
         } else {
-            let mut calling_frame = callstack.peek_mut().expect("no calling frame?");
             let calling_operands_types = function_type.params();
-            let mut arguments = calling_frame
-                .stack
-                .pull_reversed_from_stack(calling_operands_types)?;
-            arguments.reverse();
+            let mut arguments = stack.pull_results(calling_operands_types)?;
             arguments
         };
 
@@ -219,6 +207,7 @@ impl FunctionManager {
         }
 
         callstack.push(function);
+        stack.push_section(StackSection::Function(function_index), None)?;
 
         Ok(())
     }

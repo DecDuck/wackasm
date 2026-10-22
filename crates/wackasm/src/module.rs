@@ -5,16 +5,7 @@ use serde::{Deserialize, Serialize};
 use wasmparser::{ExternalKind, FuncType, FunctionBody, Payload, ValType};
 
 use crate::{
-    HaltError, Value,
-    blocks::{Block, BlockManager, lookahead_find_blocks},
-    functions::FunctionManager,
-    globals::GlobalManager,
-    macros::unsupported,
-    memory::MemoryManager,
-    operator::OperatorView,
-    pc::ProgramCounter,
-    stack::{BlockAwareStack, FrameOperandStack, LocalStore},
-    table::TableManager,
+    HaltError, Value, blocks::{Block, BlockManager, lookahead_find_blocks}, functions::FunctionManager, globals::GlobalManager, macros::unsupported, memory::MemoryManager, operator::OperatorView, pc::ProgramCounter, stack::{FrameOperandStack, GlobalStack, LocalStore, StackSection}, table::TableManager,
 };
 
 macro_rules! type_indexes {
@@ -59,7 +50,6 @@ pub(crate) struct FunctionFrame {
     pub(crate) locals: LocalStore,
     pub(crate) code: OperatorView,
 
-    pub(crate) stack: FrameOperandStack,
     pub(crate) pc: ProgramCounter,
 }
 
@@ -100,7 +90,7 @@ impl WackasmModule {
             }
         };
 
-        operand_stack.push_block(*idx, block_params.as_ref().map(|v| &**v))?;
+        operand_stack.push_section(StackSection::Block(*idx), block_params.as_ref().map(|v| &**v))?;
 
         Ok(())
     }

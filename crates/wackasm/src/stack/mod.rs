@@ -1,14 +1,12 @@
 use anyhow::anyhow;
+use serde::{Deserialize, Serialize};
 use wasmparser::ValType;
 
 use crate::{
-    HaltError, Value,
-    module::BlockIndex,
-    stack::{basic::OperandStack, flat::FlatBlockAwareStack},
+    HaltError, Value, macros::trap, module::{BlockIndex, FunctionIndex}, stack::{basic::OperandStack, flat::FlatBlockAwareStack},
 };
 
 mod basic;
-mod block;
 mod flat;
 mod locals;
 #[cfg(test)]
@@ -17,31 +15,53 @@ mod tests;
 const MAX_OPERAND_STACK_SIZE: usize = 200;
 const MAX_STACK_POOL: usize = 10;
 
-use block::BlockAwareOperandStack;
 pub(crate) use locals::LocalStore;
 
 pub(crate) type FrameOperandStack = FlatBlockAwareStack;
 
-pub(crate) trait BlockAwareStack {
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum StackSection {
+    Block(BlockIndex),
+    Function(FunctionIndex),
+}
+
+impl StackSection {
+    pub fn expect_block(&self) -> Result<&BlockIndex, HaltError> {
+        match self {
+            StackSection::Block(block_index) => Ok(block_index),
+            StackSection::Function(_) => Err(trap!("expected block but got function section")),
+        }
+    }
+
+    pub fn expect_function(&self) -> Result<&FunctionIndex, HaltError> {
+        match self {
+            StackSection::Block(_) => Err(trap!("expected function but got block section")),
+            StackSection::Function(function_index) => Ok(function_index),
+        }
+    }
+}
+
+pub(crate) trait GlobalStack {
     fn push(&mut self, value: Value) -> Result<(), HaltError>;
-    /// Pushes them to the stack in reverse order, so r1 r2 goes onto the stack as [..., r2, r1],
-    /// like they were pushed one at a time.
-    fn push_reversed_all(&mut self, values: Vec<Value>) -> Result<(), HaltError>;
-    /// Pops values from top to bottom, validating them against the result types.
-    /// The returned values are therefore in reverse signature order.
-    fn pull_reversed_from_stack(&mut self, returns: &[ValType]) -> Result<Vec<Value>, HaltError>;
+
     fn pop(&mut self) -> Result<Value, HaltError>;
 
     fn peek(&mut self) -> Result<&Value, HaltError>;
 
-    fn push_block(
+    fn push_section(
         &mut self,
-        block_idx: BlockIndex,
+        section: StackSection,
         pull_from_parent: Option<&[ValType]>,
     ) -> Result<(), HaltError>;
 
-    fn return_block(&mut self, preserve: &[ValType]) -> Result<Option<BlockIndex>, HaltError>;
-    fn peek_block(&self) -> Option<&BlockIndex>;
+    fn return_section(&mut self, preserve: &[ValType], pos: Option<usize>) -> Result<Option<StackSection>, HaltError>;
+    fn reset_section(&mut self, preserve: &[ValType], pos: usize) -> Result<(), HaltError>;
+    fn return_function(&mut self, preserve: &[ValType]) -> Result<Option<StackSection>, HaltError>;
+
+    fn peek_section(&self, pos: Option<usize>) -> Option<&StackSection>;
+    fn len_sections(&self) -> usize;
+
+    fn pull_results(&mut self, types: &[ValType]) -> Result<Vec<Value>, HaltError>;
 
     fn pop_i32(&mut self) -> Result<i32, HaltError> {
         Ok(self.pop()?.0 as i32)
