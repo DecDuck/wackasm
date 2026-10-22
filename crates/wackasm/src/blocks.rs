@@ -198,6 +198,22 @@ impl BlockManager {
             .ok_or_else(|| anyhow!("no block for block_index {:?}", block_index).into())
     }
 
+    pub fn find_if_by_else_pc(&self, else_pc: usize) -> Option<&Block> {
+        self.blocks
+            .iter()
+            .find(|v| match v {
+                Some(block) => match block {
+                    Block::If { r#else, .. } => match r#else {
+                        Some(v) => *v == else_pc,
+                        None => false,
+                    },
+                    _ => false,
+                },
+                None => false,
+            })
+            .flatten_ref()
+    }
+
     pub fn insert(&mut self, block_index: BlockIndex, block: Block) {
         let target_length = usize::max((block_index.0 + 1) as usize, self.blocks.len());
         let to_extend = target_length - self.blocks.len();

@@ -404,8 +404,7 @@ impl WackasmExecutor {
                     }
 
                     if start_block {
-                        self.module
-                            .start_block(&mut self.stack, &block, idx)?;
+                        self.module.start_block(&mut self.stack, &block, idx)?;
                     }
 
                     // Skip PC increment
@@ -413,17 +412,9 @@ impl WackasmExecutor {
                 }
 
                 // Jump to end block if we hit an else
-                WackasmOperator::Else => {
-                    let block_index = self
-                        .stack
-                        .peek_section(None)
-                        .ok_or_else(|| anyhow!("hit else op not in block"))?
-                        .expect_block()?;
-                    let block = function_frame.block_lookup.get(block_index)?;
-
-                    let (_, _, end) = block.if_block()?;
+                WackasmOperator::Else { end } => {
                     // Jump to end block which will handle block frame cleanup
-                    pc = end;
+                    pc = *end;
 
                     // Skip PC incremenet
                     continue;
