@@ -9,7 +9,6 @@ use crate::{
     functions::FunctionManager,
     macros::unsupported,
     module::{BlockIndex, FunctionTypeIndex},
-    operator::OperatorView,
 };
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
