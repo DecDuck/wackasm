@@ -2,7 +2,7 @@ use anyhow::anyhow;
 use serde::{Deserialize, Serialize};
 use wasmparser::{BrTable, FunctionBody, MemArg, Operator};
 
-use crate::{HaltError, pc::ProgramCounter};
+use crate::{HaltError, blocks::BlockManager, pc::ProgramCounter};
 
 mod compile;
 mod types;
@@ -19,16 +19,12 @@ impl WackasmFunctionBody {
         Self { inner: Vec::new() }
     }
 
-    pub fn compile(code: &FunctionBody) -> Result<Self, HaltError> {
+    pub fn compile(code: &FunctionBody, blocks: &BlockManager) -> Result<Self, HaltError> {
         let code = code.get_operators_reader()?.into_iter().collect::<Result<Vec<_>, _>>()?;
-        compile::compile(code)
+        compile::compile(code, blocks)
     }
 
     pub fn get(&self, pc: ProgramCounter) -> &WackasmOperator {
         &self.inner[pc]
-    }
-
-    pub fn read(&self) -> impl Iterator<Item = &WackasmOperator> {
-        self.inner.iter()
     }
 }
