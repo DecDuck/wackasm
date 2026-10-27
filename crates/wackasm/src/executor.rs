@@ -120,7 +120,6 @@ impl WackasmExecutor {
     }
 
     // runs X instructions, decrementing fuel
-    #[inline]
     fn incremental_execute(&mut self, instructions: usize) -> Result<isize, HaltError> {
         let mut instructions_executed = 0;
 
@@ -381,30 +380,31 @@ impl WackasmExecutor {
                 }
 
                 // Control flow
-                WackasmOperator::If { block, idx } => {
+                WackasmOperator::If {
+                    idx,
+                    params,
+                    false_target,
+                    has_else,
+                } => {
                     let condition = self.stack.pop_i32()?;
                     let condition = condition != 0;
 
-                    let (start, else_block, end) = block.if_block()?;
                     let mut start_block = false;
 
                     if condition {
                         // Jump to next instruction
-                        pc = start + 1;
+                        pc += 1;
                         start_block = true;
                     } else {
-                        if let Some(else_block) = else_block {
+                        pc = *false_target as usize;
+                        if *has_else {
                             start_block = true;
                             // Jump after else instruction
-                            pc = else_block + 1;
-                        } else {
-                            // Jump after end
-                            pc = end + 1;
                         }
                     }
 
                     if start_block {
-                        self.module.start_block(&mut self.stack, &block, idx)?;
+                        self.module.start_block(&mut self.stack, &params, idx)?;
                     }
 
                     // Skip PC increment
@@ -420,8 +420,8 @@ impl WackasmExecutor {
                     continue;
                 }
 
-                WackasmOperator::Block { block, idx } | WackasmOperator::Loop { block, idx } => {
-                    self.module.start_block(&mut self.stack, &block, idx)?;
+                WackasmOperator::Block { idx, params } | WackasmOperator::Loop { idx, params } => {
+                    self.module.start_block(&mut self.stack, &params, idx)?;
                 }
 
                 WackasmOperator::BrIf { relative_depth } => {

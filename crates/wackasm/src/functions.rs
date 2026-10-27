@@ -1,4 +1,4 @@
-use std::{collections::HashMap, sync::Arc};
+use std::{collections::HashMap, rc::Rc, sync::Arc};
 
 use anyhow::anyhow;
 use serde::{Deserialize, Serialize};
@@ -108,7 +108,7 @@ impl FunctionManager {
             // Stuff that needs to be initialised
             function_index: FunctionIndex(u32::MAX),
             locals: LocalStore::new(),
-            code: Arc::new(WackasmFunctionBody::empty()),
+            code: Rc::new(WackasmFunctionBody::empty()),
             block_lookup: Arc::new(BlockManager::new()),
 
             // Runtime state
@@ -153,7 +153,7 @@ impl FunctionManager {
 
         // Save function body for later
         function_state.block_lookup = Arc::new(lookahead_find_blocks(&code_section)?);
-        function_state.code = Arc::new(WackasmFunctionBody::compile(&code_section, &function_state.block_lookup)?);
+        function_state.code = Rc::new(WackasmFunctionBody::compile(&code_section, &function_state.block_lookup)?);
 
         self.init_function_frames.push(function_state);
         Ok(())
@@ -210,7 +210,7 @@ impl FunctionManager {
             arguments
         } else {
             let calling_operands_types = function_type.params();
-            let mut arguments = stack.pull_results(calling_operands_types)?;
+            let arguments = stack.pull_results(calling_operands_types)?;
             arguments
         };
 

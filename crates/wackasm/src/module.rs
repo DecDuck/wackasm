@@ -1,4 +1,4 @@
-use std::{collections::HashMap, sync::Arc};
+use std::{collections::HashMap, rc::Rc, sync::Arc};
 
 use anyhow::anyhow;
 use serde::{Deserialize, Serialize};
@@ -7,7 +7,7 @@ use wasmparser::{ExternalKind, FuncType, FunctionBody, Payload, ValType};
 use crate::{
     HaltError, Value,
     blocks::{Block, BlockManager},
-    compiler::WackasmFunctionBody,
+    compiler::{BlockParams, WackasmFunctionBody},
     functions::FunctionManager,
     globals::GlobalManager,
     macros::unsupported,
@@ -57,7 +57,7 @@ pub(crate) struct FunctionFrame {
     pub(crate) function_index: FunctionIndex,
     pub(crate) block_lookup: Arc<BlockManager>,
     pub(crate) locals: LocalStore,
-    pub(crate) code: Arc<WackasmFunctionBody>,
+    pub(crate) code: Rc<WackasmFunctionBody>,
     pub(crate) pc: ProgramCounter,
 }
 
@@ -82,26 +82,19 @@ impl WackasmModule {
     pub(crate) fn start_block(
         &mut self,
         operand_stack: &mut FrameOperandStack,
-        block: &Block,
+        params: &BlockParams,
         idx: &BlockIndex,
     ) -> Result<(), HaltError> {
-        let block_params = match block.ty() {
-            wasmparser::BlockType::Empty => None,
-            wasmparser::BlockType::Type(_) => None,
-            wasmparser::BlockType::FuncType(func_type_index) => {
-                let function_type_index = FunctionTypeIndex(*func_type_index);
-                let function_type = self
-                    .functions
-                    .function_type_idx_type(&function_type_index)?;
+        let block_params = match params.get() {
+            None => None,
+            Some(func_type_index) => {
+                let function_type = self.functions.function_type_idx_type(&func_type_index)?;
 
-                Some(function_type.params().to_vec())
+                Some(function_type.params())
             }
         };
 
-        operand_stack.push_section(
-            StackSection::Block(*idx),
-            block_params.as_ref().map(|v| &**v),
-        )?;
+        operand_stack.push_section(StackSection::Block(*idx), block_params)?;
 
         Ok(())
     }
