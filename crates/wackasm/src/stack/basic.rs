@@ -2,7 +2,9 @@ use anyhow::anyhow;
 use serde::{Deserialize, Serialize};
 use wasmparser::ValType;
 
-use crate::{HaltError, Value, macros::trap, module::BlockIndex, stack::GlobalStack};
+use crate::{
+    HaltError, Value, compiler::DropKeep, macros::trap, module::BlockIndex, stack::GlobalStack,
+};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub(crate) struct OperandStack {
@@ -11,6 +13,9 @@ pub(crate) struct OperandStack {
 }
 
 impl GlobalStack for OperandStack {
+    fn clear(&mut self) {
+        self.len = 0;
+    }
     fn push(&mut self, value: Value) -> Result<(), HaltError> {
         if self.len == self.inner.len() {
             return Err(trap!("stack overflow"));
@@ -34,6 +39,13 @@ impl GlobalStack for OperandStack {
     #[inline]
     fn peek_mut(&mut self) -> Result<&mut Value, HaltError> {
         Ok(&mut self.inner[self.len - 1])
+    }
+
+    fn drop_keep(&mut self, dk: DropKeep) {
+        let (drop, keep) = (dk.drop as usize, dk.keep as usize);
+        let len = self.len;
+        self.inner.copy_within(len - keep..len, len - keep - drop);
+        self.len = len - drop;
     }
 
     fn pull_results(&mut self, types: &[ValType]) -> Result<Vec<Value>, HaltError> {
