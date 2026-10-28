@@ -95,28 +95,29 @@ pub enum WackasmOperator {
     },
     CallIndirect {
         table_index: u32,
+        type_index: u32,
     },
 
     // Stack
     LocalGet {
-        local_index: u32,
+        slot: u32,
     },
     LocalGetWide {
-        local_index: u32,
+        slot: u32,
     },
     LocalSet {
-        local_index: u32,
+        slot: u32,
     },
     LocalSetWide {
-        local_index: u32,
+        slot: u32,
     },
     Drop,
     DropWide,
     LocalTee {
-        local_index: u32,
+        slot: u32,
     },
     LocalTeeWide {
-        local_index: u32,
+        slot: u32,
     },
     GlobalGet {
         global_index: u32,

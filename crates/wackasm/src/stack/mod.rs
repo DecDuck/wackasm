@@ -1,26 +1,18 @@
-use anyhow::anyhow;
-use serde::{Deserialize, Serialize};
 use wasmparser::ValType;
 
-use crate::{
-    HaltError, Value,
-    compiler::DropKeep,
-    macros::trap,
-    module::{BlockIndex, FunctionIndex},
-    stack::basic::OperandStack,
-};
+use crate::{HaltError, Value, compiler::DropKeep, stack::basic::OperandStack};
 
 mod basic;
-mod locals;
-// #[cfg(test)]
-// mod tests;
-
-const MAX_OPERAND_STACK_SIZE: usize = 200;
-
-pub(crate) use locals::LocalStore;
 
 pub(crate) type FrameOperandStack = OperandStack;
 
+pub fn val_type_to_size(val_type: &ValType) -> usize {
+    if matches!(val_type, &ValType::V128) {
+        2
+    } else {
+        1
+    }
+}
 pub fn val_types_to_size(val_types: &[ValType]) -> usize {
     val_types
         .iter()
@@ -40,9 +32,32 @@ pub(crate) trait GlobalStack {
     fn peek_wide(&mut self) -> Result<u128, HaltError>;
     fn peek_mut(&mut self) -> Result<&mut Value, HaltError>;
 
+    fn push_all(&mut self, values: &[Value]);
+
+    fn local_get(&self, base: usize, index: u32) -> Value;
+    fn local_set(&mut self, base: usize, index: u32, value: Value);
+    fn local_wide_get(&self, base: usize, index: u32) -> u128 {
+        let low = self.local_get(base, index).0 as u128;
+        let high = self.local_get(base, index + 1).0 as u128;
+        (high << 64) | low
+    }
+    fn local_wide_set(&mut self, base: usize, index: u32, value: u128) {
+        let low = Value(value as u64);
+        let high = Value((value >> 64) as u64);
+        self.local_set(base, index, low);
+        self.local_set(base, index + 1, high);
+    }
+
+    /// Copies {keep} number of values to {len - keep - drop} in the stack.
+    /// Essentially keeps the top {keep} values while dropping the {drop} values
+    /// after that
     fn drop_keep(&mut self, dk: DropKeep);
-    fn pull_results(&mut self, types: &[ValType]) -> Result<Vec<Value>, HaltError>;
+    /// Equivalent to drop_keep where the drop is enough to move the keep values
+    /// down to target
     fn unwind_to(&mut self, target: usize, keep: usize);
+
+    /// Pulls values from the top of the stack, and returns them.
+    fn pull_results(&mut self, types: &[ValType]) -> Result<Vec<Value>, HaltError>;
 
     fn pop_i32(&mut self) -> Result<i32, HaltError> {
         Ok(self.pop()?.0 as i32)
@@ -61,22 +76,16 @@ pub(crate) trait GlobalStack {
     }
 
     fn push_v128(&mut self, value: u128) -> Result<(), HaltError> {
-        let bytes = value.to_le_bytes();
-        let low = u64::from_le_bytes(bytes[0..8].try_into().unwrap());
-        let high = u64::from_le_bytes(bytes[8..].try_into().unwrap());
-
-        self.push(Value(high))?;
-        self.push(Value(low))?;
-
+        let low = Value(value as u64);
+        let high = Value((value >> 64) as u64);
+        self.push(low)?;
+        self.push(high)?;
         Ok(())
     }
 
     fn pop_v128(&mut self) -> Result<u128, HaltError> {
-        let low = self.pop()?.0;
-        let high = self.pop()?.0;
-        let mut result = [0u8; 16];
-        result[0..8].copy_from_slice(&low.to_le_bytes());
-        result[8..].copy_from_slice(&high.to_le_bytes());
-        Ok(u128::from_le_bytes(result))
+        let high = self.pop()?.0 as u128;
+        let low = self.pop()?.0 as u128;
+        Ok((high << 64) | low)
     }
 }

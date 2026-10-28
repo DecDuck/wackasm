@@ -6,7 +6,6 @@ use crate::{
     HaltError, Value,
     compiler::DropKeep,
     macros::trap,
-    module::BlockIndex,
     stack::{GlobalStack, val_types_to_size},
 };
 
@@ -20,9 +19,17 @@ impl GlobalStack for OperandStack {
     fn len(&self) -> usize {
         self.len
     }
+
     fn clear(&mut self) {
         self.len = 0;
     }
+
+    fn push_all(&mut self, values: &[Value]) {
+        let end = self.len + values.len();
+        self.inner[self.len..end].copy_from_slice(values);
+        self.len = end;
+    }
+
     fn push(&mut self, value: Value) -> Result<(), HaltError> {
         self.len += 1;
         self.inner[self.len - 1] = value;
@@ -41,8 +48,8 @@ impl GlobalStack for OperandStack {
         Ok(&self.inner[self.len - 1])
     }
     fn peek_wide(&mut self) -> Result<u128, HaltError> {
-        let low = &self.inner[self.len - 1].0;
-        let high = &self.inner[self.len - 2].0;
+        let low = &self.inner[self.len - 2].0;
+        let high = &self.inner[self.len - 1].0;
         let mut result = [0u8; 16];
         result[0..8].copy_from_slice(&low.to_le_bytes());
         result[8..].copy_from_slice(&high.to_le_bytes());
@@ -82,6 +89,16 @@ impl GlobalStack for OperandStack {
         self.inner.copy_within(len - keep..len, target);
         self.len = target + keep;
     }
+    
+    fn local_get(&self, base: usize, index: u32) -> Value {
+        self.inner[base + index as usize]
+    }
+    
+    fn local_set(&mut self, base: usize, index: u32, value: Value) {
+        self.inner[base + index as usize] = value;
+    }
+
+    
 }
 
 impl OperandStack {

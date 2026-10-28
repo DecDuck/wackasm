@@ -1,12 +1,23 @@
+use anyhow::anyhow;
 use wasmparser::{Operator, ValType, WasmModuleResources as _};
 
 use crate::{
     HaltError,
     compiler::{WackasmOperator, compile::Compiler, filter::CompilerFilter},
     functions::FunctionManager,
+    macros::trap,
 };
 
 pub struct LocalsPass {}
+
+impl LocalsPass {
+    pub fn slot_for_index(&self, compiler: &Compiler, local_index: u32) -> Result<u32, HaltError> {
+        Ok(*compiler
+            .locals_slot_to_index
+            .get(local_index as usize)
+            .ok_or_else(|| anyhow!("invalid local index"))? as u32)
+    }
+}
 
 impl CompilerFilter for LocalsPass {
     fn compile(
@@ -29,20 +40,32 @@ impl CompilerFilter for LocalsPass {
 
         let operator = match operator {
             Operator::LocalGet { local_index } => match is_wide {
-                true => WackasmOperator::LocalGetWide { local_index },
-                false => WackasmOperator::LocalGet { local_index },
+                true => WackasmOperator::LocalGetWide {
+                    slot: self.slot_for_index(compiler, local_index)?,
+                },
+                false => WackasmOperator::LocalGet {
+                    slot: self.slot_for_index(compiler, local_index)?,
+                },
             },
             Operator::LocalSet { local_index } => match is_wide {
-                true => WackasmOperator::LocalSetWide { local_index },
-                false => WackasmOperator::LocalSet { local_index },
+                true => WackasmOperator::LocalSetWide {
+                    slot: self.slot_for_index(compiler, local_index)?,
+                },
+                false => WackasmOperator::LocalSet {
+                    slot: self.slot_for_index(compiler, local_index)?,
+                },
             },
             Operator::Drop => match is_wide {
                 true => WackasmOperator::DropWide,
                 false => WackasmOperator::Drop,
             },
             Operator::LocalTee { local_index } => match is_wide {
-                true => WackasmOperator::LocalTeeWide { local_index },
-                false => WackasmOperator::LocalTee { local_index },
+                true => WackasmOperator::LocalTeeWide {
+                    slot: self.slot_for_index(compiler, local_index)?,
+                },
+                false => WackasmOperator::LocalTee {
+                    slot: self.slot_for_index(compiler, local_index)?,
+                },
             },
             Operator::GlobalGet { global_index } => match is_wide {
                 true => WackasmOperator::GlobalGetWide { global_index },

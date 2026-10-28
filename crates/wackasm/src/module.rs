@@ -12,7 +12,6 @@ use crate::{
     macros::unsupported,
     memory::MemoryManager,
     pc::ProgramCounter,
-    stack::LocalStore,
     table::TableManager,
 };
 
@@ -51,10 +50,9 @@ pub(crate) enum TableValue {
     FuncRef(FunctionIndex),
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
 pub(crate) struct FunctionFrame {
     pub(crate) function_index: FunctionIndex,
-    pub(crate) locals: LocalStore,
     pub(crate) pc: ProgramCounter,
     pub(crate) stack_base: usize,
 }

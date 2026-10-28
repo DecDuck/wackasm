@@ -25,9 +25,9 @@ impl ExpectedValue {
     }
 }
 
-/// Splits a v128 into runtime slots, matching the stack layout (high half first).
+/// Splits a v128 into runtime slots, matching the stack layout (low half first).
 fn v128_to_slots(value: u128) -> [Value; 2] {
-    [Value((value >> 64) as u64), Value(value as u64)]
+    [Value(value as u64), Value((value >> 64) as u64)]
 }
 
 pub(super) fn convert_args(args: &[wast::WastArg<'_>]) -> Result<Vec<Value>, String> {
@@ -122,7 +122,7 @@ pub(super) fn results_match(actual: &[Value], expected: &[Vec<ExpectedValue>]) -
 
 fn slots_match(slots: &[Value], expected: &ExpectedValue) -> bool {
     match (expected, slots) {
-        (ExpectedValue::V128(pattern), [high, low]) => {
+        (ExpectedValue::V128(pattern), [low, high]) => {
             v128_matches(((high.0 as u128) << 64) | low.0 as u128, pattern)
         }
         (ExpectedValue::V128(_), _) => false,
@@ -276,15 +276,15 @@ mod tests {
     }
 
     #[test]
-    fn converts_vector_arguments_to_high_then_low_slots() {
+    fn converts_vector_arguments_to_low_then_high_slots() {
         let vector = WastArg::Core(WastArgCore::V128(V128Const::I32x4([1, 2, 3, 4])));
         let slots = convert_args(&[WastArg::Core(WastArgCore::I32(7)), vector]).unwrap();
 
         assert_eq!(slots.len(), 3);
         assert_eq!(slots[0].as_i32(), 7);
-        // Lanes 2 and 3 form the high half; lanes 0 and 1 the low half.
-        assert_eq!(slots[1].0, 0x0000_0004_0000_0003);
-        assert_eq!(slots[2].0, 0x0000_0002_0000_0001);
+        // Lanes 0 and 1 form the low half; lanes 2 and 3 the high half.
+        assert_eq!(slots[1].0, 0x0000_0002_0000_0001);
+        assert_eq!(slots[2].0, 0x0000_0004_0000_0003);
     }
 
     #[test]

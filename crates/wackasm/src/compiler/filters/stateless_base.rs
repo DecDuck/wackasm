@@ -29,8 +29,8 @@ impl CompilerFilter for StatelessBasePass {
             Operator::Return => WackasmOperator::Return,
             Operator::Select => WackasmOperator::Select,
             Operator::Call { function_index } => WackasmOperator::Call { function_index },
-            Operator::CallIndirect { table_index, .. } => {
-                WackasmOperator::CallIndirect { table_index }
+            Operator::CallIndirect { table_index, type_index, .. } => {
+                WackasmOperator::CallIndirect { table_index, type_index }
             }
 
             // Memory
