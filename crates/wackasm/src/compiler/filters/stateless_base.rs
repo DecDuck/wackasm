@@ -3,11 +3,9 @@ use wasmparser::Operator;
 
 use crate::{
     HaltError,
-    compiler::{
-        WackasmOperator, compile::Compiler,
-        filter::CompilerFilter,
-    },
+    compiler::{WackasmOperator, compile::Compiler, filter::CompilerFilter},
     functions::FunctionManager,
+    stack::val_type_to_size,
 };
 
 pub struct StatelessBasePass {}
@@ -20,18 +18,31 @@ impl CompilerFilter for StatelessBasePass {
         _pc: usize,
         operator: wasmparser::Operator,
     ) -> Result<bool, HaltError> {
-        
         let compiled_operator = match operator {
             Operator::Nop => return Ok(true),
 
             // Control
             Operator::Unreachable => WackasmOperator::Unreachable,
             Operator::Return => WackasmOperator::Return,
-            Operator::Select => WackasmOperator::Select,
-            Operator::Call { function_index } => WackasmOperator::Call { function_index },
-            Operator::CallIndirect { table_index, type_index, .. } => {
-                WackasmOperator::CallIndirect { table_index, type_index }
+            Operator::Select => {
+                let wide = val_type_to_size(
+                    &compiler
+                        .func_validator
+                        .get_operand_type(1)
+                        .flatten()
+                        .ok_or_else(|| anyhow!("failed to inspect select top value"))?,
+                ) > 1;
+                WackasmOperator::Select { wide }
             }
+            Operator::Call { function_index } => WackasmOperator::Call { function_index },
+            Operator::CallIndirect {
+                table_index,
+                type_index,
+                ..
+            } => WackasmOperator::CallIndirect {
+                table_index,
+                type_index,
+            },
 
             // Memory
             Operator::MemoryGrow { mem } => WackasmOperator::MemoryGrow { mem },

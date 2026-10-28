@@ -564,15 +564,17 @@ impl WackasmExecutor {
                     let a = self.stack.pop_i64()?;
                     self.stack.push(Value((a == 0) as u64))?;
                 }
-                WackasmOperator::Select => {
-                    let cond = self.stack.pop_i32()?;
-                    let val2 = self.stack.pop()?;
-                    let val1 = self.stack.pop()?;
+                WackasmOperator::Select { wide } => {
+                    let cond = self.stack.pop_i32()? == 0;
 
-                    if cond == 0 {
-                        self.stack.push(val2)?;
+                    if *wide {
+                        let top = self.stack.pop_v128()?;
+                        let bottom = self.stack.pop_v128()?;
+                        self.stack.push_v128(if cond { top } else { bottom })?;
                     } else {
-                        self.stack.push(val1)?;
+                        let top = self.stack.pop()?;
+                        let bottom = self.stack.pop()?;
+                        self.stack.push(if cond { top } else { bottom })?;
                     }
                 }
                 WackasmOperator::I64ExtendI32U => {
