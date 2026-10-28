@@ -46,13 +46,12 @@ fn runs_float_vector_and_null_reference_assert_returns() {
         "#,
     );
 
-    // v128 values need two stack slots and can't be passed or returned as a single `Value`.
     assert_eq!(
         summary,
         Summary {
-            passed: 4,
+            passed: 5,
             failed: 0,
-            unsupported: 1
+            unsupported: 0
         }
     );
 }
@@ -94,13 +93,12 @@ fn runs_float_and_vector_memory_loads_and_stores() {
         "#,
     );
 
-    // v128 values need two stack slots and can't be passed or returned as a single `Value`.
     assert_eq!(
         summary,
         Summary {
-            passed: 4,
+            passed: 5,
             failed: 0,
-            unsupported: 1
+            unsupported: 0
         }
     );
 }

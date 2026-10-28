@@ -6,7 +6,7 @@ use std::{
 
 use wackasm::{HaltError, Value, WackasmExecutor, WackasmModule};
 
-use crate::values::convert_arg;
+use crate::values::convert_args;
 
 #[derive(Default)]
 pub(super) struct ScriptRunner {
@@ -111,11 +111,7 @@ impl ScriptRunner {
         args: &[wast::WastArg<'_>],
     ) -> Result<Vec<Value>, RuntimeError> {
         let name = self.instance_name(module)?;
-        let args = args
-            .iter()
-            .map(convert_arg)
-            .collect::<Result<Vec<_>, _>>()
-            .map_err(RuntimeError::Unsupported)?;
+        let args = convert_args(args).map_err(RuntimeError::Unsupported)?;
         let executor = self
             .instances
             .get_mut(&name)
