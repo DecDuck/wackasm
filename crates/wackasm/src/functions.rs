@@ -21,6 +21,7 @@ const MAX_CALL_DEPTH: usize = 10_000;
 pub(crate) struct FunctionManager {
     pub(crate) function_type_indexes: Vec<FuncType>,
     pub(crate) function_types: Vec<FunctionTypeIndex>,
+    pub(crate) function_bodies: Vec<WackasmFunctionBody>,
     pub(crate) init_function_frames: Vec<FunctionFrame>,
 }
 
@@ -29,6 +30,7 @@ impl FunctionManager {
         Self {
             function_type_indexes: Vec::new(),
             function_types: Vec::new(),
+            function_bodies: Vec::new(),
             init_function_frames: Vec::new(),
         }
     }
@@ -59,6 +61,10 @@ impl FunctionManager {
             })?;
 
         Ok(function_type)
+    }
+
+    pub(crate) fn get_function_code(&self, function_index: &FunctionIndex) -> Result<&WackasmFunctionBody, HaltError> {
+        self.function_bodies.get(function_index.0 as usize).ok_or_else(|| anyhow!("internally inconsistent function index").into())
     }
 
     fn get_next_function_index(&self) -> FunctionIndex {
@@ -110,7 +116,6 @@ impl FunctionManager {
             // Stuff that needs to be initialised
             function_index: FunctionIndex(u32::MAX),
             locals: LocalStore::new(),
-            code: Rc::new(WackasmFunctionBody::empty()),
 
             // Runtime state
             pc: ProgramCounter::default(),
@@ -156,7 +161,7 @@ impl FunctionManager {
         // Save function body for later
         let (function_body, allocs) =
             WackasmFunctionBody::compile(&code_section, func_validator, self)?;
-        function_state.code = Rc::new(function_body);
+        self.function_bodies.push(function_body);
 
         self.init_function_frames.push(function_state);
         Ok(allocs)
@@ -180,7 +185,7 @@ impl FunctionManager {
                 anyhow!("internal module corruption: cannot lookup initial function state")
             })?;
 
-        if stack.space() < function.code.theoretical_max_stack_size() as usize {
+        if stack.space() < self.get_function_code(&function.function_index)?.theoretical_max_stack_size() as usize {
             return Err(trap!("potential stack overflow"));
         }
 

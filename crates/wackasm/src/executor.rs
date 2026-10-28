@@ -169,7 +169,7 @@ impl WackasmExecutor {
             .ok_or_else(|| anyhow!("callstack empty"))?;
 
         let mut pc = function_frame.pc;
-        let code_view = &function_frame.code.inner[..];
+        let code_view = &self.module.functions.get_function_code(&function_frame.function_index)?.inner[..];
 
         for _ in 0..instructions {
             *instructions_executed += 1;
