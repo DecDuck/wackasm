@@ -1,5 +1,5 @@
 use anyhow::anyhow;
-use wasmparser::{FuncValidator, Operator};
+use wasmparser::{FuncValidator, Operator, ValType};
 
 use crate::{
     HaltError,
@@ -11,6 +11,7 @@ use crate::{
     functions::FunctionManager,
     macros::trap,
     module::BlockIndex,
+    stack::val_types_to_size,
 };
 
 pub struct BlockPass {
@@ -62,10 +63,20 @@ impl BlockPass {
         let frame = validator
             .get_control_frame(depth as usize)
             .ok_or_else(|| anyhow!("target control frame doesn't exist"))?;
-        let keep = keep.map(|v| v.len()).unwrap_or(0) as u32;
-        let height = (validator.operand_stack_height() - stack_pops) as usize;
-        let drop = height
-            .checked_sub(frame.height + keep as usize)
+
+        let keep = keep.map(|v| val_types_to_size(v)).unwrap_or(0) as u32;
+        let total = validator.operand_stack_height() as usize;
+        let above_frame = total - frame.height;
+        let slots: usize = (stack_pops as usize..above_frame)
+            .into_iter()
+            .map(|depth| {
+                let ty = validator.get_operand_type(depth).flatten();
+                if ty == Some(ValType::V128) { 2 } else { 1 }
+            })
+            .sum();
+
+        let drop = slots
+            .checked_sub(keep as usize)
             .ok_or_else(|| anyhow!("negative drop depth"))?;
 
         Ok(BranchResolveResult::Target {
@@ -97,7 +108,6 @@ impl CompilerFilter for BlockPass {
                 let idx = BlockIndex(pc as u32);
                 self.block_stack.push(idx);
                 let block = compiler.block_manager.get(&idx)?.clone();
-                let params = BlockParams::from_block_type(block.ty());
                 let (_, r#else, end) = block.if_block()?;
 
                 let false_target = r#else.unwrap_or(end) as u32 + 1;

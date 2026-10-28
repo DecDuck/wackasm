@@ -20,6 +20,7 @@ impl CompilerFilter for StatelessBasePass {
         _pc: usize,
         operator: wasmparser::Operator,
     ) -> Result<bool, HaltError> {
+        
         let compiled_operator = match operator {
             Operator::Nop => return Ok(true),
 
@@ -31,14 +32,6 @@ impl CompilerFilter for StatelessBasePass {
             Operator::CallIndirect { table_index, .. } => {
                 WackasmOperator::CallIndirect { table_index }
             }
-
-            // Stack
-            Operator::LocalGet { local_index } => WackasmOperator::LocalGet { local_index },
-            Operator::LocalSet { local_index } => WackasmOperator::LocalSet { local_index },
-            Operator::Drop => WackasmOperator::Drop,
-            Operator::LocalTee { local_index } => WackasmOperator::LocalTee { local_index },
-            Operator::GlobalGet { global_index } => WackasmOperator::GlobalGet { global_index },
-            Operator::GlobalSet { global_index } => WackasmOperator::GlobalSet { global_index },
 
             // Memory
             Operator::MemoryGrow { mem } => WackasmOperator::MemoryGrow { mem },

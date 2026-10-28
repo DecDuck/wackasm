@@ -6,15 +6,13 @@ use wasmparser::{ExternalKind, FuncType, FuncValidatorAllocations, FunctionBody,
 
 use crate::{
     HaltError, Value,
-    blocks::{Block, BlockManager},
-    compiler::{BlockParams, WackasmFunctionBody},
-    executor::FunctionScopedResult,
+    compiler::WackasmFunctionBody,
     functions::FunctionManager,
     globals::GlobalManager,
     macros::unsupported,
     memory::MemoryManager,
     pc::ProgramCounter,
-    stack::{FrameOperandStack, GlobalStack, LocalStore, StackSection},
+    stack::LocalStore,
     table::TableManager,
 };
 
@@ -59,6 +57,7 @@ pub(crate) struct FunctionFrame {
     pub(crate) locals: LocalStore,
     pub(crate) code: Rc<WackasmFunctionBody>,
     pub(crate) pc: ProgramCounter,
+    pub(crate) stack_base: usize,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -78,7 +77,7 @@ impl WackasmModule {
             _ => Value(0),
         }
     }
-    
+
     pub fn new(data: &[u8]) -> Result<Self, HaltError> {
         let mut validator = wasmparser::Validator::new();
         let mut allocs = FuncValidatorAllocations::default();

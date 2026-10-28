@@ -22,13 +22,9 @@ pub fn main() -> Result<(), anyhow::Error> {
     println!("after serialize: {:?}", executor.get_result());
 
     executor.set_fuel(isize::MAX);
-    #[cfg(feature = "op-profile")]
-    wackasm::profiling::reset();
     let start = Instant::now();
     executor.execute()?;
     let time = start.elapsed();
-    #[cfg(feature = "op-profile")]
-    wackasm::profiling::report();
 
     let consumed_fuel = isize::MAX - executor.get_fuel();
 
