@@ -8,7 +8,6 @@ use wasmparser::{
 
 use crate::{
     HaltError, Value, WackasmModule,
-    blocks::{BlockManager, lookahead_find_blocks},
     compiler::WackasmFunctionBody,
     macros::trap,
     module::{FunctionFrame, FunctionIndex, FunctionTypeIndex},
@@ -226,7 +225,6 @@ impl FunctionManager {
         }
 
         callstack.push(function);
-        stack.push_section(StackSection::Function(function_index), None)?;
 
         Ok(())
     }

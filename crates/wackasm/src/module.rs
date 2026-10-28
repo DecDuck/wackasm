@@ -78,26 +78,6 @@ impl WackasmModule {
             _ => Value(0),
         }
     }
-
-    pub(crate) fn start_block(
-        &mut self,
-        operand_stack: &mut FrameOperandStack,
-        params: &BlockParams,
-        idx: &BlockIndex,
-    ) -> Result<(), HaltError> {
-        let block_params = match params.get() {
-            None => None,
-            Some(func_type_index) => {
-                let function_type = self.functions.function_type_idx_type(&func_type_index)?;
-
-                Some(function_type.params())
-            }
-        };
-
-        operand_stack.push_section(StackSection::Block(*idx), block_params)?;
-
-        Ok(())
-    }
     
     pub fn new(data: &[u8]) -> Result<Self, HaltError> {
         let mut validator = wasmparser::Validator::new();
