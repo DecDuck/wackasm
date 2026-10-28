@@ -6,7 +6,7 @@ In more words, `wackasm` was built so that you could run a WASM module that uses
 
 ## performance
 
-I am not good at writing WASM interpreters, so for this reason, the code is built more around being understandable, rather than very fast. However, wackasm generally gets around ~100-120 million operations/s on the CPUs I test on, so it's not *prohibitively slow*. 
+I am not good at writing WASM interpreters, so for this reason, the code is built more around being understandable, rather than very fast. However, wackasm generally gets around ~100-120 million operations/s on the CPUs I test on, so it's not *prohibitively slow*. Because that number mostly tracks clock speed, `cargo bench --bench percent_of_wasmi` instead reports how fast wackasm runs a prime sieve relative to [wasmi](https://github.com/wasmi-labs/wasmi) running the exact same `.wasm` file with fuel metering on (currently ~10% of wasmi).
 
 ## support
 

@@ -9,46 +9,86 @@ use criterion::{
 };
 use wackasm::{Value, WackasmExecutor, WackasmModule};
 
+// Both wackasm and the wasmi baseline run exactly these bytes.
 static WASM: &[u8] = include_bytes!("../../../compute/target/wasm32-unknown-unknown/release/compute.wasm");
 
-const LIMIT: u32 = 10_000;
+const EXPORT: &str = "run_prime_benchmark";
+const LIMIT: u32 = 1_000;
 const ROUNDS: u32 = 1000;
+const SAMPLES: usize = 500;
 
-fn run_native() -> u64 {
-    compute::run_prime_benchmark(black_box(LIMIT), black_box(ROUNDS))
+/// Runs `WASM` in wasmi, a mature interpreter, as the reference point.
+struct WasmiBaseline {
+    engine: wasmi::Engine,
+    module: wasmi::Module,
+    linker: wasmi::Linker<()>,
 }
 
-/// Measures wall time in units of one native run of the same workload, so
+impl WasmiBaseline {
+    fn new() -> Result<Self, wasmi::Error> {
+        let mut config = wasmi::Config::default();
+        config
+            // Translate everything up front, like wackasm does in `WackasmModule::new`.
+            .compilation_mode(wasmi::CompilationMode::Eager)
+            // wackasm always meters fuel, so make wasmi pay for it too.
+            .consume_fuel(true);
+        let engine = wasmi::Engine::new(&config);
+        let module = wasmi::Module::new(&engine, WASM)?;
+        let linker = wasmi::Linker::new(&engine);
+        Ok(Self {
+            engine,
+            module,
+            linker,
+        })
+    }
+
+    /// Instantiates a fresh copy (untimed) so every run starts from the same
+    /// memory state as the restored wackasm executor, then times one call.
+    fn run(&self) -> Result<(Duration, u64), wasmi::Error> {
+        let mut store = wasmi::Store::new(&self.engine, ());
+        store.set_fuel(u64::MAX)?;
+        let instance = self.linker.instantiate_and_start(&mut store, &self.module)?;
+        let function = instance.get_typed_func::<(u32, u32), u64>(&store, EXPORT)?;
+
+        let start = Instant::now();
+        let result = function.call(&mut store, (black_box(LIMIT), black_box(ROUNDS)))?;
+        let elapsed = start.elapsed();
+
+        Ok((elapsed, black_box(result)))
+    }
+}
+
+/// Measures wall time in units of one wasmi run of the same module, so
 /// results are comparable across CPUs with different clock speeds.
-struct RelativeToNative {
-    native_ns: f64,
+struct RelativeToWasmi {
+    wasmi_ns: f64,
 }
 
-impl RelativeToNative {
+impl RelativeToWasmi {
     fn calibrate() -> Self {
+        let baseline = WasmiBaseline::new().expect("compile wasm with wasmi");
+        let run = || baseline.run().expect("run wasm with wasmi");
+
         let warm_up = Instant::now();
         while warm_up.elapsed() < Duration::from_secs(1) {
-            black_box(run_native());
+            run();
         }
 
-        let mut samples = Vec::new();
-        let sampling = Instant::now();
-        while samples.len() < 50 || sampling.elapsed() < Duration::from_secs(2) {
-            let start = Instant::now();
-            black_box(run_native());
-            samples.push(start.elapsed());
+        let mut samples = Vec::with_capacity(SAMPLES);
+        while samples.len() < SAMPLES {
+            samples.push(run().0);
         }
         samples.sort_unstable();
         let median = samples[samples.len() / 2];
-        println!("native baseline: {median:?} per run ({} samples)", samples.len());
+        println!("wasmi baseline: {median:?} per run ({} samples)", samples.len());
 
         Self {
-            native_ns: median.as_nanos() as f64,
+            wasmi_ns: median.as_nanos() as f64,
         }
     }
 }
 
-impl Measurement for RelativeToNative {
+impl Measurement for RelativeToWasmi {
     type Intermediate = Instant;
     type Value = f64;
 
@@ -57,7 +97,7 @@ impl Measurement for RelativeToNative {
     }
 
     fn end(&self, start: Instant) -> f64 {
-        start.elapsed().as_nanos() as f64 / self.native_ns
+        start.elapsed().as_nanos() as f64 / self.wasmi_ns
     }
 
     fn add(&self, a: &f64, b: &f64) -> f64 {
@@ -77,9 +117,9 @@ impl Measurement for RelativeToNative {
     }
 }
 
-impl ValueFormatter for RelativeToNative {
+impl ValueFormatter for RelativeToWasmi {
     fn scale_values(&self, _typical_value: f64, _values: &mut [f64]) -> &'static str {
-        "x native"
+        "x wasmi"
     }
 
     fn scale_throughputs(
@@ -91,11 +131,11 @@ impl ValueFormatter for RelativeToNative {
         for value in values {
             *value = 100.0 / *value;
         }
-        "% of native"
+        "% of wasmi"
     }
 
     fn scale_for_machines(&self, _values: &mut [f64]) -> &'static str {
-        "native_runs"
+        "wasmi_runs"
     }
 }
 
@@ -103,10 +143,7 @@ fn suspended_executor() -> anyhow::Result<Vec<u8>> {
     let module = WackasmModule::new(&WASM)?;
     let mut executor = WackasmExecutor::new(module)?;
 
-    executor.call_export(
-        "run_prime_benchmark",
-        vec![Value(LIMIT as u64), Value(ROUNDS as u64)],
-    )?;
+    executor.call_export(EXPORT, vec![Value(LIMIT as u64), Value(ROUNDS as u64)])?;
     executor.set_fuel(0);
     executor.execute()?;
 
@@ -126,15 +163,19 @@ fn execute(serialized: &[u8]) -> (isize, u64) {
     (isize::MAX - executor.get_fuel(), result)
 }
 
-fn percent_of_native(criterion: &mut Criterion<RelativeToNative>) {
+fn percent_of_wasmi(criterion: &mut Criterion<RelativeToWasmi>) {
     let serialized = suspended_executor().expect("prepare suspended benchmark executor");
     let (fuel_per_iteration, result) = execute(&serialized);
-    assert_eq!(result, run_native(), "wackasm and native results differ");
+    let expected = WasmiBaseline::new()
+        .and_then(|baseline| baseline.run())
+        .expect("run wasm with wasmi")
+        .1;
+    assert_eq!(result, expected, "wackasm and wasmi results differ");
     println!("wackasm: {fuel_per_iteration} fuel per run");
 
-    let mut group = criterion.benchmark_group("percent_of_native");
-    group.sample_size(50);
-    // Only enables the "% of native" line; the formatter ignores the count.
+    let mut group = criterion.benchmark_group("percent_of_wasmi");
+    group.sample_size(SAMPLES);
+    // Only enables the "% of wasmi" line; the formatter ignores the count.
     group.throughput(Throughput::Elements(1));
     group.bench_function("run_prime_benchmark", |bencher| {
         bencher.iter_batched(
@@ -157,7 +198,7 @@ fn percent_of_native(criterion: &mut Criterion<RelativeToNative>) {
 
 criterion_group! {
     name = benches;
-    config = Criterion::default().with_measurement(RelativeToNative::calibrate());
-    targets = percent_of_native
+    config = Criterion::default().with_measurement(RelativeToWasmi::calibrate());
+    targets = percent_of_wasmi
 }
 criterion_main!(benches);
