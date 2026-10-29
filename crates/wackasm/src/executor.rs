@@ -14,7 +14,7 @@ use crate::{
     },
 };
 
-const MAX_INSTRUCTIONS_IN_LOOP: isize = 500;
+const MAX_FUEL_BEFORE_SYNC: isize = 1000;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct WackasmExecutor {
@@ -141,7 +141,7 @@ impl WackasmExecutor {
     pub fn execute(&mut self) -> Result<(), HaltError> {
         while self.callstack.len() > 0 {
             let remaining_fuel = self.fuel.load(Ordering::Relaxed);
-            let target_fuel = remaining_fuel.min(MAX_INSTRUCTIONS_IN_LOOP);
+            let target_fuel = remaining_fuel.min(MAX_FUEL_BEFORE_SYNC);
             if target_fuel == 0 {
                 break;
             }
@@ -160,8 +160,9 @@ impl WackasmExecutor {
     /// function frame. Adds how many were executed to instructions_executed.
     fn incremental_execute_function(
         &mut self,
-        instructions: isize,
+        mut instructions: isize,
     ) -> Result<(FunctionScopedResult, ProgramCounter, StackHandle<'_>, isize), HaltError> {
+        instructions += 10; // Consume fuel for calling functions, just in case functions don't have any loops
         let function_frame = self
             .callstack
             .last_mut()
