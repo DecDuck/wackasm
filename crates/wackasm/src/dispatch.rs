@@ -3,19 +3,10 @@ use std::{convert::Infallible, hint::unreachable_unchecked, ops::FromResidual};
 use anyhow::anyhow;
 
 use crate::{
-    HaltError, Value,
-    compiler::{WackasmFunctionBody, WackasmOperator, WackasmTableTarget},
-    functions::FunctionManager,
-    globals::GlobalManager,
-    macros::{
+    HaltError, Value, compiler::{RuntimeWackasmOperator, WackasmFunctionBody, WackasmOperator, WackasmTableTarget}, functions::FunctionManager, globals::GlobalManager, macros::{
         f32_load, f32_store, f64_load, f64_store, i32_binop, i32_load, i32_store, i64_binop,
         i64_cmp, i64_load, i64_store, trap, unsupported, v128_load, v128_store,
-    },
-    memory::MemoryManager,
-    module::{FunctionTypeIndex, GlobalIndex, TableIndex, TableValue},
-    ops,
-    stack::{LocalsHandle, RuntimeStack, StackHandle},
-    table::TableManager,
+    }, memory::MemoryManager, module::{FunctionTypeIndex, GlobalIndex, TableIndex, TableValue}, ops, stack::{LocalsHandle, RuntimeStack, StackHandle}, table::TableManager,
 };
 
 pub(crate) struct DispatchCtx<'a> {
@@ -23,7 +14,7 @@ pub(crate) struct DispatchCtx<'a> {
     pub(crate) globals: &'a mut GlobalManager,
     pub(crate) tables: &'a TableManager,
     pub(crate) functions: &'a FunctionManager, // CallIndirect type check
-    pub(crate) code: &'a [WackasmOperator],
+    pub(crate) code: &'a [RuntimeWackasmOperator],
     pub(crate) fuel: isize,
 
     // We pass the exit value back through here, so the entirety of
@@ -33,24 +24,31 @@ pub(crate) struct DispatchCtx<'a> {
 
 impl DispatchCtx<'_> {
     #[inline(always)]
-    fn at(&self, index: u32) -> *const WackasmOperator {
+    fn at(&self, index: u32) -> *const RuntimeWackasmOperator {
         // SAFETY: the compiler only emits jump targets that are inside this function's code
         unsafe { self.code.as_ptr().add(index as usize) }
     }
 }
 
+pub(crate) type WackasmOperatorHandler = for<'a, 'b> fn(
+    &'b mut DispatchCtx<'a>,
+    *const RuntimeWackasmOperator,
+    StackHandle<'a>,
+    LocalsHandle<'a>,
+) -> Result<(), HaltError>;
+
 pub(crate) enum Exit<'a> {
     OutOfFuel {
-        pc: *const WackasmOperator,
+        pc: *const RuntimeWackasmOperator,
         stack: StackHandle<'a>,
     },
     Call {
-        pc: *const WackasmOperator,
+        pc: *const RuntimeWackasmOperator,
         stack: StackHandle<'a>,
         function_index: u32,
     },
     Return {
-        pc: *const WackasmOperator,
+        pc: *const RuntimeWackasmOperator,
         stack: StackHandle<'a>,
     },
 }
@@ -476,7 +474,7 @@ ops!(|ctx, pc, stack, locals| match op {
 
 pub fn dispatch<'a>(
     ctx: &mut DispatchCtx<'a>,
-    pc: *const WackasmOperator,
+    pc: *const RuntimeWackasmOperator,
     stack: StackHandle<'a>,
     locals: LocalsHandle<'a>,
 ) -> Result<(), HaltError> {

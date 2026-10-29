@@ -21,3 +21,7 @@ Of the couple tens of thousands of WASM tests I found, ~~these are the results:~
 ## what's this for?
 
 It's for an WASM OpenComputers architecture. The current ones out there piss me off because I can't write shitty code, i.e. you have to work around the fact that the WASM executors they use can't resume in-process state, so use hacky workarounds that make you write your code differently. 
+
+## ai usage
+
+I didn't feel like hooking up wackasm to the wasm tests myself, so everything under `crates/wackasm-spec-tests/` is AI-generated. Otherwise it's all fleshy. 

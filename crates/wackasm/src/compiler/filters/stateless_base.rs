@@ -184,7 +184,7 @@ impl CompilerFilter for StatelessBasePass {
                 description: Box::new(format!("{:?}", operator)),
             },
         };
-        compiler.func_body.inner.push(compiled_operator);
+        compiler.func_body.inner.as_mut().unwrap().push(compiled_operator);
         return Ok(true);
     }
 }

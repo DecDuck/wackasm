@@ -13,7 +13,7 @@ use crate::{
     HaltError, Value,
     blocks::{BlockManager, lookahead_find_blocks},
     compiler::{
-        WackasmFunctionBody, WackasmOperator, WackasmTableTarget,
+        RuntimeWackasmOperator, WackasmFunctionBody, WackasmOperator, WackasmTableTarget,
         filter::{CompilerFilter, CompilerFilterConcrete},
         filters::{block::BlockPass, locals::LocalsPass, stateless_base::StatelessBasePass},
     },
@@ -100,7 +100,8 @@ impl Compiler {
 
         let mut pc = 0;
         while !ops.eof() {
-            self.transform_pc_lookup.push(self.func_body.inner.len());
+            self.transform_pc_lookup
+                .push(self.func_body.inner.as_ref().unwrap().len());
             let (operator, offset) = ops.read_with_offset()?;
             for filter in &mut compiler_passes {
                 if filter.compile(&mut *self, functions, pc, operator.clone())? {
@@ -114,7 +115,8 @@ impl Compiler {
                 .max(self.func_validator.operand_stack_height());
             pc += 1;
         }
-        self.transform_pc_lookup.push(self.func_body.inner.len());
+        self.transform_pc_lookup
+            .push(self.func_body.inner.as_ref().unwrap().len());
 
         ops.get_binary_reader()
             .finish_expression(&self.func_validator.visitor(ops.original_position()))?;
@@ -123,7 +125,7 @@ impl Compiler {
     }
 
     pub fn target_rewrite(&mut self) -> Result<(), HaltError> {
-        for operator in &mut self.func_body.inner {
+        for operator in self.func_body.inner.as_mut().unwrap() {
             match operator {
                 WackasmOperator::Jump { target }
                 | WackasmOperator::JumpIf { target }
@@ -156,7 +158,17 @@ impl Compiler {
         Ok(())
     }
 
-    pub fn finish(self) -> Result<(WackasmFunctionBody, FuncValidatorAllocations), HaltError> {
+    pub fn finish(mut self) -> Result<(WackasmFunctionBody, FuncValidatorAllocations), HaltError> {
+        // Lookup and transform all operators
+        let runtime_operators = self
+            .func_body
+            .inner
+            .take()
+            .unwrap()
+            .into_iter()
+            .map(|v| RuntimeWackasmOperator::from(v))
+            .collect();
+        self.func_body.runtime = runtime_operators;
         Ok((self.func_body, self.func_validator.into_allocations()))
     }
 }
