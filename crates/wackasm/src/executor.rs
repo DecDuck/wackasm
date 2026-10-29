@@ -16,7 +16,9 @@ use crate::{
         TableValue,
     },
     pc::ProgramCounter,
-    stack::{FrameOperandStack, GlobalStack as _, val_types_to_size},
+    stack::{
+        FrameOperandStack, GlobalStack as _, RuntimeStack as _, StackHandle, val_types_to_size,
+    },
 };
 
 const MAX_INSTRUCTIONS_IN_LOOP: isize = 500;
@@ -63,7 +65,7 @@ impl WackasmExecutor {
     pub fn call_export(&mut self, name: &str, arguments: Vec<Value>) -> Result<(), HaltError> {
         self.output.take();
         self.callstack.clear();
-        self.stack.handle().clear();
+        self.stack.clear();
 
         let function = self
             .module
@@ -87,8 +89,10 @@ impl WackasmExecutor {
     fn incremental_execute(&mut self, instructions: usize) -> Result<isize, HaltError> {
         let mut instructions_executed = 0;
 
-        let (function_result, pc) =
+        let (function_result, pc, local_stack) =
             self.incremental_execute_function(instructions, &mut instructions_executed)?;
+        let local_stack = local_stack.into_raw();
+        self.stack.reconcile(local_stack);
 
         // Update PC
         self.callstack
@@ -113,11 +117,10 @@ impl WackasmExecutor {
                 let result_types = function_type.results();
 
                 if self.callstack.is_empty() {
-                    let results = self.stack.handle().pull_results(result_types)?;
+                    let results = self.stack.pull_results(result_types)?;
                     self.output = Some(results);
                 } else {
                     self.stack
-                        .handle()
                         .unwind_to(function_frame.stack_base, val_types_to_size(result_types));
                 }
             }
@@ -167,7 +170,7 @@ impl WackasmExecutor {
         &mut self,
         instructions: usize,
         instructions_executed: &mut isize,
-    ) -> Result<(FunctionScopedResult, ProgramCounter), HaltError> {
+    ) -> Result<(FunctionScopedResult, ProgramCounter, StackHandle<'_>), HaltError> {
         let function_frame = self
             .callstack
             .last_mut()
@@ -175,7 +178,6 @@ impl WackasmExecutor {
 
         // Copy PC and stack into local variables
         let mut pc = function_frame.pc;
-        let mut stack = self.stack.handle();
 
         let base = function_frame.stack_base;
         let code_view = &self
@@ -184,6 +186,8 @@ impl WackasmExecutor {
             .get_function_code(&function_frame.function_index)?
             .inner[..];
 
+        let (mut stack, locals) = self.stack.handle(base);
+
         for _ in 0..instructions {
             *instructions_executed += 1;
             let operator = unsafe { code_view.get_unchecked(pc) };
@@ -191,21 +195,21 @@ impl WackasmExecutor {
                 WackasmOperator::Nop => {}
                 // Gets
                 WackasmOperator::LocalGet { slot } => {
-                    let local = stack.local_get(base, *slot);
+                    let local = locals.get(*slot);
                     stack.push(local);
                 }
                 WackasmOperator::LocalGetWide { slot } => {
-                    let local = stack.local_wide_get(base, *slot);
+                    let local = locals.get_wide(*slot);
                     stack.push_v128(local);
                 }
 
                 WackasmOperator::LocalSet { slot } => {
                     let value = stack.pop();
-                    stack.local_set(base, *slot, value);
+                    locals.set(*slot, value);
                 }
                 WackasmOperator::LocalSetWide { slot } => {
                     let value = stack.pop_v128();
-                    stack.local_wide_set(base, *slot, value);
+                    locals.set_wide(*slot, value);
                 }
 
                 WackasmOperator::Drop => {
@@ -217,11 +221,11 @@ impl WackasmExecutor {
 
                 WackasmOperator::LocalTee { slot } => {
                     let value = *stack.peek();
-                    stack.local_set(base, *slot, value.clone());
+                    locals.set(*slot, value.clone());
                 }
                 WackasmOperator::LocalTeeWide { slot } => {
                     let value = stack.peek_wide();
-                    stack.local_wide_set(base, *slot, value);
+                    locals.set_wide(*slot, value);
                 }
 
                 WackasmOperator::GlobalGet { global_index } => {
@@ -348,6 +352,7 @@ impl WackasmExecutor {
                             function_index: *function_index,
                         },
                         pc,
+                        stack,
                     ));
                 }
                 WackasmOperator::CallIndirect {
@@ -386,6 +391,7 @@ impl WackasmExecutor {
                             function_index: func_index.0,
                         },
                         pc,
+                        stack,
                     ));
                 }
 
@@ -423,7 +429,7 @@ impl WackasmExecutor {
                     let i = stack.pop_i32() as u32 as usize;
                     match targets[i.min(targets.len() - 1)] {
                         WackasmTableTarget::Return => {
-                            return Ok((FunctionScopedResult::FunctionReturn, pc));
+                            return Ok((FunctionScopedResult::FunctionReturn, pc, stack));
                         }
                         WackasmTableTarget::Break { target, dk } => {
                             stack.drop_keep(dk);
@@ -434,11 +440,11 @@ impl WackasmExecutor {
                 }
 
                 WackasmOperator::Return => {
-                    return Ok((FunctionScopedResult::FunctionReturn, pc));
+                    return Ok((FunctionScopedResult::FunctionReturn, pc, stack));
                 }
                 WackasmOperator::ReturnIf => {
                     if stack.pop_i32() != 0 {
-                        return Ok((FunctionScopedResult::FunctionReturn, pc));
+                        return Ok((FunctionScopedResult::FunctionReturn, pc, stack));
                     }
                 }
 
@@ -600,6 +606,6 @@ impl WackasmExecutor {
             pc += 1;
         }
 
-        return Ok((FunctionScopedResult::OutOfFuel, pc));
+        return Ok((FunctionScopedResult::OutOfFuel, pc, stack));
     }
 }
