@@ -58,11 +58,11 @@ macro_rules! ops {
         $(
             #[allow(unused_variables, unused_mut, unreachable_code)]
             fn $name<'a>(
-                $ctx: &mut DispatchCtx<'_>,
+                $ctx: &mut DispatchCtx<'a>,
                 $pc: *const WackasmOperator,
                 mut $stack: StackHandle<'a>,
                 $locals: LocalsHandle<'a>,
-            ) -> Exit<'a> {
+            ) -> Result<(), HaltError> {
                 // `{ .. }` matches unit variants too.
                 let WackasmOperator::$variant { $($field,)* .. } = (unsafe { &*$pc }) else {
                     unsafe { unreachable_unchecked() }
