@@ -1,0 +1,79 @@
+/// Defines tail-call op handlers and the `dispatch!` macro that jumps between them.
+///
+/// The input is written as a closure over a `match` so it parses as a Rust expression,
+/// which lets rustfmt format it. Each arm is `handler_name @ Variant { fields } => body`;
+/// the scrutinee (`op`) is ignored. Fields bind by reference to the current operator.
+///
+/// ```ignore
+/// ops!(|ctx, pc, stack, locals| match op {
+///     nop @ Nop => {}
+///     local_get @ LocalGet { slot } => stack.push(locals.get(*slot)),
+/// });
+/// ```
+#[macro_export]
+macro_rules! ops {
+    (|$ctx:ident, $pc:ident, $stack:ident, $locals:ident| match $op:ident { $($arms:tt)* }) => {
+        // Pass a literal `$` through so the final rule can define a nested macro_rules.
+        ops!(@parse [($) $ctx, $pc, $stack, $locals] [] $($arms)*);
+    };
+
+    // Munch arms one at a time: rustfmt omits the comma after block bodies but requires it
+    // after expression bodies, and a single repetition can't express both.
+    (@parse $params:tt [$($acc:tt)*]
+        $name:ident @ $variant:ident $({ $($field:ident),* $(,)? })? => $body:block, $($rest:tt)*
+    ) => {
+        ops!(@parse $params [$($acc)* [$name $variant [$($($field)*)?] $body]] $($rest)*);
+    };
+    (@parse $params:tt [$($acc:tt)*]
+        $name:ident @ $variant:ident $({ $($field:ident),* $(,)? })? => $body:block $($rest:tt)*
+    ) => {
+        ops!(@parse $params [$($acc)* [$name $variant [$($($field)*)?] $body]] $($rest)*);
+    };
+    (@parse $params:tt [$($acc:tt)*]
+        $name:ident @ $variant:ident $({ $($field:ident),* $(,)? })? => $body:expr, $($rest:tt)*
+    ) => {
+        ops!(@parse $params [$($acc)* [$name $variant [$($($field)*)?] $body]] $($rest)*);
+    };
+    (@parse $params:tt [$($acc:tt)*]
+        $name:ident @ $variant:ident $({ $($field:ident),* $(,)? })? => $body:expr
+    ) => {
+        ops!(@parse $params [$($acc)* [$name $variant [$($($field)*)?] $body]]);
+    };
+
+    (@parse [($d:tt) $ctx:ident, $pc:ident, $stack:ident, $locals:ident] [$(
+        [$name:ident $variant:ident [$($field:ident)*] $body:tt]
+    )*]) => {
+        #[macro_export]
+        macro_rules! dispatch {
+            ($d c:expr, $d p:expr, $d s:expr, $d l:expr) => {{
+                let (ctx, pc, stack, locals) = ($d c, $d p, $d s, $d l);
+                if ctx.fuel == 0 {
+                    return Exit::OutOfFuel { pc, stack, fuel: ctx.fuel };
+                }
+                ctx.fuel -= 1;
+                match unsafe { &*pc } {
+                    $( WackasmOperator::$variant { .. } => become $name(ctx, pc, stack, locals), )*
+                    #[allow(unreachable_patterns)]
+                    op => unimplemented!("{op:?}"), // swap for unreachable_unchecked() once complete
+                }
+            }};
+        }
+
+        $(
+            #[allow(unused_variables, unused_mut, unreachable_code)]
+            fn $name<'a>(
+                $ctx: &mut DispatchCtx<'_>,
+                $pc: *const WackasmOperator,
+                mut $stack: StackHandle<'a>,
+                $locals: LocalsHandle<'a>,
+            ) -> Exit<'a> {
+                // `{ .. }` matches unit variants too.
+                let WackasmOperator::$variant { $($field,)* .. } = (unsafe { &*$pc }) else {
+                    unsafe { unreachable_unchecked() }
+                };
+                $body;
+                dispatch!($ctx, unsafe { $pc.add(1) }, $stack, $locals)
+            }
+        )*
+    };
+}

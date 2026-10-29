@@ -2,19 +2,12 @@ use std::sync::atomic::{AtomicIsize, Ordering};
 
 use anyhow::anyhow;
 use serde::{Deserialize, Serialize};
-use wasmparser::Operator;
 
 use crate::{
     HaltError, Value, WackasmModule,
-    compiler::{WackasmOperator, WackasmTableTarget},
-    macros::{
-        f32_load, f32_store, f64_load, f64_store, i32_binop, i32_load, i32_store, i64_binop,
-        i64_cmp, i64_load, i64_store, trap, unsupported, v128_load, v128_store,
-    },
-    module::{
-        ExportIndex, FunctionFrame, FunctionIndex, FunctionTypeIndex, GlobalIndex, TableIndex,
-        TableValue,
-    },
+    compiler::WackasmOperator,
+    dispatch::{DispatchCtx, Exit, dispatch},
+    module::{ExportIndex, FunctionFrame, FunctionIndex},
     pc::ProgramCounter,
     stack::{
         FrameOperandStack, GlobalStack as _, RuntimeStack as _, StackHandle, val_types_to_size,
@@ -86,11 +79,9 @@ impl WackasmExecutor {
     }
 
     // runs X instructions, decrementing fuel
-    fn incremental_execute(&mut self, instructions: usize) -> Result<isize, HaltError> {
-        let mut instructions_executed = 0;
-
-        let (function_result, pc, local_stack) =
-            self.incremental_execute_function(instructions, &mut instructions_executed)?;
+    fn incremental_execute(&mut self, fuel: isize) -> Result<isize, HaltError> {
+        let (function_result, pc, local_stack, fuel_remaining) =
+            self.incremental_execute_function(fuel)?;
         let local_stack = local_stack.into_raw();
         self.stack.reconcile(local_stack);
 
@@ -136,7 +127,7 @@ impl WackasmExecutor {
             }
         }
 
-        Ok(instructions_executed)
+        Ok(fuel_remaining)
     }
 
     pub fn set_fuel(&self, fuel: isize) {
@@ -154,8 +145,9 @@ impl WackasmExecutor {
             if target_fuel == 0 {
                 break;
             }
-            let executed = self.incremental_execute(target_fuel as usize)?;
-            self.fuel.fetch_sub(executed, Ordering::Relaxed);
+            let remaining_fuel = self.incremental_execute(target_fuel)?;
+            let fuel_difference = target_fuel - remaining_fuel;
+            self.fuel.fetch_sub(fuel_difference, Ordering::Relaxed);
         }
         Ok(())
     }
@@ -168,16 +160,12 @@ impl WackasmExecutor {
     /// function frame. Adds how many were executed to instructions_executed.
     fn incremental_execute_function(
         &mut self,
-        instructions: usize,
-        instructions_executed: &mut isize,
-    ) -> Result<(FunctionScopedResult, ProgramCounter, StackHandle<'_>), HaltError> {
+        instructions: isize,
+    ) -> Result<(FunctionScopedResult, ProgramCounter, StackHandle<'_>, isize), HaltError> {
         let function_frame = self
             .callstack
             .last_mut()
             .ok_or_else(|| anyhow!("callstack empty"))?;
-
-        // Copy PC and stack into local variables
-        let mut pc = function_frame.pc;
 
         let base = function_frame.stack_base;
         let code_view = &self
@@ -186,8 +174,54 @@ impl WackasmExecutor {
             .get_function_code(&function_frame.function_index)?
             .inner[..];
 
-        let (mut stack, locals) = self.stack.handle(base);
+        let (stack, locals) = self.stack.handle(base);
 
+        let mut ctx = DispatchCtx {
+            memories: &mut self.module.memories,
+            functions: &self.module.functions,
+            globals: &mut self.module.globals,
+            tables: &self.module.tables,
+            code: code_view,
+            fuel: instructions,
+        };
+
+        let base_ptr = code_view.as_ptr();
+        let pc = unsafe { base_ptr.add(function_frame.pc) };
+
+        let to_index = |p: *const WackasmOperator| -> ProgramCounter {
+            debug_assert!(
+                p >= base_ptr && p <= base_ptr.wrapping_add(code_view.len()),
+                "program counter went out of bounds"
+            );
+            unsafe { p.offset_from_unsigned(base_ptr) }
+        };
+
+        let exit = dispatch(&mut ctx, pc, stack, locals);
+        return match exit {
+            Exit::OutOfFuel { pc, stack, fuel } => {
+                Ok((FunctionScopedResult::OutOfFuel, to_index(pc), stack, fuel))
+            }
+            Exit::Call {
+                pc,
+                stack,
+                fuel,
+                function_index,
+            } => Ok((
+                FunctionScopedResult::FunctionCall { function_index },
+                to_index(pc),
+                stack,
+                fuel,
+            )),
+            Exit::Return { pc, stack, fuel } => Ok((
+                FunctionScopedResult::FunctionReturn,
+                to_index(pc),
+                stack,
+                fuel,
+            )),
+            Exit::Halt(halt_error) => Err(halt_error),
+        };
+
+        /*
         for _ in 0..instructions {
             *instructions_executed += 1;
             let operator = unsafe { code_view.get_unchecked(pc) };
@@ -606,6 +640,6 @@ impl WackasmExecutor {
             pc += 1;
         }
 
-        return Ok((FunctionScopedResult::OutOfFuel, pc, stack));
+         */
     }
 }

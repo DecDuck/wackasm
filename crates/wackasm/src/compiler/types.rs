@@ -7,7 +7,7 @@ use crate::{
     module::{BlockIndex, FunctionTypeIndex},
 };
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct WackasmMemArg {
     pub(crate) offset: u32,
     pub(crate) memory: u32,
