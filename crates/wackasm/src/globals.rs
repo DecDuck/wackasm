@@ -47,34 +47,29 @@ impl GlobalManager {
         Ok(())
     }
 
-    pub fn get(&self, global_index: &GlobalIndex) -> Result<&Global, HaltError> {
-        self.globals
-            .get(global_index.0 as usize)
-            .ok_or_else(|| anyhow!("no global for index {:?}", global_index).into())
+    pub fn get(&self, global_index: &GlobalIndex) -> &Global {
+        unsafe { self.globals.get_unchecked(global_index.0 as usize) }
     }
 
     pub fn get_wide(&self, global_index: &GlobalIndex) -> Result<u128, HaltError> {
-        Ok(self
-            .globals
-            .get(global_index.0 as usize)
-            .ok_or_else(|| trap!("no global for index {:?}", global_index))?
+        let global = unsafe { self.globals.get_unchecked(global_index.0 as usize) };
+        Ok(global
             .inner
             .get_wide()
             .ok_or_else(|| trap!("global not wide"))?)
     }
 
-    pub fn set(&mut self, global_index: &GlobalIndex, new_value: Value) -> Result<(), HaltError> {
-        let value = self
-            .globals
-            .get_mut(global_index.0 as usize)
-            .ok_or_else(|| anyhow!("no global for index {:?}", global_index))?;
+    pub fn set(&mut self, global_index: &GlobalIndex, new_value: Value) {
+        let value = unsafe { self.globals.get_unchecked_mut(global_index.0 as usize) };
 
         value.inner.set(new_value);
-
-        Ok(())
     }
 
-    pub fn set_wide(&mut self, global_index: &GlobalIndex, new_value: u128) -> Result<(), HaltError> {
+    pub fn set_wide(
+        &mut self,
+        global_index: &GlobalIndex,
+        new_value: u128,
+    ) -> Result<(), HaltError> {
         let value = self
             .globals
             .get_mut(global_index.0 as usize)
