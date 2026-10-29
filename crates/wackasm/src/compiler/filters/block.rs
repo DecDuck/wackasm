@@ -1,11 +1,11 @@
 use anyhow::anyhow;
-use wasmparser::{FuncValidator, Operator, ValType};
+use wasmparser::{Operator, ValType};
 
 use crate::{
     HaltError,
     blocks::Block,
     compiler::{
-        BlockParams, DropKeep, WackasmOperator, WackasmTableTarget, WackasmTableTargets,
+        DropKeep, WackasmOperator, WackasmTableTarget, WackasmTableTargets,
         compile::Compiler, filter::CompilerFilter,
     },
     functions::FunctionManager,
