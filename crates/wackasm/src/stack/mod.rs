@@ -25,12 +25,12 @@ pub(crate) trait GlobalStack {
     fn space(&self) -> usize;
 
     fn clear(&mut self);
-    fn push(&mut self, value: Value) -> Result<(), HaltError>;
-    fn pop(&mut self) -> Result<Value, HaltError>;
+    fn push(&mut self, value: Value);
+    fn pop(&mut self) -> Value;
 
-    fn peek(&mut self) -> Result<&Value, HaltError>;
-    fn peek_wide(&mut self) -> Result<u128, HaltError>;
-    fn peek_mut(&mut self) -> Result<&mut Value, HaltError>;
+    fn peek(&mut self) -> &Value;
+    fn peek_wide(&mut self) -> u128;
+    fn peek_mut(&mut self) -> &mut Value;
 
     fn push_all(&mut self, values: &[Value]);
 
@@ -59,33 +59,32 @@ pub(crate) trait GlobalStack {
     /// Pulls values from the top of the stack, and returns them.
     fn pull_results(&mut self, types: &[ValType]) -> Result<Vec<Value>, HaltError>;
 
-    fn pop_i32(&mut self) -> Result<i32, HaltError> {
-        Ok(self.pop()?.0 as i32)
+    fn pop_i32(&mut self) -> i32 {
+        self.pop().0 as i32
     }
 
-    fn pop_i64(&mut self) -> Result<i64, HaltError> {
-        Ok(self.pop()?.0 as i64)
+    fn pop_i64(&mut self) -> i64 {
+        self.pop().0 as i64
     }
 
-    fn pop_f32(&mut self) -> Result<f32, HaltError> {
-        Ok(self.pop()?.as_f32())
+    fn pop_f32(&mut self) -> f32 {
+        self.pop().as_f32()
     }
 
-    fn pop_f64(&mut self) -> Result<f64, HaltError> {
-        Ok(self.pop()?.as_f64())
+    fn pop_f64(&mut self) -> f64 {
+        self.pop().as_f64()
     }
 
-    fn push_v128(&mut self, value: u128) -> Result<(), HaltError> {
+    fn push_v128(&mut self, value: u128) {
         let low = Value(value as u64);
         let high = Value((value >> 64) as u64);
-        self.push(low)?;
-        self.push(high)?;
-        Ok(())
+        self.push(low);
+        self.push(high);
     }
 
-    fn pop_v128(&mut self) -> Result<u128, HaltError> {
-        let high = self.pop()?.0 as u128;
-        let low = self.pop()?.0 as u128;
-        Ok((high << 64) | low)
+    fn pop_v128(&mut self) -> u128 {
+        let high = self.pop().0 as u128;
+        let low = self.pop().0 as u128;
+        (high << 64) | low
     }
 }

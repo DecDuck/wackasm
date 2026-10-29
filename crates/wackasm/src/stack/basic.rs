@@ -15,7 +15,30 @@ pub(crate) struct OperandStack {
     len: usize,
 }
 
-impl GlobalStack for OperandStack {
+pub(crate) struct LocalOperandStack<'a> {
+    inner: &'a mut [Value],
+    len: usize,
+    writeback_len: &'a mut usize,
+}
+
+impl<'a> Drop for LocalOperandStack<'a> {
+    fn drop(&mut self) {
+        *self.writeback_len = self.len;
+    }
+}
+
+impl OperandStack {
+    #[inline(always)]
+    pub(crate) fn handle(&mut self) -> LocalOperandStack<'_> {
+        LocalOperandStack {
+            len: self.len,
+            inner: &mut self.inner[..],
+            writeback_len: &mut self.len,
+        }
+    }
+}
+
+impl<'a> GlobalStack for LocalOperandStack<'a> {
     fn len(&self) -> usize {
         self.len
     }
@@ -30,34 +53,33 @@ impl GlobalStack for OperandStack {
         self.len = end;
     }
 
-    fn push(&mut self, value: Value) -> Result<(), HaltError> {
+    fn push(&mut self, value: Value) {
         self.len += 1;
         self.inner[self.len - 1] = value;
-        Ok(())
     }
     fn space(&self) -> usize {
         self.inner.len() - self.len
     }
 
-    fn pop(&mut self) -> Result<Value, HaltError> {
+    fn pop(&mut self) -> Value {
         self.len -= 1;
-        Ok(self.inner[self.len]) // - 1 not required to access by index here because we -1 above
+        self.inner[self.len] // - 1 not required to access by index here because we -1 above
     }
 
-    fn peek(&mut self) -> Result<&Value, HaltError> {
-        Ok(&self.inner[self.len - 1])
+    fn peek(&mut self) -> &Value {
+        &self.inner[self.len - 1]
     }
-    fn peek_wide(&mut self) -> Result<u128, HaltError> {
+    fn peek_wide(&mut self) -> u128 {
         let low = &self.inner[self.len - 2].0;
         let high = &self.inner[self.len - 1].0;
         let mut result = [0u8; 16];
         result[0..8].copy_from_slice(&low.to_le_bytes());
         result[8..].copy_from_slice(&high.to_le_bytes());
-        Ok(u128::from_le_bytes(result))
+        u128::from_le_bytes(result)
     }
 
-    fn peek_mut(&mut self) -> Result<&mut Value, HaltError> {
-        Ok(&mut self.inner[self.len - 1])
+    fn peek_mut(&mut self) -> &mut Value {
+        &mut self.inner[self.len - 1]
     }
 
     fn drop_keep(&mut self, dk: DropKeep) {
@@ -89,16 +111,14 @@ impl GlobalStack for OperandStack {
         self.inner.copy_within(len - keep..len, target);
         self.len = target + keep;
     }
-    
+
     fn local_get(&self, base: usize, index: u32) -> Value {
         self.inner[base + index as usize]
     }
-    
+
     fn local_set(&mut self, base: usize, index: u32, value: Value) {
         self.inner[base + index as usize] = value;
     }
-
-    
 }
 
 impl OperandStack {

@@ -162,13 +162,17 @@ impl FunctionManager {
             return Err(trap!("call stack exhausted"));
         }
 
+        let mut stack = stack.handle();
+
         let code_body = self.get_function_code(&function_index)?;
 
         if stack.space() < code_body.theoretical_max_stack_size() as usize {
             return Err(trap!("potential stack overflow"));
         }
 
-        if let Some(arguments) = &arguments && arguments.len() != code_body.params_slots {
+        if let Some(arguments) = &arguments
+            && arguments.len() != code_body.params_slots
+        {
             return Err(trap!("invalid arguments len"));
         }
 
