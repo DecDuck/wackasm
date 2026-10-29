@@ -47,10 +47,6 @@ macro_rules! ops {
         macro_rules! dispatch {
             ($d c:expr, $d p:expr, $d s:expr, $d l:expr) => {{
                 let (ctx, pc, stack, locals) = ($d c, $d p, $d s, $d l);
-                if ctx.fuel == 0 {
-                    return Exit::OutOfFuel { pc, stack, fuel: ctx.fuel };
-                }
-                ctx.fuel -= 1;
                 match unsafe { &*pc } {
                     $( WackasmOperator::$variant { .. } => become $name(ctx, pc, stack, locals), )*
                     #[allow(unreachable_patterns)]

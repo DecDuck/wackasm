@@ -6,7 +6,7 @@ In more words, `wackasm` was built so that you could run a WASM module that uses
 
 ## performance
 
-I am not good at writing WASM interpreters, so for this reason, the interpreter is slow. It benchmarks against `wasmi`, one of the best WASM interpreters, and gets about 17% of that performance... which is not *prohibitively* slow, especially for my intended use case, but there is definitely performance headroom not taken advantage of.
+I am not good at writing WASM interpreters, so for this reason, the interpreter is slow. It benchmarks against `wasmi`, one of the best WASM interpreters, and gets about 28% of that performance... which is not *prohibitively* slow, especially for my intended use case, but there is definitely performance headroom not taken advantage of.
 
 ## support
 

@@ -61,6 +61,8 @@ const _: () = assert!(std::mem::size_of::<WackasmOperator>() <= 16);
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum WackasmOperator {
+    ConsumeFuel,
+
     // Compiled block handling
     Jump {
         target: u32,
