@@ -19,12 +19,15 @@ mod dispatch;
 #[macro_use]
 mod dispatch_macros;
 
+#[cfg(test)]
+mod tests;
+
 pub use executor::WackasmExecutor;
 pub use module::WackasmModule;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[repr(transparent)]
 pub struct Value(pub u64);
 
