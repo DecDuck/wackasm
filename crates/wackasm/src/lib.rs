@@ -2,6 +2,7 @@
 #![feature(option_reference_flattening)]
 #![feature(explicit_tail_calls)]
 #![feature(try_trait_v2)]
+#![feature(macro_metavar_expr)]
 
 mod blocks;
 mod compiler;
@@ -16,6 +17,7 @@ mod pc;
 mod stack;
 mod table;
 mod dispatch;
+pub mod imports;
 #[macro_use]
 mod dispatch_macros;
 
@@ -27,7 +29,7 @@ pub use module::WackasmModule;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
 #[repr(transparent)]
 pub struct Value(pub u64);
 

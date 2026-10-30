@@ -7,14 +7,14 @@ use criterion::{
     BatchSize, Criterion, Throughput, criterion_group, criterion_main,
     measurement::{Measurement, ValueFormatter},
 };
-use wackasm::{Value, WackasmExecutor, WackasmModule};
+use wackasm::{Value, WackasmExecutor, WackasmModule, imports::NoResources};
 
 // Both wackasm and the wasmi baseline run exactly these bytes.
 static WASM: &[u8] = include_bytes!("../../../compute/target/wasm32-unknown-unknown/release/compute.wasm");
 
 const EXPORT: &str = "run_prime_benchmark";
 const LIMIT: u32 = 1_000;
-const ROUNDS: u32 = 1000;
+const ROUNDS: u32 = 10_000;
 const SAMPLES: usize = 500;
 
 /// Runs `WASM` in wasmi, a mature interpreter, as the reference point.
@@ -141,7 +141,7 @@ impl ValueFormatter for RelativeToWasmi {
 
 fn suspended_executor() -> anyhow::Result<Vec<u8>> {
     let module = WackasmModule::new(&WASM)?;
-    let mut executor = WackasmExecutor::new(module)?;
+    let mut executor: WackasmExecutor = WackasmExecutor::new(module)?;
 
     executor.call_export(EXPORT, vec![Value(LIMIT as u64), Value(ROUNDS as u64)])?;
     executor.set_fuel(0);

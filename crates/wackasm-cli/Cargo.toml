@@ -11,4 +11,5 @@ path = "src/main.rs"
 anyhow = "1.0.104"
 bitcode = { version = "0.6.9", features = ["serde"] }
 human_bytes = "0.4.3"
+serde = { version = "1.0.229", features = ["derive"] }
 wackasm = { path = "../wackasm" }
