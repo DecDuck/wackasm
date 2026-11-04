@@ -53,39 +53,21 @@ pub(crate) enum TableValue {
     FuncRef(FunctionIndex),
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub(crate) enum FunctionFrame {
-    Internal(InternalFunctionFrame),
-    Import {
-        module: String,
-        name: String,
-        args: Vec<Value>,
-        should_return: usize,
-    },
-}
-
-impl FunctionFrame {
-    pub fn on_internal_frame(&mut self, modifier: impl FnOnce(&mut InternalFunctionFrame)) {
-        match self {
-            FunctionFrame::Internal(internal_function_frame) => modifier(internal_function_frame),
-            FunctionFrame::Import { .. } => {}
-        }
-    }
-
-    pub fn is_import_frame(&self) -> bool {
-        match self {
-            FunctionFrame::Import { .. } => true,
-            _ => false,
-        }
-    }
-}
-
-#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
-pub struct InternalFunctionFrame {
+#[derive(Copy, Clone, Debug, Serialize, Deserialize)]
+pub(crate) struct FunctionFrame {
     pub(crate) function_index: FunctionIndex,
     pub(crate) pc: ProgramCounter,
     pub(crate) stack_base: usize,
 }
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct PendingImportCall {
+    pub(crate) module: String,
+    pub(crate) name: String,
+    pub(crate) args: Vec<Value>,
+    pub(crate) should_return: usize,
+}
+
 
 #[derive(Serialize, Deserialize)]
 pub struct WackasmModule {

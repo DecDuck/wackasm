@@ -1,10 +1,7 @@
-use std::{
-    collections::HashMap,
-    sync::atomic::{AtomicIsize, Ordering},
-};
+use std::sync::atomic::{AtomicIsize, Ordering};
 
 use anyhow::anyhow;
-use serde::{Deserialize, Deserializer, Serialize};
+use serde::{Deserialize, Serialize};
 
 use crate::{
     HaltError, Value, WackasmModule,
@@ -13,7 +10,7 @@ use crate::{
     imports::{WackasmHostBridge, WackasmImports, WackasmResource},
     macros::trap,
     memory::MemoryManager,
-    module::{ExportIndex, FunctionFrame, FunctionIndex},
+    module::{ExportIndex, FunctionFrame, FunctionIndex, PendingImportCall},
     pc::ProgramCounter,
     stack::{
         FrameOperandStack, GlobalStack as _, RuntimeStack as _, StackHandle, val_types_to_size,
@@ -28,6 +25,7 @@ pub struct WackasmExecutor {
     fuel: AtomicIsize,
     module: WackasmModule,
     callstack: Vec<FunctionFrame>,
+    pending_import: Option<PendingImportCall>,
     output: Option<Vec<Value>>,
 }
 
@@ -56,11 +54,13 @@ impl WackasmExecutor {
             fuel: AtomicIsize::new(isize::MAX),
             module,
             callstack: Vec::new(),
+            pending_import: None,
             output: None,
         };
 
         if let Some(start_func) = me.module.start_func.take() {
             me.module.functions.call_internal(
+                &mut me.pending_import,
                 &mut me.callstack,
                 &mut me.stack,
                 start_func,
@@ -93,6 +93,7 @@ impl WackasmExecutor {
         self.module
             .functions
             .call_internal(
+                &mut self.pending_import,
                 &mut self.callstack,
                 &mut self.stack,
                 *function,
@@ -115,30 +116,23 @@ impl WackasmExecutor {
         let local_stack = local_stack.into_raw();
         self.stack.reconcile(local_stack);
 
+        if let Some(pending_import_call) = &self.pending_import {
+            return Ok((
+                fuel,
+                Some(HostYield::ImportCall {
+                    module: pending_import_call.module.to_owned(),
+                    name: pending_import_call.name.to_owned(),
+                    args: pending_import_call.args.to_vec(),
+                    should_return: pending_import_call.should_return,
+                }),
+            ));
+        }
+
         // Update PC or return ImportCall
-        match self
-            .callstack
+        self.callstack
             .last_mut()
             .ok_or_else(|| anyhow!("callstack empty"))?
-        {
-            FunctionFrame::Internal(frame) => frame.pc = pc,
-            FunctionFrame::Import {
-                module,
-                name,
-                args,
-                should_return,
-            } => {
-                return Ok((
-                    fuel,
-                    Some(HostYield::ImportCall {
-                        module: module.to_owned(),
-                        name: name.to_owned(),
-                        args: args.to_vec(),
-                        should_return: *should_return,
-                    }),
-                ));
-            }
-        }
+            .pc = pc;
 
         match function_result {
             FunctionScopedResult::OutOfFuel => {} // nothing, just continue
@@ -148,15 +142,6 @@ impl WackasmExecutor {
                     .callstack
                     .pop()
                     .expect("incremental_execute_function would have errored by now");
-
-                let function_frame = match function_frame {
-                    FunctionFrame::Internal(internal_function_frame) => internal_function_frame,
-                    FunctionFrame::Import { .. } => {
-                        return Err(trap!(
-                            "got function return while import frame on stop of callstack"
-                        ));
-                    }
-                };
 
                 let function_type = self
                     .module
@@ -177,6 +162,7 @@ impl WackasmExecutor {
                 let function_index = FunctionIndex(function_index);
 
                 if let Some(host_yield) = self.module.functions.call_internal(
+                    &mut self.pending_import,
                     &mut self.callstack,
                     &mut self.stack,
                     function_index,
@@ -222,16 +208,11 @@ impl WackasmExecutor {
     }
 
     pub fn import_return(&mut self, results: &[Value]) -> Result<(), HaltError> {
-        if self
-            .callstack
-            .last()
-            .map(|v| !v.is_import_frame())
-            .unwrap_or(true)
-        {
+        if self.pending_import.is_none() {
             return Err(trap!("callstack empty or not expecting import return"));
         }
 
-        self.callstack.pop(); // Remove the dummy frame
+        self.pending_import.take(); // Remove the pending call
         self.stack.push_all(results);
 
         Ok(())
@@ -252,13 +233,6 @@ impl WackasmExecutor {
             .callstack
             .last_mut()
             .ok_or_else(|| anyhow!("callstack empty"))?;
-
-        let function_frame = match function_frame {
-            FunctionFrame::Internal(internal_function_frame) => internal_function_frame,
-            FunctionFrame::Import { .. } => {
-                return Err(trap!("expected import call return before continuing"));
-            }
-        };
 
         let base = function_frame.stack_base;
         let code_view = &self
@@ -341,7 +315,7 @@ impl WackasmExecutor {
                     }
                     self.import_return(&result)?;
                 }
-                v => return Ok(v)
+                v => return Ok(v),
             }
         }
     }

@@ -1,19 +1,18 @@
 use anyhow::anyhow;
 use serde::{Deserialize, Serialize};
-use std::rc::Rc;
 use wasmparser::{
     FuncType, FuncValidator, FuncValidatorAllocations, FunctionBody, Imports, RecGroup,
-    SectionLimited, TypeRef, ValType, ValidatorResources,
+    SectionLimited, TypeRef, ValidatorResources,
 };
 
 use crate::{
     HaltError, HostYield, Value,
     compiler::WackasmFunctionBody,
-    imports::{WackasmHostBridge, WackasmImports, WackasmResource},
     macros::trap,
-    module::{FunctionFrame, FunctionIndex, FunctionTypeIndex, InternalFunctionFrame},
-    pc::ProgramCounter,
-    stack::{FrameOperandStack, GlobalStack as _, RuntimeStack as _, val_types_to_size},
+    module::{
+        FunctionFrame, FunctionIndex, FunctionTypeIndex, PendingImportCall,
+    },
+    stack::{FrameOperandStack, GlobalStack as _, val_types_to_size},
 };
 
 const MAX_CALL_DEPTH: usize = 10_000;
@@ -247,9 +246,8 @@ impl FunctionManager {
 
     pub(crate) fn call_import_internal(
         &self,
-        callstack: &mut Vec<FunctionFrame>,
+        pending_import: &mut Option<PendingImportCall>,
         stack: &mut FrameOperandStack,
-        function_index: FunctionIndex,
         arguments: Option<Vec<Value>>,
         module: &str,
         name: &str,
@@ -268,11 +266,11 @@ impl FunctionManager {
             ));
         }
 
-        callstack.push(FunctionFrame::Import {
+        *pending_import = Some(PendingImportCall {
             module: module.to_owned(),
             name: name.to_owned(),
             args: arguments.clone(),
-            should_return: returns
+            should_return: returns,
         });
 
         Ok(Some(HostYield::ImportCall {
@@ -286,6 +284,7 @@ impl FunctionManager {
     #[must_use]
     pub(crate) fn call_internal(
         &self,
+        pending_import: &mut Option<PendingImportCall>,
         callstack: &mut Vec<FunctionFrame>,
         stack: &mut FrameOperandStack,
         function_index: FunctionIndex,
@@ -304,9 +303,8 @@ impl FunctionManager {
                 returns,
             } => {
                 return self.call_import_internal(
-                    callstack,
+                    pending_import,
                     stack,
-                    function_index,
                     arguments,
                     module,
                     name,
@@ -337,11 +335,11 @@ impl FunctionManager {
             stack.push_all(&code_body.local_defaults);
         }
 
-        let function = FunctionFrame::Internal(InternalFunctionFrame {
+        let function = FunctionFrame {
             function_index,
             pc: 0,
             stack_base,
-        });
+        };
 
         callstack.push(function);
 
