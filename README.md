@@ -14,7 +14,7 @@ I am not good at writing WASM interpreters, so for this reason, the code is buil
 
 Of the couple tens of thousands of WASM tests I found, these are the results:
 
-***total: 18501 passed, 914 failed, 45409 unsupported**
+**total: 18501 passed, 914 failed, 45409 unsupported**
 
 ## what's this for?
 
