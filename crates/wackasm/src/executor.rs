@@ -24,6 +24,7 @@ use crate::{
 };
 
 const MAX_INSTRUCTIONS_IN_LOOP: isize = 500;
+const MAX_CALL_DEPTH: usize = 10_000;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct WackasmExecutor {
@@ -49,7 +50,7 @@ impl WackasmExecutor {
         };
 
         if let Some(start_func) = me.module.start_func.take() {
-            me.call_internal(start_func, Vec::new())?;
+            me.call_internal(start_func, Some(Vec::new()))?;
         }
 
         Ok(me)
@@ -70,14 +71,18 @@ impl WackasmExecutor {
             _ => return Err(HaltError::Error(anyhow!("not a function"))),
         };
 
-        self.call_internal(*function, arguments)
+        self.call_internal(*function, Some(arguments))
     }
 
     fn call_internal(
         &mut self,
         function_index: FunctionIndex,
-        arguments: Vec<Value>,
+        arguments: Option<Vec<Value>>,
     ) -> Result<(), HaltError> {
+        if self.callstack.len() >= MAX_CALL_DEPTH {
+            return Err(trap!("call stack exhausted"));
+        }
+
         let function = self
             .module
             .init_function_frames
@@ -110,13 +115,24 @@ impl WackasmExecutor {
             })?;
 
         let params = function_type.params();
-        if arguments.len() != params.len() {
-            return Err(HaltError::Error(anyhow!(
-                "invalid amount of arguments, expected {}, got {}",
-                params.len(),
-                arguments.len()
-            )));
-        }
+        let arguments = if let Some(arguments) = arguments {
+            if arguments.len() != params.len() {
+                return Err(HaltError::Error(anyhow!(
+                    "invalid amount of arguments, expected {}, got {}",
+                    params.len(),
+                    arguments.len()
+                )));
+            }
+            arguments
+        } else {
+            let mut calling_frame = self.callstack.peek_mut().expect("no calling frame?");
+            let calling_operands_types = function_type.params();
+            let mut arguments = calling_frame
+                .stack
+                .pull_reversed_from_stack(calling_operands_types)?;
+            arguments.reverse();
+            arguments
+        };
 
         // Insert arguments
         for (index, value) in arguments.into_iter().enumerate() {
@@ -156,6 +172,75 @@ impl WackasmExecutor {
         }
 
         Ok(())
+    }
+
+    // runs X instructions, decrementing fuel
+    #[inline]
+    fn incremental_execute(&mut self, instructions: usize) -> Result<isize, HaltError> {
+        let mut instructions_executed = 0;
+
+        let function_result =
+            self.incremental_execute_function(instructions, &mut instructions_executed)?;
+
+        match function_result {
+            FunctionScopedResult::OutOfFuel => {} // nothing, just continue
+            FunctionScopedResult::FunctionReturn => {
+                // Now we get to pop the function frame and push the results to
+                let mut function_frame = self
+                    .callstack
+                    .pop()
+                    .expect("incremental_execute_function would have errored by now");
+
+                let function_type = self
+                    .module
+                    .function_idx_type(&function_frame.function_index)?;
+
+                let result_types = function_type.results();
+                let results = function_frame
+                    .stack
+                    .pull_reversed_from_stack(result_types)?;
+
+                if let Some(mut next_frame) = self.callstack.peek_mut() {
+                    next_frame.stack.push_reversed_all(results)?;
+                } else {
+                    let mut results = results;
+                    results.reverse();
+                    self.output = Some(results);
+                }
+            }
+            FunctionScopedResult::FunctionCall { function_index } => {
+                let function_index = FunctionIndex(function_index);
+
+                self.call_internal(function_index, None)?;
+            }
+        }
+
+        Ok(instructions_executed)
+    }
+
+    pub fn set_fuel(&self, fuel: isize) {
+        self.fuel.store(fuel, Ordering::Relaxed);
+    }
+
+    pub fn get_fuel(&self) -> isize {
+        self.fuel.load(Ordering::Relaxed)
+    }
+
+    pub fn execute(&mut self) -> Result<(), HaltError> {
+        while self.callstack.len() > 0 {
+            let remaining_fuel = self.fuel.load(Ordering::Relaxed);
+            let target_fuel = remaining_fuel.min(MAX_INSTRUCTIONS_IN_LOOP);
+            if target_fuel == 0 {
+                break;
+            }
+            let executed = self.incremental_execute(target_fuel as usize)?;
+            self.fuel.fetch_sub(executed, Ordering::Relaxed);
+        }
+        Ok(())
+    }
+
+    pub fn get_result(&self) -> Option<&Vec<Value>> {
+        self.output.as_ref()
     }
 
     /// Executes up to [`instructions`] instructions within a single
@@ -608,95 +693,5 @@ impl WackasmExecutor {
         }
 
         return Ok(FunctionScopedResult::OutOfFuel);
-    }
-
-    // runs X instructions, decrementing fuel
-    #[inline]
-    fn incremental_execute(&mut self, instructions: usize) -> Result<isize, HaltError> {
-        let mut instructions_executed = 0;
-
-        let function_result =
-            self.incremental_execute_function(instructions, &mut instructions_executed)?;
-
-        match function_result {
-            FunctionScopedResult::OutOfFuel => {} // nothing, just continue
-            FunctionScopedResult::FunctionReturn => {
-                // Now we get to pop the function frame and push the results to
-                let mut function_frame = self
-                    .callstack
-                    .pop()
-                    .expect("incremental_execute_function would have errored by now");
-
-                let function_type = self
-                    .module
-                    .function_idx_type(&function_frame.function_index)?;
-
-                let result_types = function_type.results();
-                let results = function_frame
-                    .stack
-                    .pull_reversed_from_stack(result_types)?;
-
-                if let Some(mut next_frame) = self.callstack.peek_mut() {
-                    next_frame.stack.push_reversed_all(results)?;
-                } else {
-                    let mut results = results;
-                    results.reverse();
-                    self.output = Some(results);
-                }
-            }
-            FunctionScopedResult::FunctionCall { function_index } => {
-                let function_index = FunctionIndex(function_index);
-
-                let mut new_frame = self
-                    .module
-                    .init_function_frames
-                    .get(&function_index)
-                    .ok_or_else(|| anyhow!("no function for {:?}", function_index))?
-                    .clone();
-
-                let function_type = self.module.function_idx_type(&function_index)?.clone();
-                let mut calling_operands = {
-                    let mut calling_frame = self.callstack.peek_mut().expect("no calling frame?");
-                    let calling_operands_types = function_type.params();
-                    calling_frame
-                        .stack
-                        .pull_reversed_from_stack(calling_operands_types)?
-                };
-                calling_operands.reverse();
-
-                for (index, value) in calling_operands.into_iter().enumerate() {
-                    new_frame.locals.set_checked(index as u32, value)?;
-                }
-
-                self.callstack.push(new_frame);
-            }
-        }
-
-        Ok(instructions_executed)
-    }
-
-    pub fn set_fuel(&self, fuel: isize) {
-        self.fuel.store(fuel, Ordering::Relaxed);
-    }
-
-    pub fn get_fuel(&self) -> isize {
-        self.fuel.load(Ordering::Relaxed)
-    }
-
-    pub fn execute(&mut self) -> Result<(), HaltError> {
-        while self.callstack.len() > 0 {
-            let remaining_fuel = self.fuel.load(Ordering::Relaxed);
-            let target_fuel = remaining_fuel.min(MAX_INSTRUCTIONS_IN_LOOP);
-            if target_fuel == 0 {
-                break;
-            }
-            let executed = self.incremental_execute(target_fuel as usize)?;
-            self.fuel.fetch_sub(executed, Ordering::Relaxed);
-        }
-        Ok(())
-    }
-
-    pub fn get_result(&self) -> Option<&Vec<Value>> {
-        self.output.as_ref()
     }
 }
