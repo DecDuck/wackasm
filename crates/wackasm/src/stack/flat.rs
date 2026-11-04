@@ -45,6 +45,10 @@ impl GlobalStack for FlatBlockAwareStack {
         self.stack.peek()
     }
 
+    fn peek_mut(&mut self) -> Result<&mut Value, HaltError> {
+        self.stack.peek_mut()
+    }
+
     fn push_section(
         &mut self,
         section: StackSection,

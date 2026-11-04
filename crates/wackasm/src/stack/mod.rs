@@ -46,6 +46,7 @@ pub(crate) trait GlobalStack {
     fn pop(&mut self) -> Result<Value, HaltError>;
 
     fn peek(&mut self) -> Result<&Value, HaltError>;
+    fn peek_mut(&mut self) -> Result<&mut Value, HaltError>;
 
     fn push_section(
         &mut self,

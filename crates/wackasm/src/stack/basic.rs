@@ -31,6 +31,10 @@ impl GlobalStack for OperandStack {
     fn peek(&mut self) -> Result<&Value, HaltError> {
         Ok(&self.inner[self.len - 1])
     }
+    #[inline]
+    fn peek_mut(&mut self) -> Result<&mut Value, HaltError> {
+        Ok(&mut self.inner[self.len - 1])
+    }
 
     fn pull_results(&mut self, types: &[ValType]) -> Result<Vec<Value>, HaltError> {
         let start = self
