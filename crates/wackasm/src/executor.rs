@@ -148,9 +148,12 @@ impl WackasmExecutor {
 
                 let result_types = function_type.results();
 
-                if let Some(section) = self.stack.return_function(result_types)? {
-                    section.expect_function()?;
-                } else {
+                self.stack
+                    .return_function(result_types)?
+                    .ok_or_else(|| anyhow!("no function section to return from"))?
+                    .expect_function()?;
+
+                if self.callstack.is_empty() {
                     let results = self.stack.pull_results(result_types)?;
                     self.output = Some(results);
                 }
@@ -212,6 +215,8 @@ impl WackasmExecutor {
         for _ in 0..instructions {
             *instructions_executed += 1;
             let operator = function_frame.code.get(pc).unwrap();
+            #[cfg(feature = "op-profile")]
+            crate::profiling::begin(operator);
             match operator {
                 Operator::Nop => {}
                 // Gets

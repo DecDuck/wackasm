@@ -62,23 +62,23 @@ impl GlobalStack for OperandStack {
 
     fn return_section(
         &mut self,
-        preserve: &[ValType],
-        position: Option<usize>,
+        _preserve: &[ValType],
+        _position: Option<usize>,
     ) -> Result<Option<super::StackSection>, HaltError> {
         todo!()
     }
 
-    fn reset_section(&mut self, preserve: &[ValType], pos: usize) -> Result<(), HaltError> {
+    fn reset_section(&mut self, _preserve: &[ValType], _pos: usize) -> Result<(), HaltError> {
         todo!()
     }
 
-    fn peek_section(&self, position: Option<usize>) -> Option<&super::StackSection> {
+    fn peek_section(&self, _position: Option<usize>) -> Option<&super::StackSection> {
         todo!()
     }
 
     fn return_function(
         &mut self,
-        preserve: &[ValType],
+        _preserve: &[ValType],
     ) -> Result<Option<super::StackSection>, HaltError> {
         todo!()
     }
