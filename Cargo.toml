@@ -1,0 +1,17 @@
+[package]
+name = "wackasm"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+anyhow = "1.0.104"
+bitcode = { version = "0.6.9", features = ["serde"] }
+serde = { version = "1.0.229", features = ["derive", "rc"] }
+self_cell = "1.2"
+wasmparser = "0.262.0"
+
+[package.metadata.patch]
+crates = ["wasmparser"]
+
+[patch.crates-io]
+wasmparser = { path="./target/patch/wasmparser-0.262.0" }
