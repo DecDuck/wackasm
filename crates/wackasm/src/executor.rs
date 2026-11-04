@@ -63,7 +63,7 @@ impl WackasmExecutor {
     pub fn call_export(&mut self, name: &str, arguments: Vec<Value>) -> Result<(), HaltError> {
         self.output.take();
         self.callstack.clear();
-        self.stack.clear();
+        self.stack.handle().clear();
 
         let function = self
             .module
@@ -113,10 +113,11 @@ impl WackasmExecutor {
                 let result_types = function_type.results();
 
                 if self.callstack.is_empty() {
-                    let results = self.stack.pull_results(result_types)?;
+                    let results = self.stack.handle().pull_results(result_types)?;
                     self.output = Some(results);
                 } else {
                     self.stack
+                        .handle()
                         .unwind_to(function_frame.stack_base, val_types_to_size(result_types));
                 }
             }
@@ -172,7 +173,10 @@ impl WackasmExecutor {
             .last_mut()
             .ok_or_else(|| anyhow!("callstack empty"))?;
 
+        // Copy PC and stack into local variables
         let mut pc = function_frame.pc;
+        let mut stack = self.stack.handle();
+
         let base = function_frame.stack_base;
         let code_view = &self
             .module
@@ -182,160 +186,158 @@ impl WackasmExecutor {
 
         for _ in 0..instructions {
             *instructions_executed += 1;
-            let operator = code_view
-                .get(pc)
-                .ok_or_else(|| anyhow!("invalid program counter"))?;
+            let operator = unsafe { code_view.get_unchecked(pc) };
             match operator {
                 WackasmOperator::Nop => {}
                 // Gets
                 WackasmOperator::LocalGet { slot } => {
-                    let local = self.stack.local_get(base, *slot);
-                    self.stack.push(local)?;
+                    let local = stack.local_get(base, *slot);
+                    stack.push(local);
                 }
                 WackasmOperator::LocalGetWide { slot } => {
-                    let local = self.stack.local_wide_get(base, *slot);
-                    self.stack.push_v128(local)?;
+                    let local = stack.local_wide_get(base, *slot);
+                    stack.push_v128(local);
                 }
 
                 WackasmOperator::LocalSet { slot } => {
-                    let value = self.stack.pop()?;
-                    self.stack.local_set(base, *slot, value);
+                    let value = stack.pop();
+                    stack.local_set(base, *slot, value);
                 }
                 WackasmOperator::LocalSetWide { slot } => {
-                    let value = self.stack.pop_v128()?;
-                    self.stack.local_wide_set(base, *slot, value);
+                    let value = stack.pop_v128();
+                    stack.local_wide_set(base, *slot, value);
                 }
 
                 WackasmOperator::Drop => {
-                    self.stack.pop()?;
+                    stack.pop();
                 }
                 WackasmOperator::DropWide => {
-                    self.stack.pop_v128()?;
+                    stack.pop_v128();
                 }
 
                 WackasmOperator::LocalTee { slot } => {
-                    let value = *self.stack.peek()?;
-                    self.stack.local_set(base, *slot, value.clone());
+                    let value = *stack.peek();
+                    stack.local_set(base, *slot, value.clone());
                 }
                 WackasmOperator::LocalTeeWide { slot } => {
-                    let value = self.stack.peek_wide()?;
-                    self.stack.local_wide_set(base, *slot, value);
+                    let value = stack.peek_wide();
+                    stack.local_wide_set(base, *slot, value);
                 }
 
                 WackasmOperator::GlobalGet { global_index } => {
                     let global = self.module.globals.get(&GlobalIndex(*global_index))?;
-                    self.stack.push(*global.inner.get())?;
+                    stack.push(*global.inner.get());
                 }
                 WackasmOperator::GlobalGetWide { global_index } => {
                     let global = self.module.globals.get_wide(&GlobalIndex(*global_index))?;
-                    self.stack.push_v128(global)?;
+                    stack.push_v128(global);
                 }
                 WackasmOperator::GlobalSet { global_index } => {
-                    let value = self.stack.pop()?;
+                    let value = stack.pop();
                     self.module
                         .globals
                         .set(&GlobalIndex(*global_index), value)?;
                 }
                 WackasmOperator::GlobalSetWide { global_index } => {
-                    let value = self.stack.pop_v128()?;
+                    let value = stack.pop_v128();
                     self.module
                         .globals
                         .set_wide(&GlobalIndex(*global_index), value)?;
                 }
 
                 WackasmOperator::MemoryGrow { mem } => {
-                    let amount = self.stack.pop_i32()?;
+                    let amount = stack.pop_i32();
                     let result = self.module.memories.grow(*mem, amount)?;
-                    self.stack.push(Value(result as u64))?;
+                    stack.push(Value(result as u64));
                 }
                 WackasmOperator::MemoryFill { mem } => {
-                    let amount = self.stack.pop_i32()? as u32 as usize;
-                    let value = self.stack.pop_i32()? as u8;
-                    let offset = self.stack.pop_i32()? as u32 as usize;
+                    let amount = stack.pop_i32() as u32 as usize;
+                    let value = stack.pop_i32() as u8;
+                    let offset = stack.pop_i32() as u32 as usize;
                     self.module.memories.fill(*mem, offset, amount, value)?;
                 }
 
                 // memory load
                 WackasmOperator::I32Load { memarg } => {
-                    i32_load!(self.stack, self.module.memories, memarg, i32)
+                    i32_load!(stack, self.module.memories, memarg, i32)
                 }
                 WackasmOperator::I32Load8U { memarg } => {
-                    i32_load!(self.stack, self.module.memories, memarg, u8)
+                    i32_load!(stack, self.module.memories, memarg, u8)
                 }
                 WackasmOperator::I32Load8S { memarg } => {
-                    i32_load!(self.stack, self.module.memories, memarg, i8)
+                    i32_load!(stack, self.module.memories, memarg, i8)
                 }
                 WackasmOperator::I32Load16U { memarg } => {
-                    i32_load!(self.stack, self.module.memories, memarg, u16)
+                    i32_load!(stack, self.module.memories, memarg, u16)
                 }
                 WackasmOperator::I32Load16S { memarg } => {
-                    i32_load!(self.stack, self.module.memories, memarg, i16)
+                    i32_load!(stack, self.module.memories, memarg, i16)
                 }
 
                 WackasmOperator::I64Load { memarg } => {
-                    i64_load!(self.stack, self.module.memories, memarg, i64);
+                    i64_load!(stack, self.module.memories, memarg, i64);
                 }
                 WackasmOperator::I64Load8U { memarg } => {
-                    i64_load!(self.stack, self.module.memories, memarg, u8)
+                    i64_load!(stack, self.module.memories, memarg, u8)
                 }
                 WackasmOperator::I64Load8S { memarg } => {
-                    i64_load!(self.stack, self.module.memories, memarg, i8);
+                    i64_load!(stack, self.module.memories, memarg, i8);
                 }
                 WackasmOperator::I64Load16U { memarg } => {
-                    i64_load!(self.stack, self.module.memories, memarg, u16);
+                    i64_load!(stack, self.module.memories, memarg, u16);
                 }
                 WackasmOperator::I64Load16S { memarg } => {
-                    i64_load!(self.stack, self.module.memories, memarg, i16);
+                    i64_load!(stack, self.module.memories, memarg, i16);
                 }
                 WackasmOperator::I64Load32U { memarg } => {
-                    i64_load!(self.stack, self.module.memories, memarg, u32);
+                    i64_load!(stack, self.module.memories, memarg, u32);
                 }
                 WackasmOperator::I64Load32S { memarg } => {
-                    i64_load!(self.stack, self.module.memories, memarg, i32);
+                    i64_load!(stack, self.module.memories, memarg, i32);
                 }
 
                 WackasmOperator::F32Load { memarg } => {
-                    f32_load!(self.stack, self.module.memories, memarg)
+                    f32_load!(stack, self.module.memories, memarg)
                 }
                 WackasmOperator::F64Load { memarg } => {
-                    f64_load!(self.stack, self.module.memories, memarg)
+                    f64_load!(stack, self.module.memories, memarg)
                 }
                 WackasmOperator::V128Load { memarg } => {
-                    v128_load!(self.stack, self.module.memories, memarg)
+                    v128_load!(stack, self.module.memories, memarg)
                 }
 
                 // memory store
                 WackasmOperator::I32Store { memarg } => {
-                    i32_store!(self.stack, self.module.memories, memarg, i32)
+                    i32_store!(stack, self.module.memories, memarg, i32)
                 }
                 WackasmOperator::I32Store8 { memarg } => {
-                    i32_store!(self.stack, self.module.memories, memarg, u8)
+                    i32_store!(stack, self.module.memories, memarg, u8)
                 }
                 WackasmOperator::I32Store16 { memarg } => {
-                    i32_store!(self.stack, self.module.memories, memarg, u16)
+                    i32_store!(stack, self.module.memories, memarg, u16)
                 }
 
                 WackasmOperator::I64Store { memarg } => {
-                    i64_store!(self.stack, self.module.memories, memarg, i64)
+                    i64_store!(stack, self.module.memories, memarg, i64)
                 }
                 WackasmOperator::I64Store8 { memarg } => {
-                    i64_store!(self.stack, self.module.memories, memarg, u8)
+                    i64_store!(stack, self.module.memories, memarg, u8)
                 }
                 WackasmOperator::I64Store16 { memarg } => {
-                    i64_store!(self.stack, self.module.memories, memarg, u16)
+                    i64_store!(stack, self.module.memories, memarg, u16)
                 }
                 WackasmOperator::I64Store32 { memarg } => {
-                    i64_store!(self.stack, self.module.memories, memarg, u32)
+                    i64_store!(stack, self.module.memories, memarg, u32)
                 }
 
                 WackasmOperator::F32Store { memarg } => {
-                    f32_store!(self.stack, self.module.memories, memarg)
+                    f32_store!(stack, self.module.memories, memarg)
                 }
                 WackasmOperator::F64Store { memarg } => {
-                    f64_store!(self.stack, self.module.memories, memarg)
+                    f64_store!(stack, self.module.memories, memarg)
                 }
                 WackasmOperator::V128Store { memarg } => {
-                    v128_store!(self.stack, self.module.memories, memarg)
+                    v128_store!(stack, self.module.memories, memarg)
                 }
 
                 // Handle function call
@@ -352,7 +354,7 @@ impl WackasmExecutor {
                     table_index,
                     type_index,
                 } => {
-                    let func_index_index = self.stack.pop_i32()?;
+                    let func_index_index = stack.pop_i32();
                     let table = self
                         .module
                         .tables
@@ -392,25 +394,25 @@ impl WackasmExecutor {
                     continue;
                 }
                 WackasmOperator::JumpIf { target } => {
-                    if self.stack.pop_i32()? != 0 {
+                    if stack.pop_i32() != 0 {
                         pc = *target as usize;
                         continue;
                     }
                 }
                 WackasmOperator::JumpIfEqz { target } => {
-                    if self.stack.pop_i32()? == 0 {
+                    if stack.pop_i32() == 0 {
                         pc = *target as usize;
                         continue;
                     }
                 }
                 WackasmOperator::Br { target, drop_keep } => {
-                    self.stack.drop_keep(*drop_keep);
+                    stack.drop_keep(*drop_keep);
                     pc = *target as usize;
                     continue;
                 }
                 WackasmOperator::BrIf { target, drop_keep } => {
-                    if self.stack.pop_i32()? != 0 {
-                        self.stack.drop_keep(*drop_keep);
+                    if stack.pop_i32() != 0 {
+                        stack.drop_keep(*drop_keep);
                         pc = *target as usize;
 
                         continue;
@@ -418,13 +420,13 @@ impl WackasmExecutor {
                 }
 
                 WackasmOperator::BrTable { targets } => {
-                    let i = self.stack.pop_i32()? as u32 as usize;
+                    let i = stack.pop_i32() as u32 as usize;
                     match targets[i.min(targets.len() - 1)] {
                         WackasmTableTarget::Return => {
                             return Ok((FunctionScopedResult::FunctionReturn, pc));
                         }
                         WackasmTableTarget::Break { target, dk } => {
-                            self.stack.drop_keep(dk);
+                            stack.drop_keep(dk);
                             pc = target as usize;
                             continue;
                         }
@@ -435,157 +437,157 @@ impl WackasmExecutor {
                     return Ok((FunctionScopedResult::FunctionReturn, pc));
                 }
                 WackasmOperator::ReturnIf => {
-                    if self.stack.pop_i32()? != 0 {
+                    if stack.pop_i32() != 0 {
                         return Ok((FunctionScopedResult::FunctionReturn, pc));
                     }
                 }
 
                 // i32 maths
                 WackasmOperator::I32Const { value } => {
-                    self.stack.push(Value((*value) as u64))?;
+                    stack.push(Value((*value) as u64));
                 }
                 WackasmOperator::I64Const { value } => {
-                    self.stack.push(Value((*value) as u64))?;
+                    stack.push(Value((*value) as u64));
                 }
                 WackasmOperator::F32Const { value } => {
-                    self.stack.push(Value(value.to_bits() as u64))?;
+                    stack.push(Value(value.to_bits() as u64));
                 }
                 WackasmOperator::F64Const { value } => {
-                    self.stack.push(Value(value.to_bits()))?;
+                    stack.push(Value(value.to_bits()));
                 }
 
                 WackasmOperator::I32Add => {
-                    i32_binop!(self.stack, i32, |lhs, rhs| lhs.wrapping_add(rhs))
+                    i32_binop!(stack, i32, |lhs, rhs| lhs.wrapping_add(rhs))
                 }
                 WackasmOperator::I32Mul => {
-                    i32_binop!(self.stack, i32, |lhs, rhs| lhs.wrapping_mul(rhs))
+                    i32_binop!(stack, i32, |lhs, rhs| lhs.wrapping_mul(rhs))
                 }
                 WackasmOperator::I32DivU => {
-                    i32_binop!(self.stack, u32, |lhs, rhs| lhs
+                    i32_binop!(stack, u32, |lhs, rhs| lhs
                         .checked_div(rhs)
                         .ok_or_else(|| trap!("integer divide by zero"))?)
                 }
                 WackasmOperator::I32Sub => {
-                    i32_binop!(self.stack, i32, |lhs, rhs| lhs.wrapping_sub(rhs))
+                    i32_binop!(stack, i32, |lhs, rhs| lhs.wrapping_sub(rhs))
                 }
                 WackasmOperator::I32ShrU => {
-                    i32_binop!(self.stack, u32, |lhs, rhs| lhs.wrapping_shr(rhs))
+                    i32_binop!(stack, u32, |lhs, rhs| lhs.wrapping_shr(rhs))
                 }
                 WackasmOperator::I32Shl => {
-                    i32_binop!(self.stack, u32, |lhs, rhs| lhs.wrapping_shl(rhs))
+                    i32_binop!(stack, u32, |lhs, rhs| lhs.wrapping_shl(rhs))
                 }
                 WackasmOperator::I32And => {
-                    i32_binop!(self.stack, i32, |lhs, rhs| lhs & rhs)
+                    i32_binop!(stack, i32, |lhs, rhs| lhs & rhs)
                 }
                 WackasmOperator::I32Xor => {
-                    i32_binop!(self.stack, i32, |lhs, rhs| lhs ^ rhs)
+                    i32_binop!(stack, i32, |lhs, rhs| lhs ^ rhs)
                 }
 
                 // i32 comparators
                 WackasmOperator::I32GtS => {
-                    i32_binop!(self.stack, i32, |lhs, rhs| lhs > rhs)
+                    i32_binop!(stack, i32, |lhs, rhs| lhs > rhs)
                 }
                 WackasmOperator::I32LtS => {
-                    i32_binop!(self.stack, i32, |lhs, rhs| lhs < rhs)
+                    i32_binop!(stack, i32, |lhs, rhs| lhs < rhs)
                 }
                 WackasmOperator::I32LtU => {
-                    i32_binop!(self.stack, u32, |lhs, rhs| lhs < rhs)
+                    i32_binop!(stack, u32, |lhs, rhs| lhs < rhs)
                 }
                 WackasmOperator::I32GtU => {
-                    i32_binop!(self.stack, u32, |lhs, rhs| lhs > rhs)
+                    i32_binop!(stack, u32, |lhs, rhs| lhs > rhs)
                 }
                 WackasmOperator::I32LeU => {
-                    i32_binop!(self.stack, u32, |lhs, rhs| lhs <= rhs)
+                    i32_binop!(stack, u32, |lhs, rhs| lhs <= rhs)
                 }
                 WackasmOperator::I32Ne => {
-                    i32_binop!(self.stack, i32, |a, b| a != b)
+                    i32_binop!(stack, i32, |a, b| a != b)
                 }
                 WackasmOperator::I32GeU => {
-                    i32_binop!(self.stack, u32, |lhs, rhs| lhs >= rhs)
+                    i32_binop!(stack, u32, |lhs, rhs| lhs >= rhs)
                 }
                 WackasmOperator::I32Eqz => {
-                    let a = self.stack.pop_i32()?;
+                    let a = stack.pop_i32();
                     let result = if a == 0 { 1 } else { 0 };
-                    self.stack.push(Value(result as u64))?;
+                    stack.push(Value(result as u64));
                 }
                 WackasmOperator::I32Eq => {
-                    i32_binop!(self.stack, i32, |a, b| a == b)
+                    i32_binop!(stack, i32, |a, b| a == b)
                 }
                 WackasmOperator::I32Or => {
-                    i32_binop!(self.stack, i32, |a, b| a | b)
+                    i32_binop!(stack, i32, |a, b| a | b)
                 }
 
                 // i64 maths
                 WackasmOperator::I64Add => {
-                    i64_binop!(self.stack, i64, |lhs, rhs| lhs.wrapping_add(rhs))
+                    i64_binop!(stack, i64, |lhs, rhs| lhs.wrapping_add(rhs))
                 }
                 WackasmOperator::I64Mul => {
-                    i64_binop!(self.stack, i64, |lhs, rhs| lhs.wrapping_mul(rhs))
+                    i64_binop!(stack, i64, |lhs, rhs| lhs.wrapping_mul(rhs))
                 }
                 WackasmOperator::I64Sub => {
-                    i64_binop!(self.stack, i64, |lhs, rhs| lhs.wrapping_sub(rhs))
+                    i64_binop!(stack, i64, |lhs, rhs| lhs.wrapping_sub(rhs))
                 }
                 WackasmOperator::I64ShrU => {
-                    i64_binop!(self.stack, u64, |lhs, rhs| lhs.wrapping_shr(rhs as u32))
+                    i64_binop!(stack, u64, |lhs, rhs| lhs.wrapping_shr(rhs as u32))
                 }
                 WackasmOperator::I64Shl => {
-                    i64_binop!(self.stack, u64, |lhs, rhs| lhs.wrapping_shl(rhs as u32))
+                    i64_binop!(stack, u64, |lhs, rhs| lhs.wrapping_shl(rhs as u32))
                 }
                 WackasmOperator::I64And => {
-                    i64_binop!(self.stack, i64, |lhs, rhs| lhs & rhs)
+                    i64_binop!(stack, i64, |lhs, rhs| lhs & rhs)
                 }
                 WackasmOperator::I64Or => {
-                    i64_binop!(self.stack, i64, |lhs, rhs| lhs | rhs)
+                    i64_binop!(stack, i64, |lhs, rhs| lhs | rhs)
                 }
 
                 // i64 comparators
                 WackasmOperator::I64GtS => {
-                    i64_cmp!(self.stack, i64, |lhs, rhs| lhs > rhs)
+                    i64_cmp!(stack, i64, |lhs, rhs| lhs > rhs)
                 }
                 WackasmOperator::I64LtU => {
-                    i64_cmp!(self.stack, u64, |lhs, rhs| lhs < rhs)
+                    i64_cmp!(stack, u64, |lhs, rhs| lhs < rhs)
                 }
                 WackasmOperator::I64GtU => {
-                    i64_cmp!(self.stack, u64, |lhs, rhs| lhs > rhs)
+                    i64_cmp!(stack, u64, |lhs, rhs| lhs > rhs)
                 }
                 WackasmOperator::I64LeU => {
-                    i64_cmp!(self.stack, u64, |lhs, rhs| lhs <= rhs)
+                    i64_cmp!(stack, u64, |lhs, rhs| lhs <= rhs)
                 }
                 WackasmOperator::I64GeU => {
-                    i64_cmp!(self.stack, u64, |lhs, rhs| lhs >= rhs)
+                    i64_cmp!(stack, u64, |lhs, rhs| lhs >= rhs)
                 }
                 WackasmOperator::I64Eq => {
-                    i64_cmp!(self.stack, i64, |lhs, rhs| lhs == rhs)
+                    i64_cmp!(stack, i64, |lhs, rhs| lhs == rhs)
                 }
                 WackasmOperator::I64Ne => {
-                    i64_cmp!(self.stack, i64, |lhs, rhs| lhs != rhs)
+                    i64_cmp!(stack, i64, |lhs, rhs| lhs != rhs)
                 }
                 WackasmOperator::I64Eqz => {
-                    let a = self.stack.pop_i64()?;
-                    self.stack.push(Value((a == 0) as u64))?;
+                    let a = stack.pop_i64();
+                    stack.push(Value((a == 0) as u64));
                 }
                 WackasmOperator::Select { wide } => {
-                    let cond = self.stack.pop_i32()? == 0;
+                    let cond = stack.pop_i32() == 0;
 
                     if *wide {
-                        let top = self.stack.pop_v128()?;
-                        let bottom = self.stack.pop_v128()?;
-                        self.stack.push_v128(if cond { top } else { bottom })?;
+                        let top = stack.pop_v128();
+                        let bottom = stack.pop_v128();
+                        stack.push_v128(if cond { top } else { bottom });
                     } else {
-                        let top = self.stack.pop()?;
-                        let bottom = self.stack.pop()?;
-                        self.stack.push(if cond { top } else { bottom })?;
+                        let top = stack.pop();
+                        let bottom = stack.pop();
+                        stack.push(if cond { top } else { bottom });
                     }
                 }
                 WackasmOperator::I64ExtendI32U => {
-                    let value = self.stack.pop_i32()?;
+                    let value = stack.pop_i32();
                     let new_value = value as u32 as i64;
-                    self.stack.push(Value(new_value as u64))?;
+                    stack.push(Value(new_value as u64));
                 }
                 WackasmOperator::I32WrapI64 => {
-                    let value = self.stack.pop_i64()?;
+                    let value = stack.pop_i64();
                     let value = value as i32;
-                    self.stack.push(Value(value as u64))?;
+                    stack.push(Value(value as u64));
                 }
                 WackasmOperator::Unreachable => {
                     return Err(trap!("unreachable"));
