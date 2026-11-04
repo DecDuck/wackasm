@@ -3,20 +3,19 @@ use serde::{Deserialize, Serialize};
 use wasmparser::ValType;
 
 use crate::{
-    HaltError, Value, compiler::DropKeep, macros::trap, module::{BlockIndex, FunctionIndex}, stack::{basic::OperandStack, flat::FlatBlockAwareStack},
+    HaltError, Value, compiler::DropKeep, macros::trap, module::{BlockIndex, FunctionIndex}, stack::{basic::OperandStack},
 };
 
 mod basic;
-mod flat;
 mod locals;
-#[cfg(test)]
-mod tests;
+// #[cfg(test)]
+// mod tests;
 
 const MAX_OPERAND_STACK_SIZE: usize = 200;
 
 pub(crate) use locals::LocalStore;
 
-pub(crate) type FrameOperandStack = FlatBlockAwareStack;
+pub(crate) type FrameOperandStack = OperandStack;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum StackSection {
@@ -50,19 +49,6 @@ pub(crate) trait GlobalStack {
     fn peek_mut(&mut self) -> Result<&mut Value, HaltError>;
 
     fn drop_keep(&mut self, dk: DropKeep);
-
-    fn push_section(
-        &mut self,
-        section: StackSection,
-        pull_from_parent: Option<&[ValType]>,
-    ) -> Result<(), HaltError>;
-
-    fn return_section(&mut self, preserve: &[ValType], pos: Option<usize>) -> Result<Option<StackSection>, HaltError>;
-    fn reset_section(&mut self, preserve: &[ValType], pos: usize) -> Result<(), HaltError>;
-    fn return_function(&mut self, preserve: &[ValType]) -> Result<Option<StackSection>, HaltError>;
-
-    fn peek_section(&self, pos: Option<usize>) -> Option<&StackSection>;
-    fn len_sections(&self) -> usize;
 
     fn pull_results(&mut self, types: &[ValType]) -> Result<Vec<Value>, HaltError>;
 

@@ -112,11 +112,6 @@ impl WackasmExecutor {
 
                 let result_types = function_type.results();
 
-                self.stack
-                    .return_function(result_types)?
-                    .ok_or_else(|| anyhow!("no function section to return from"))?
-                    .expect_function()?;
-
                 if self.callstack.is_empty() {
                     let results = self.stack.pull_results(result_types)?;
                     self.output = Some(results);
