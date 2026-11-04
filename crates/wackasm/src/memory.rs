@@ -5,7 +5,10 @@ use serde::{Deserialize, Serialize};
 use wasmparser::{Data, DataKind, MemArg, MemoryType, SectionLimited};
 
 use crate::{
-    HaltError, Value, compiler::WackasmMemArg, const_expr::resolve_const_expr, macros::{trap, unsupported},
+    HaltError, Value,
+    compiler::WackasmMemArg,
+    const_expr::resolve_const_expr,
+    macros::{trap, unsupported},
 };
 
 pub(crate) trait MemoryNumber: Copy {
@@ -36,7 +39,9 @@ macro_rules! impl_memory_number {
     };
 }
 
-impl_memory_number!(u8, i8, u16, i16, u32, i32, u64, i64, u128, i128, usize, isize, f32, f64);
+impl_memory_number!(
+    u8, i8, u16, i16, u32, i32, u64, i64, u128, i128, usize, isize, f32, f64
+);
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub(crate) struct LinearMemory {
@@ -96,7 +101,11 @@ impl MemoryManager {
                     memory_index,
                     offset_expr,
                 } => {
-                    let offset_value = resolve_const_expr(offset_expr)?;
+                    let offset_value = resolve_const_expr(offset_expr)?
+                        .into_value_checked()
+                        .ok_or_else(|| {
+                            anyhow!("values larger than a u64 not supported for data section")
+                        })?;
 
                     let linear_memory = self
                         .memories
@@ -133,7 +142,7 @@ impl MemoryManager {
 
         // No more than 4GiB of pages
         let hard_max_pages = (1u64 << 32) / memory.page_size as u64;
-        
+
         let limit = memory
             .max
             .map_or(hard_max_pages, |max| max.min(hard_max_pages));

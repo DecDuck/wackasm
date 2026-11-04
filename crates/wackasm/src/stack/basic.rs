@@ -3,7 +3,11 @@ use serde::{Deserialize, Serialize};
 use wasmparser::ValType;
 
 use crate::{
-    HaltError, Value, compiler::DropKeep, macros::trap, module::BlockIndex, stack::GlobalStack,
+    HaltError, Value,
+    compiler::DropKeep,
+    macros::trap,
+    module::BlockIndex,
+    stack::{GlobalStack, val_types_to_size},
 };
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -13,30 +17,38 @@ pub(crate) struct OperandStack {
 }
 
 impl GlobalStack for OperandStack {
+    fn len(&self) -> usize {
+        self.len
+    }
     fn clear(&mut self) {
         self.len = 0;
     }
     fn push(&mut self, value: Value) -> Result<(), HaltError> {
-        if self.len == self.inner.len() {
-            return Err(trap!("stack overflow"));
-        }
-
         self.len += 1;
         self.inner[self.len - 1] = value;
         Ok(())
     }
+    fn space(&self) -> usize {
+        self.inner.len() - self.len
+    }
 
-    #[inline]
     fn pop(&mut self) -> Result<Value, HaltError> {
         self.len -= 1;
         Ok(self.inner[self.len]) // - 1 not required to access by index here because we -1 above
     }
 
-    #[inline]
     fn peek(&mut self) -> Result<&Value, HaltError> {
         Ok(&self.inner[self.len - 1])
     }
-    #[inline]
+    fn peek_wide(&mut self) -> Result<u128, HaltError> {
+        let low = &self.inner[self.len - 1].0;
+        let high = &self.inner[self.len - 2].0;
+        let mut result = [0u8; 16];
+        result[0..8].copy_from_slice(&low.to_le_bytes());
+        result[8..].copy_from_slice(&high.to_le_bytes());
+        Ok(u128::from_le_bytes(result))
+    }
+
     fn peek_mut(&mut self) -> Result<&mut Value, HaltError> {
         Ok(&mut self.inner[self.len - 1])
     }
@@ -49,11 +61,12 @@ impl GlobalStack for OperandStack {
     }
 
     fn pull_results(&mut self, types: &[ValType]) -> Result<Vec<Value>, HaltError> {
+        let type_len = val_types_to_size(types);
         let start = self
-            .len()
-            .checked_sub(types.len())
+            .len
+            .checked_sub(type_len)
             .ok_or_else(|| trap!("stack underflow"))?;
-        let end = self.len();
+        let end = self.len;
         self.len = start;
         Ok(self
             .inner
@@ -63,6 +76,12 @@ impl GlobalStack for OperandStack {
             .cloned()
             .collect())
     }
+
+    fn unwind_to(&mut self, target: usize, keep: usize) {
+        let len = self.len;
+        self.inner.copy_within(len - keep..len, target);
+        self.len = target + keep;
+    }
 }
 
 impl OperandStack {
@@ -71,21 +90,5 @@ impl OperandStack {
             inner: vec![Value(u64::MAX); capacity],
             len: 0,
         }
-    }
-
-    pub fn clear(&mut self) {
-        self.len = 0;
-    }
-
-    pub fn set_len(&mut self, len: usize) {
-        self.len = len;
-    }
-
-    pub fn len(&self) -> usize {
-        self.len
-    }
-
-    pub fn get_mut(&mut self) -> &mut Vec<Value> {
-        &mut self.inner
     }
 }

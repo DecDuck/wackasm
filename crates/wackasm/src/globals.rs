@@ -4,18 +4,21 @@ use anyhow::anyhow;
 use serde::{Deserialize, Serialize};
 use wasmparser::{Global as WASMPARSERGlobal, SectionLimited};
 
-use crate::{HaltError, Value, const_expr::resolve_const_expr, module::GlobalIndex};
+use crate::{
+    HaltError, InlineWideValue, Value, const_expr::resolve_const_expr, macros::trap,
+    module::GlobalIndex,
+};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub(crate) struct Global {
-    pub inner: Value,
+    pub inner: InlineWideValue,
     pub mutable: bool,
     pub shared: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 pub(crate) struct GlobalManager {
-    pub(crate) globals: Vec<Global>,
+    globals: Vec<Global>,
 }
 
 impl GlobalManager {
@@ -50,17 +53,34 @@ impl GlobalManager {
             .ok_or_else(|| anyhow!("no global for index {:?}", global_index).into())
     }
 
-    pub fn set(
-        &mut self,
-        global_index: &GlobalIndex,
-        new_value: Value,
-    ) -> Result<(), HaltError> {
+    pub fn get_wide(&self, global_index: &GlobalIndex) -> Result<u128, HaltError> {
+        Ok(self
+            .globals
+            .get(global_index.0 as usize)
+            .ok_or_else(|| trap!("no global for index {:?}", global_index))?
+            .inner
+            .get_wide()
+            .ok_or_else(|| trap!("global not wide"))?)
+    }
+
+    pub fn set(&mut self, global_index: &GlobalIndex, new_value: Value) -> Result<(), HaltError> {
         let value = self
             .globals
             .get_mut(global_index.0 as usize)
             .ok_or_else(|| anyhow!("no global for index {:?}", global_index))?;
 
-        value.inner = new_value;
+        value.inner.set(new_value);
+
+        Ok(())
+    }
+
+    pub fn set_wide(&mut self, global_index: &GlobalIndex, new_value: u128) -> Result<(), HaltError> {
+        let value = self
+            .globals
+            .get_mut(global_index.0 as usize)
+            .ok_or_else(|| anyhow!("no global for index {:?}", global_index))?;
+
+        value.inner.set_wide(new_value);
 
         Ok(())
     }

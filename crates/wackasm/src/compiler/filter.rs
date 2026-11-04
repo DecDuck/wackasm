@@ -1,6 +1,7 @@
 use wasmparser::Operator;
 
 use crate::compiler::filters::block::BlockPass;
+use crate::compiler::filters::locals::LocalsPass;
 use crate::compiler::filters::stateless_base::StatelessBasePass;
 use crate::functions::FunctionManager;
 use crate::{
@@ -22,6 +23,7 @@ pub trait CompilerFilter: Send + Sync {
 #[static_dispatch::setup]
 pub enum CompilerFilterConcrete {
     BlockPass(BlockPass),
+    LocalsPass(LocalsPass),
     StatelessBase(StatelessBasePass),
 }
 

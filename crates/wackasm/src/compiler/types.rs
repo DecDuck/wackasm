@@ -101,17 +101,33 @@ pub enum WackasmOperator {
     LocalGet {
         local_index: u32,
     },
+    LocalGetWide {
+        local_index: u32,
+    },
     LocalSet {
         local_index: u32,
     },
+    LocalSetWide {
+        local_index: u32,
+    },
     Drop,
+    DropWide,
     LocalTee {
+        local_index: u32,
+    },
+    LocalTeeWide {
         local_index: u32,
     },
     GlobalGet {
         global_index: u32,
     },
+    GlobalGetWide {
+        global_index: u32,
+    },
     GlobalSet {
+        global_index: u32,
+    },
+    GlobalSetWide {
         global_index: u32,
     },
 

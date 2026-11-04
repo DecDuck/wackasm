@@ -2,19 +2,17 @@
 #![feature(option_reference_flattening)]
 
 mod blocks;
+mod compiler;
 mod const_expr;
 mod executor;
+mod functions;
 mod globals;
 mod macros;
 mod memory;
 mod module;
 mod pc;
-#[cfg(feature = "op-profile")]
-pub mod profiling;
 mod stack;
 mod table;
-mod functions;
-mod compiler;
 
 pub use executor::WackasmExecutor;
 pub use module::WackasmModule;
@@ -71,6 +69,43 @@ impl Value {
     #[inline]
     pub const fn is_null_ref(self) -> bool {
         self.0 == Self::NULL_REF.0
+    }
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+pub struct InlineWideValue(Value, Option<Value>);
+
+impl InlineWideValue {
+    pub fn new(value: Value) -> Self {
+        Self(value, None)
+    }
+
+    pub fn set(&mut self, value: Value) {
+        self.0 = value;
+        self.1 = None;
+    }
+    pub fn set_wide(&mut self, value: u128) {
+        let high = (value >> 64) as u64;
+        let low = value as u64;
+        self.0 = Value(high);
+        self.1 = Some(Value(low));
+    }
+
+    pub fn get(&self) -> &Value {
+        &self.0
+    }
+    pub fn get_wide(&self) -> Option<u128> {
+        let high = self.0.0;
+        let low = self.1?.0;
+        let combined = ((high as u128) << 64) | (low as u128);
+        Some(combined)
+    }
+
+    pub fn into_value_checked(self) -> Option<Value> {
+        if self.1.is_some() {
+            return None;
+        }
+        Some(self.0)
     }
 }
 

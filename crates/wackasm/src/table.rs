@@ -20,9 +20,7 @@ pub(crate) struct TableManager {
 
 impl TableManager {
     pub fn new() -> Self {
-        Self {
-            tables: Vec::new(),
-        }
+        Self { tables: Vec::new() }
     }
 
     pub fn process_table_section(
@@ -36,7 +34,11 @@ impl TableManager {
             let init_value = match table.init {
                 TableInit::RefNull => TableValue::NullRef,
                 TableInit::Expr(const_expr) => {
-                    let value = resolve_const_expr(const_expr)?;
+                    let value = resolve_const_expr(const_expr)?
+                        .into_value_checked()
+                        .ok_or_else(|| {
+                            anyhow!("values larger than u64 not supported for table init")
+                        })?;
                     TableValue::FuncRef(FunctionIndex(value.0 as u32))
                 }
             };
@@ -58,7 +60,11 @@ impl TableManager {
                     offset_expr,
                 } => {
                     let table_index = TableIndex(table_index.unwrap_or(0));
-                    let offset = resolve_const_expr(offset_expr)?;
+                    let offset = resolve_const_expr(offset_expr)?
+                        .into_value_checked()
+                        .ok_or_else(|| {
+                            anyhow!("values larger than u64 not supported for element section")
+                        })?;
                     let offset = offset.0 as u32;
 
                     let table_value = self

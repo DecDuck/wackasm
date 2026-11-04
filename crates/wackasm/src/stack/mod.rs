@@ -3,7 +3,11 @@ use serde::{Deserialize, Serialize};
 use wasmparser::ValType;
 
 use crate::{
-    HaltError, Value, compiler::DropKeep, macros::trap, module::{BlockIndex, FunctionIndex}, stack::{basic::OperandStack},
+    HaltError, Value,
+    compiler::DropKeep,
+    macros::trap,
+    module::{BlockIndex, FunctionIndex},
+    stack::basic::OperandStack,
 };
 
 mod basic;
@@ -17,40 +21,28 @@ pub(crate) use locals::LocalStore;
 
 pub(crate) type FrameOperandStack = OperandStack;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub enum StackSection {
-    Block(BlockIndex),
-    Function(FunctionIndex),
-}
-
-impl StackSection {
-    pub fn expect_block(&self) -> Result<&BlockIndex, HaltError> {
-        match self {
-            StackSection::Block(block_index) => Ok(block_index),
-            StackSection::Function(_) => Err(trap!("expected block but got function section")),
-        }
-    }
-
-    pub fn expect_function(&self) -> Result<&FunctionIndex, HaltError> {
-        match self {
-            StackSection::Block(_) => Err(trap!("expected function but got block section")),
-            StackSection::Function(function_index) => Ok(function_index),
-        }
-    }
+pub fn val_types_to_size(val_types: &[ValType]) -> usize {
+    val_types
+        .iter()
+        .map(|t| if matches!(t, ValType::V128) { 2 } else { 1 })
+        .sum()
 }
 
 pub(crate) trait GlobalStack {
+    fn len(&self) -> usize;
+    fn space(&self) -> usize;
+
     fn clear(&mut self);
     fn push(&mut self, value: Value) -> Result<(), HaltError>;
-
     fn pop(&mut self) -> Result<Value, HaltError>;
 
     fn peek(&mut self) -> Result<&Value, HaltError>;
+    fn peek_wide(&mut self) -> Result<u128, HaltError>;
     fn peek_mut(&mut self) -> Result<&mut Value, HaltError>;
 
     fn drop_keep(&mut self, dk: DropKeep);
-
     fn pull_results(&mut self, types: &[ValType]) -> Result<Vec<Value>, HaltError>;
+    fn unwind_to(&mut self, target: usize, keep: usize);
 
     fn pop_i32(&mut self) -> Result<i32, HaltError> {
         Ok(self.pop()?.0 as i32)

@@ -15,17 +15,21 @@ use crate::{
     compiler::{
         WackasmFunctionBody, WackasmOperator, WackasmTableTarget,
         filter::{CompilerFilter, CompilerFilterConcrete},
-        filters::{block::BlockPass, stateless_base::StatelessBasePass},
+        filters::{block::BlockPass, locals::LocalsPass, stateless_base::StatelessBasePass},
     },
     functions::FunctionManager,
 };
 
 pub(crate) struct Compiler {
+    // Outputs
     pub(crate) func_body: WackasmFunctionBody,
+
+    // Utils
     pub(crate) block_manager: BlockManager,
     pub(crate) func_validator: FuncValidator<ValidatorResources>,
+
+    // Internal state
     pub(crate) compilation_lookup: Vec<usize>, // map of old pc to new pc, think of it as a hashmap
-    passes: Vec<CompilerFilterConcrete>,
 }
 
 impl Compiler {
@@ -33,7 +37,6 @@ impl Compiler {
         Self {
             func_body: WackasmFunctionBody::empty(),
             block_manager: BlockManager::new(),
-            passes: vec![],
             func_validator,
             compilation_lookup: Vec::new(),
         }
@@ -42,6 +45,7 @@ impl Compiler {
     pub fn create_compiler_filters(&self) -> Vec<CompilerFilterConcrete> {
         vec![
             CompilerFilterConcrete::BlockPass(BlockPass::new()),
+            CompilerFilterConcrete::LocalsPass(LocalsPass::new()),
             CompilerFilterConcrete::StatelessBase(StatelessBasePass::new()),
         ]
     }
@@ -72,6 +76,10 @@ impl Compiler {
                 }
             }
             self.func_validator.op(offset, &operator)?; // advance the validator after the filters
+            self.func_body.max_stack_operands = self
+                .func_body
+                .max_stack_operands
+                .max(self.func_validator.operand_stack_height());
             pc += 1;
         }
         self.compilation_lookup.push(self.func_body.inner.len());

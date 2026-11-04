@@ -23,11 +23,15 @@ pub(crate) use types::*;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WackasmFunctionBody {
     pub(crate) inner: Vec<WackasmOperator>,
+    max_stack_operands: u32,
 }
 
 impl WackasmFunctionBody {
     pub fn empty() -> Self {
-        Self { inner: Vec::new() }
+        Self {
+            inner: Vec::new(),
+            max_stack_operands: 0,
+        }
     }
 
     pub fn compile(
@@ -50,7 +54,9 @@ impl WackasmFunctionBody {
         compiler.finish()
     }
 
-    pub fn get(&self, pc: ProgramCounter) -> &WackasmOperator {
-        &self.inner[pc]
+    pub fn theoretical_max_stack_size(&self) -> u32 {
+        let value = self.max_stack_operands * 2; // v128 takes double size
+
+        value
     }
 }

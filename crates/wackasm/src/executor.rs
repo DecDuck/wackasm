@@ -6,18 +6,14 @@ use wasmparser::Operator;
 
 use crate::{
     HaltError, Value, WackasmModule,
-    blocks::{Block, BlockManager},
     compiler::{WackasmOperator, WackasmTableTarget},
-    functions::FunctionManager,
     macros::{
         f32_load, f32_store, f64_load, f64_store, i32_binop, i32_load, i32_store, i64_binop,
         i64_cmp, i64_load, i64_store, trap, unsupported, v128_load, v128_store,
     },
-    module::{
-        BlockIndex, ExportIndex, FunctionFrame, FunctionIndex, GlobalIndex, TableIndex, TableValue,
-    },
+    module::{ExportIndex, FunctionFrame, FunctionIndex, GlobalIndex, TableIndex, TableValue},
     pc::ProgramCounter,
-    stack::{FrameOperandStack, GlobalStack as _, StackSection},
+    stack::{FrameOperandStack, GlobalStack as _, val_types_to_size},
 };
 
 const MAX_INSTRUCTIONS_IN_LOOP: isize = 500;
@@ -40,7 +36,7 @@ pub enum FunctionScopedResult {
 impl WackasmExecutor {
     pub fn new(module: WackasmModule) -> Result<Self, HaltError> {
         let mut me = Self {
-            stack: FrameOperandStack::new(100),
+            stack: FrameOperandStack::new(10_000),
             fuel: AtomicIsize::new(isize::MAX),
             module,
             callstack: Vec::new(),
@@ -115,6 +111,9 @@ impl WackasmExecutor {
                 if self.callstack.is_empty() {
                     let results = self.stack.pull_results(result_types)?;
                     self.output = Some(results);
+                } else {
+                    self.stack
+                        .unwind_to(function_frame.stack_base, val_types_to_size(result_types));
                 }
             }
             FunctionScopedResult::FunctionCall { function_index } => {
@@ -170,10 +169,13 @@ impl WackasmExecutor {
             .ok_or_else(|| anyhow!("callstack empty"))?;
 
         let mut pc = function_frame.pc;
+        let code_view = &function_frame.code.inner[..];
 
         for _ in 0..instructions {
             *instructions_executed += 1;
-            let operator = function_frame.code.get(pc);
+            let operator = code_view
+                .get(pc)
+                .ok_or_else(|| anyhow!("invalid program counter"))?;
             match operator {
                 WackasmOperator::Nop => {}
                 // Gets
@@ -181,28 +183,55 @@ impl WackasmExecutor {
                     let local = *function_frame.locals.get(&local_index)?;
                     self.stack.push(local)?;
                 }
+                WackasmOperator::LocalGetWide { local_index } => {
+                    let local = function_frame.locals.get_wide(local_index)?;
+                    self.stack.push_v128(local)?;
+                }
+
                 WackasmOperator::LocalSet { local_index } => {
                     let value = self.stack.pop()?;
-                    function_frame.locals.set_checked(*local_index, value)?;
+                    function_frame.locals.set(*local_index, value)?;
                 }
+                WackasmOperator::LocalSetWide { local_index } => {
+                    let value = self.stack.pop_v128()?;
+                    function_frame.locals.set_wide(*local_index, value)?;
+                }
+
                 WackasmOperator::Drop => {
                     self.stack.pop()?;
                 }
+                WackasmOperator::DropWide => {
+                    self.stack.pop_v128()?;
+                }
+
                 WackasmOperator::LocalTee { local_index } => {
                     let value = self.stack.peek()?;
-                    function_frame
-                        .locals
-                        .set_checked(*local_index, value.clone())?;
+                    function_frame.locals.set(*local_index, value.clone())?;
                 }
+                WackasmOperator::LocalTeeWide { local_index } => {
+                    let value = self.stack.peek_wide()?;
+                    function_frame.locals.set_wide(*local_index, value)?;
+                }
+
                 WackasmOperator::GlobalGet { global_index } => {
                     let global = self.module.globals.get(&GlobalIndex(*global_index))?;
-                    self.stack.push(global.inner.clone())?;
+                    self.stack.push(*global.inner.get())?;
+                }
+                WackasmOperator::GlobalGetWide { global_index } => {
+                    let global = self.module.globals.get_wide(&GlobalIndex(*global_index))?;
+                    self.stack.push_v128(global)?;
                 }
                 WackasmOperator::GlobalSet { global_index } => {
                     let value = self.stack.pop()?;
                     self.module
                         .globals
                         .set(&GlobalIndex(*global_index), value)?;
+                }
+                WackasmOperator::GlobalSetWide { global_index } => {
+                    let value = self.stack.pop_v128()?;
+                    self.module
+                        .globals
+                        .set_wide(&GlobalIndex(*global_index), value)?;
                 }
 
                 WackasmOperator::MemoryGrow { mem } => {

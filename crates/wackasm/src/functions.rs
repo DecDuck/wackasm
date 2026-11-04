@@ -1,9 +1,9 @@
-use std::{collections::HashMap, rc::Rc, sync::Arc};
-
 use anyhow::anyhow;
 use serde::{Deserialize, Serialize};
+use std::rc::Rc;
 use wasmparser::{
-    FuncType, FuncValidator, FuncValidatorAllocations, FunctionBody, Import, Imports, RecGroup, SectionLimited, ValidatorResources,
+    FuncType, FuncValidator, FuncValidatorAllocations, FunctionBody, Imports, RecGroup,
+    SectionLimited, ValidatorResources,
 };
 
 use crate::{
@@ -12,7 +12,7 @@ use crate::{
     macros::trap,
     module::{FunctionFrame, FunctionIndex, FunctionTypeIndex},
     pc::ProgramCounter,
-    stack::{FrameOperandStack, GlobalStack as _, LocalStore, StackSection},
+    stack::{FrameOperandStack, GlobalStack as _, LocalStore},
 };
 
 const MAX_CALL_DEPTH: usize = 10_000;
@@ -114,6 +114,7 @@ impl FunctionManager {
 
             // Runtime state
             pc: ProgramCounter::default(),
+            stack_base: 0,
         };
 
         // Check function signature and create parameter locals
@@ -153,11 +154,8 @@ impl FunctionManager {
         }
 
         // Save function body for later
-        let (function_body, allocs) = WackasmFunctionBody::compile(
-            &code_section,
-            func_validator,
-            self,
-        )?;
+        let (function_body, allocs) =
+            WackasmFunctionBody::compile(&code_section, func_validator, self)?;
         function_state.code = Rc::new(function_body);
 
         self.init_function_frames.push(function_state);
@@ -181,6 +179,11 @@ impl FunctionManager {
             .ok_or_else(|| {
                 anyhow!("internal module corruption: cannot lookup initial function state")
             })?;
+
+        if stack.space() < function.code.theoretical_max_stack_size() as usize {
+            return Err(trap!("potential stack overflow"));
+        }
+
         let mut function = function.clone();
 
         // Get function signature
@@ -220,10 +223,25 @@ impl FunctionManager {
         };
 
         // Insert arguments
-        for (index, value) in arguments.into_iter().enumerate() {
-            function.locals.set_checked(index as u32, value)?;
+        let mut arguments = arguments.into_iter();
+        for (index, val_type) in params.into_iter().enumerate() {
+            match val_type {
+                wasmparser::ValType::V128 => {
+                    let low = arguments.next().unwrap().0;
+                    let high = arguments.next().unwrap().0;
+                    let mut result = [0u8; 16];
+                    result[0..8].copy_from_slice(&low.to_le_bytes());
+                    result[8..].copy_from_slice(&high.to_le_bytes());
+                    function.locals.set_wide(index as u32, u128::from_le_bytes(result))?;
+                }
+                _ => {
+                    let value = arguments.next().unwrap();
+                    function.locals.set(index as u32, value)?;
+                }
+            };
         }
 
+        function.stack_base = stack.len();
         callstack.push(function);
 
         Ok(())
