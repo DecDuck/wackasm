@@ -26,4 +26,8 @@ Each issue line includes the status, test file, directive number, and detail. Th
 
 Run the harness's self-tests with `cargo test -p wackasm-spec-tests`.
 
-The runner converts `f32`, `f64`, and `v128` arguments and checks their `assert_return` values, including NaN patterns and SIMD lane patterns. Reference matching is limited to null and non-null function references; extern/host references, GC references, and function-reference identity are unsupported. These harness capabilities do not add executor support: tests still require the runtime to implement the operators and typed returns used by each module. Global reads, linking, exceptions, suspension, exhaustion, threads, and component directives are also unsupported.
+The runner converts `f32`, `f64`, and `v128` arguments and checks their `assert_return` values, including NaN patterns and SIMD lane patterns. Reference matching is limited to null and non-null function references; extern/host references, GC references, and function-reference identity are unsupported. These harness capabilities do not add executor support: tests still require the runtime to implement the operators and typed returns used by each module.
+
+Function imports are linked by the harness: `spectest` print functions are no-ops, and imports from `register`ed instances (including re-exported imports) call into that instance. Importing from an instance that failed to load is reported as unsupported. Non-function imports depend on executor support. Import type checks and re-entrant calls into a running instance are unsupported, and start functions that call imports fail because the executor runs them before any imports can be serviced.
+
+Global reads, `assert_unlinkable`, exceptions, suspension, exhaustion, threads, and component directives are also unsupported.

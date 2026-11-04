@@ -197,6 +197,64 @@ fn unsupported_execution_is_reported_and_later_directives_continue() {
 }
 
 #[test]
+fn links_spectest_and_registered_function_imports() {
+    let summary = run_source(
+        r#"
+            (module $M
+                (import "spectest" "print_i32" (func $print (param i32)))
+                (func (export "log_and_add") (param i32 i32) (result i32)
+                    local.get 0
+                    call $print
+                    local.get 0
+                    local.get 1
+                    i32.add)
+                (func (export "trap") (result i32) unreachable))
+            (register "M" $M)
+            (module $N
+                (import "M" "log_and_add" (func $add (param i32 i32) (result i32)))
+                (import "M" "trap" (func $trap (result i32)))
+                (export "reexported" (func $add))
+                (func (export "add_one") (param i32) (result i32)
+                    local.get 0
+                    i32.const 1
+                    call $add)
+                (func (export "call_trap") (result i32) call $trap))
+            (register "N" $N)
+            (module $O
+                (import "N" "reexported" (func $add (param i32 i32) (result i32)))
+                (func (export "add_two") (param i32) (result i32)
+                    local.get 0
+                    i32.const 2
+                    call $add))
+            (assert_return (invoke $N "add_one" (i32.const 41)) (i32.const 42))
+            (assert_return (invoke $N "reexported" (i32.const 40) (i32.const 2)) (i32.const 42))
+            (assert_return (invoke $O "add_two" (i32.const 40)) (i32.const 42))
+            (assert_trap (invoke $N "call_trap") "unreachable")
+            (assert_return (invoke $N "add_one" (i32.const 1)) (i32.const 2))
+        "#,
+    );
+    assert_eq!(
+        summary,
+        Summary {
+            passed: 10,
+            failed: 0,
+            unsupported: 0
+        }
+    );
+}
+
+#[test]
+fn reports_unresolved_imports_when_instantiating() {
+    let summary = run_source(
+        r#"
+            (module (import "missing" "f" (func)))
+            (module (import "spectest" "missing" (func)))
+        "#,
+    );
+    assert_eq!(summary.failed, 2);
+}
+
+#[test]
 fn writes_searchable_failure_records() {
     let unique = SystemTime::now()
         .duration_since(UNIX_EPOCH)

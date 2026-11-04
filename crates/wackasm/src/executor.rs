@@ -77,6 +77,7 @@ impl WackasmExecutor {
     /// Resets the executor and queues the function for running
     pub fn call_export(&mut self, name: &str, arguments: Vec<Value>) -> Result<(), HaltError> {
         self.output.take();
+        self.pending_import.take();
         self.callstack.clear();
         self.stack.clear();
 

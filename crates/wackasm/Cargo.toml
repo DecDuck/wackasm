@@ -23,4 +23,4 @@ name = "percent_of_wasmi"
 harness = false
 
 [package.metadata.patch]
-crates = ["wasmparser"]
+crates = ["wasmparser@0.262.0"]

@@ -1,3 +1,4 @@
+mod linking;
 mod model;
 mod report;
 mod runtime;

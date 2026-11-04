@@ -96,11 +96,8 @@ fn run_directive(runner: &mut ScriptRunner, directive: WastDirective<'_>) -> Out
             }
         }
         WastDirective::Register { name, module, .. } => {
-            match runner.instance_name(module.map(|name| name.name())) {
-                Ok(instance) => {
-                    runner.register(name.to_owned(), instance);
-                    Outcome::Passed
-                }
+            match runner.register(name.to_owned(), module.map(|name| name.name())) {
+                Ok(()) => Outcome::Passed,
                 Err(error) => Outcome::Unsupported(error.into_message()),
             }
         }
