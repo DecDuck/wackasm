@@ -94,7 +94,7 @@ ops!(|ctx, pc, stack, locals| match op {
     }
 
     global_get @ GlobalGet { global_index } => {
-        let global = ctx.globals.get(&GlobalIndex(*global_index))?;
+        let global = ctx.globals.get(&GlobalIndex(*global_index));
         stack.push(*global.inner.get());
     }
     global_get_wide @ GlobalGetWide { global_index } => {
@@ -104,7 +104,7 @@ ops!(|ctx, pc, stack, locals| match op {
 
     global_set @ GlobalSet { global_index } => {
         let value = stack.pop();
-        ctx.globals.set(&GlobalIndex(*global_index), value)?;
+        ctx.globals.set(&GlobalIndex(*global_index), value);
     }
     global_set_wide @ GlobalSetWide { global_index } => {
         let value = stack.pop_v128();
