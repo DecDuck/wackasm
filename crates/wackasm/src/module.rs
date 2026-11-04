@@ -73,6 +73,7 @@ pub struct WackasmModule {
     pub(crate) tables: TableManager,
     pub(crate) memories: MemoryManager,
     pub(crate) globals: GlobalManager,
+    pub(crate) start_func: Option<FunctionIndex>,
 }
 
 impl WackasmModule {
@@ -235,10 +236,15 @@ impl WackasmModule {
         let mut memories = MemoryManager::new();
         let mut globals = GlobalManager::new();
 
+        let mut start_func = None;
+
         for payload in payloads {
             match payload {
                 Payload::Version { .. } => {
                     // todo
+                }
+                Payload::StartSection { func, .. } => {
+                    start_func = Some(FunctionIndex(func));
                 }
                 Payload::TypeSection(types) => {
                     let type_groups = types
@@ -334,6 +340,7 @@ impl WackasmModule {
             tables,
             memories,
             globals,
+            start_func,
         })
     }
 }
