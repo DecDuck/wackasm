@@ -13,7 +13,7 @@ use crate::{
     blocks::{Block, BlockManager},
     macros::{
         f32_load, f32_store, f64_load, f64_store, i32_binop, i32_load, i32_store, i64_binop,
-        i64_cmp, i64_load, v128_load, v128_store,
+        i64_cmp, i64_load, i64_store, v128_load, v128_store,
     },
     module::{
         BlockIndex, ExportIndex, FunctionFrame, FunctionIndex, FunctionTypeIndex, GlobalIndex,
@@ -49,7 +49,11 @@ impl WackasmExecutor {
         }
     }
 
+    /// Resets the executor and queues the function for running
     pub fn call_export(&mut self, name: &str, arguments: Vec<Value>) -> Result<(), anyhow::Error> {
+        self.output.take();
+        self.callstack.clear();
+
         let function = self
             .module
             .exports
@@ -267,6 +271,15 @@ impl WackasmExecutor {
                 }
                 Operator::V128Store { memarg } => {
                     v128_store!(function_frame.stack, self.module.memories, memarg)
+                }
+                Operator::I64Store { memarg } => {
+                    i64_store!(function_frame.stack, self.module.memories, memarg, i64)
+                }
+                Operator::I64Store16 { memarg } => {
+                    i64_store!(function_frame.stack, self.module.memories, memarg, u16)
+                }
+                Operator::I64Store32 { memarg } => {
+                    i64_store!(function_frame.stack, self.module.memories, memarg, u32)
                 }
 
                 // Handle function call
