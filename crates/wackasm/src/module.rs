@@ -55,7 +55,6 @@ pub(crate) enum TableValue {
 pub(crate) struct FunctionFrame {
     pub(crate) function_index: FunctionIndex,
     pub(crate) locals: LocalStore,
-    pub(crate) code: Rc<WackasmFunctionBody>,
     pub(crate) pc: ProgramCounter,
     pub(crate) stack_base: usize,
 }
