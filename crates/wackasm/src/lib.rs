@@ -8,25 +8,25 @@
 mod blocks;
 mod compiler;
 mod const_expr;
+mod dispatch;
 mod executor;
 mod functions;
 mod globals;
+pub mod imports;
 mod macros;
 mod memory;
 mod module;
 mod pc;
 mod stack;
 mod table;
-mod dispatch;
-pub mod imports;
 #[macro_use]
 mod dispatch_macros;
 
 #[cfg(test)]
 mod tests;
 
-pub use executor::WackasmExecutor;
 pub use executor::HostYield;
+pub use executor::WackasmExecutor;
 pub use module::WackasmModule;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -81,6 +81,23 @@ impl Value {
     #[inline]
     pub const fn is_null_ref(self) -> bool {
         self.0 == Self::NULL_REF.0
+    }
+
+    #[inline]
+    pub const fn from_u32(value: u32) -> Self {
+        Self::from_i32(value as i32)
+    }
+    #[inline]
+    pub const fn as_u32(self) -> u32 {
+        self.0 as u32
+    }
+    #[inline]
+    pub const fn from_u64(value: u64) -> Self {
+        Self(value)
+    }
+    #[inline]
+    pub const fn as_u64(self) -> u64 {
+        self.0
     }
 }
 

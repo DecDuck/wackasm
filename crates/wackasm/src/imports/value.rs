@@ -2,6 +2,7 @@ use crate::{
     HaltError, Value,
     imports::{WackasmLinkerResources, WackasmResource},
 };
+use paste::paste;
 
 pub trait WackasmValue<R: WackasmResource>: Sized {
     fn into_wasm_value(self) -> Value;
@@ -16,25 +17,25 @@ pub trait WackasmValue<R: WackasmResource>: Sized {
 
 macro_rules! impl_wackasm_value {
     ($($ty:ident),*) => {
-        $(
-            impl<R: WackasmResource> WackasmValue<R> for $ty {
-                fn into_wasm_value(self) -> Value {
-                    Value(self as u64)
-                }
+        paste! {
+            $(
+                impl<R: WackasmResource> WackasmValue<R> for $ty {
+                    type Out<'a> = $ty where R: 'a;
 
-                type Out<'a> = $ty
-                where
-                    R: 'a;
+                    fn into_wasm_value(self) -> Value {
+                        Value::[<from_ $ty>](self)
+                    }
 
                     fn from_wasm_value<'a>(
                         _ctx: &'a WackasmLinkerResources<R>,
                         value: Value,
                     ) -> Result<Self::Out<'a>, HaltError> {
-                        Ok(value.0 as $ty)
+                        Ok(value.[<as_ $ty>]())
                     }
-            }
-        )*
+                }
+            )*
+        }
     };
 }
 
-impl_wackasm_value!(i8, u8, i16, u16, i32, i64, u32, u64, usize, isize);
+impl_wackasm_value!(i32, i64, f32, f64, u32, u64);

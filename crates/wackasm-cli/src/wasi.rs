@@ -6,12 +6,13 @@ use wackasm::{
 #[derive(Serialize, Deserialize, Clone)]
 pub struct WasiHandler {}
 
-fn println_i32(ctx: &mut WasiHandler, executor: &mut WackasmExecutor, address: u32) {
+fn println_i32(ctx: &mut WasiHandler, executor: &mut WackasmExecutor, address: u32) -> Result<(), HaltError> {
     let str = executor.memory().read_cstr(0, address).expect("failed to read memory");
     println!("{}", str.to_string_lossy());
+    Ok(())
 }
 
-fn get_i32(ctx: &mut WasiHandler, executor: &mut WackasmExecutor,) -> (i32,) {
+fn get_i32(ctx: &mut WasiHandler, executor: &mut WackasmExecutor,) -> Result<(i32,), HaltError> {
     todo!()
 }
 

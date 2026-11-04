@@ -111,11 +111,6 @@ impl WackasmExecutor {
         &mut self,
         fuel: isize,
     ) -> Result<(isize, Option<HostYield>), HaltError> {
-        let (function_result, pc, local_stack, fuel_remaining) =
-            self.incremental_execute_function(fuel)?;
-        let local_stack = local_stack.into_raw();
-        self.stack.reconcile(local_stack);
-
         if let Some(pending_import_call) = &self.pending_import {
             return Ok((
                 fuel,
@@ -127,6 +122,11 @@ impl WackasmExecutor {
                 }),
             ));
         }
+
+        let (function_result, pc, local_stack, fuel_remaining) =
+            self.incremental_execute_function(fuel)?;
+        let local_stack = local_stack.into_raw();
+        self.stack.reconcile(local_stack);
 
         // Update PC or return ImportCall
         self.callstack

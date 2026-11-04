@@ -47,7 +47,7 @@ macro_rules! impl_typed_fn {
         paste! {
             pub struct [<TypedWackasmFn $($P)* $($R)*>]<Ctx, F, R, $($P,)* $($R,)*>
             where
-                F: for<'a> Fn(&mut Ctx, &mut WackasmExecutor, $($P::Out<'a>),*) -> ($($R,)*),
+                F: for<'a> Fn(&mut Ctx, &mut WackasmExecutor, $($P::Out<'a>),*) -> Result<($($R,)*), HaltError>,
                 R: WackasmResource,
                 $( $P: WackasmValue<R>, )*
                 $( $R: WackasmValue<R>, )*
@@ -58,7 +58,7 @@ macro_rules! impl_typed_fn {
 
             impl<Ctx, F, R, $($P,)* $($R,)*> WackasmUntypedCall<Ctx, R> for [<TypedWackasmFn $($P)* $($R)*>]<Ctx, F, R, $($P,)* $($R,)*>
             where
-                F: for<'a> Fn(&mut Ctx, &mut WackasmExecutor, $($P::Out<'a>),*) -> ($($R,)*),
+                F: for<'a> Fn(&mut Ctx, &mut WackasmExecutor, $($P::Out<'a>),*) -> Result<($($R,)*), HaltError>,
                 R: WackasmResource,
                 $( $P: WackasmValue<R>, )*
                 $( $R: WackasmValue<R>, )*
@@ -75,7 +75,7 @@ macro_rules! impl_typed_fn {
                     let [<$P:lower>] = $P::from_wasm_value(_resources, *[<$P:lower>])?;
                     )*
 
-                    let _result = (self.f)(ctx, executor, $( [<$P:lower>] ),*);
+                    let _result = (self.f)(ctx, executor, $( [<$P:lower>] ),*)?;
 
                     $(
                     let [<$R:lower>] = _result.${index()};
@@ -88,8 +88,8 @@ macro_rules! impl_typed_fn {
 
             impl<Ctx: 'static, R: 'static, F, $($P: 'static,)* $($R: 'static,)*> IntoWackasmCall<Ctx, R, ( ($($P,)*), ($($R,)*) )> for F
             where
-                F: Fn(&mut Ctx, &mut WackasmExecutor, $($P),*) -> ($($R,)*)
-                    + for<'a> Fn(&mut Ctx, &mut WackasmExecutor, $($P::Out<'a>),*) -> ($($R,)*)
+                F: Fn(&mut Ctx, &mut WackasmExecutor, $($P),*) -> Result<($($R,)*), HaltError>
+                    + for<'a> Fn(&mut Ctx, &mut WackasmExecutor, $($P::Out<'a>),*) -> Result<($($R,)*), HaltError>
                     + 'static,
                 R: WackasmResource,
                 $( $P: WackasmValue<R>, )*
