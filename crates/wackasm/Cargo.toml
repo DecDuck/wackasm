@@ -12,9 +12,6 @@ serde_arrays = "0.2.0"
 thiserror = "2.0.21"
 static-dispatch = "0.3.0"
 
-[features]
-op-profile = []
-
 [dev-dependencies]
 bitcode = { version = "0.6.9", features = ["serde"] }
 criterion = "0.5"

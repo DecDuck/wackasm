@@ -9,7 +9,7 @@ use crate::{
     },
 };
 
-const MAX_FUEL_BEFORE_SYNC: isize = 1000;
+const MAX_FUEL_BEFORE_SYNC: isize = 100_000;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct WackasmExecutor {
@@ -157,7 +157,7 @@ impl WackasmExecutor {
         &mut self,
         mut instructions: isize,
     ) -> Result<(FunctionScopedResult, ProgramCounter, StackHandle<'_>, isize), HaltError> {
-        instructions += 10; // Consume fuel for calling functions, just in case functions don't have any loops
+        instructions -= 1; // Consume fuel for calling functions, just in case functions don't have any loops
         let function_frame = self
             .callstack
             .last_mut()

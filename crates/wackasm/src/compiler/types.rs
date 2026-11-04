@@ -34,24 +34,6 @@ pub enum WackasmTableTarget {
 pub type WackasmTableTargets = Vec<WackasmTableTarget>;
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
-pub struct BlockParams(u32);
-
-impl BlockParams {
-    pub const NONE: Self = Self(u32::MAX);
-
-    pub fn from_block_type(ty: &BlockType) -> Self {
-        match ty {
-            BlockType::FuncType(i) => Self(*i),
-            _ => Self::NONE,
-        }
-    }
-
-    pub fn get(self) -> Option<FunctionTypeIndex> {
-        (self.0 != u32::MAX).then_some(FunctionTypeIndex(self.0))
-    }
-}
-
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct DropKeep {
     pub drop: u16,
     pub keep: u16,

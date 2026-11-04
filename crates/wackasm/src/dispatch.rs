@@ -53,6 +53,8 @@ pub(crate) enum Exit<'a> {
     },
 }
 
+// Intention with the function signature of these operations is to have everything
+// fit in registers, even on Windows. 
 ops!(|ctx, pc, stack, locals| match op {
     nop @ Nop => {}
 

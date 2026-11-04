@@ -1,19 +1,6 @@
-/// Defines tail-call op handlers and the `dispatch!` macro that jumps between them.
-///
-/// The input is written as a closure over a `match` so it parses as a Rust expression,
-/// which lets rustfmt format it. Each arm is `handler_name @ Variant { fields } => body`;
-/// the scrutinee (`op`) is ignored. Fields bind by reference to the current operator.
-///
-/// ```ignore
-/// ops!(|ctx, pc, stack, locals| match op {
-///     nop @ Nop => {}
-///     local_get @ LocalGet { slot } => stack.push(locals.get(*slot)),
-/// });
-/// ```
 #[macro_export]
 macro_rules! ops {
     (|$ctx:ident, $pc:ident, $stack:ident, $locals:ident| match $op:ident { $($arms:tt)* }) => {
-        // Pass a literal `$` through so the final rule can define a nested macro_rules.
         ops!(@parse [($) $ctx, $pc, $stack, $locals] [] $($arms)*);
     };
 

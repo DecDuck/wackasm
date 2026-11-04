@@ -7,9 +7,6 @@ edition = "2024"
 name = "wackasm"
 path = "src/main.rs"
 
-[features]
-op-profile = ["wackasm/op-profile"]
-
 [dependencies]
 anyhow = "1.0.104"
 bitcode = { version = "0.6.9", features = ["serde"] }
