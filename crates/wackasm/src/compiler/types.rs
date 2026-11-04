@@ -89,7 +89,7 @@ pub enum WackasmOperator {
     Nop,
     Return,
     ReturnIf,
-    Select,
+    Select { wide: bool },
     Call {
         function_index: u32,
     },
