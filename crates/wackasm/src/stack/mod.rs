@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use wasmparser::ValType;
 
 use crate::{
-    HaltError, Value, macros::trap, module::{BlockIndex, FunctionIndex}, stack::{basic::OperandStack, flat::FlatBlockAwareStack},
+    HaltError, Value, compiler::DropKeep, macros::trap, module::{BlockIndex, FunctionIndex}, stack::{basic::OperandStack, flat::FlatBlockAwareStack},
 };
 
 mod basic;
@@ -41,12 +41,15 @@ impl StackSection {
 }
 
 pub(crate) trait GlobalStack {
+    fn clear(&mut self);
     fn push(&mut self, value: Value) -> Result<(), HaltError>;
 
     fn pop(&mut self) -> Result<Value, HaltError>;
 
     fn peek(&mut self) -> Result<&Value, HaltError>;
     fn peek_mut(&mut self) -> Result<&mut Value, HaltError>;
+
+    fn drop_keep(&mut self, dk: DropKeep);
 
     fn push_section(
         &mut self,

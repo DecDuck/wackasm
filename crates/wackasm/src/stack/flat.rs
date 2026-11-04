@@ -9,8 +9,8 @@ use wasmparser::ValType;
 
 use crate::{
     HaltError, Value,
+    compiler::DropKeep,
     macros::trap,
-    module::BlockIndex,
     stack::{GlobalStack, MAX_OPERAND_STACK_SIZE, StackSection, basic::OperandStack},
 };
 
@@ -33,6 +33,9 @@ impl FlatBlockAwareStack {
 }
 
 impl GlobalStack for FlatBlockAwareStack {
+    fn clear(&mut self) {
+        self.stack.clear();
+    }
     fn push(&mut self, value: Value) -> Result<(), HaltError> {
         self.stack.push(value)
     }
@@ -47,6 +50,10 @@ impl GlobalStack for FlatBlockAwareStack {
 
     fn peek_mut(&mut self) -> Result<&mut Value, HaltError> {
         self.stack.peek_mut()
+    }
+
+    fn drop_keep(&mut self, dk: DropKeep) {
+        self.stack.drop_keep(dk);
     }
 
     fn push_section(

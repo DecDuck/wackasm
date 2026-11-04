@@ -2,7 +2,9 @@ use std::{collections::HashMap, rc::Rc, sync::Arc};
 
 use anyhow::anyhow;
 use serde::{Deserialize, Serialize};
-use wasmparser::{FuncType, FunctionBody, Import, Imports, RecGroup, SectionLimited};
+use wasmparser::{
+    FuncType, FuncValidator, FuncValidatorAllocations, FunctionBody, Import, Imports, RecGroup, SectionLimited, ValidatorResources,
+};
 
 use crate::{
     HaltError, Value, WackasmModule,
@@ -103,13 +105,13 @@ impl FunctionManager {
     pub(crate) fn process_function_body_block(
         &mut self,
         code_section: FunctionBody<'_>,
-    ) -> Result<(), HaltError> {
+        func_validator: FuncValidator<ValidatorResources>,
+    ) -> Result<FuncValidatorAllocations, HaltError> {
         let mut function_state = FunctionFrame {
             // Stuff that needs to be initialised
             function_index: FunctionIndex(u32::MAX),
             locals: LocalStore::new(),
             code: Rc::new(WackasmFunctionBody::empty()),
-            block_lookup: Arc::new(BlockManager::new()),
 
             // Runtime state
             pc: ProgramCounter::default(),
@@ -152,11 +154,15 @@ impl FunctionManager {
         }
 
         // Save function body for later
-        function_state.block_lookup = Arc::new(lookahead_find_blocks(&code_section)?);
-        function_state.code = Rc::new(WackasmFunctionBody::compile(&code_section, &function_state.block_lookup)?);
+        let (function_body, allocs) = WackasmFunctionBody::compile(
+            &code_section,
+            func_validator,
+            self,
+        )?;
+        function_state.code = Rc::new(function_body);
 
         self.init_function_frames.push(function_state);
-        Ok(())
+        Ok(allocs)
     }
 
     pub(crate) fn call_internal(

@@ -2,10 +2,20 @@ use std::{collections::HashMap, rc::Rc, sync::Arc};
 
 use anyhow::anyhow;
 use serde::{Deserialize, Serialize};
-use wasmparser::{ExternalKind, FuncType, FunctionBody, Payload, ValType};
+use wasmparser::{ExternalKind, FuncType, FuncValidatorAllocations, FunctionBody, Payload, ValType, ValidPayload};
 
 use crate::{
-    HaltError, Value, blocks::{Block, BlockManager}, compiler::{BlockParams, WackasmFunctionBody}, executor::FunctionScopedResult, functions::FunctionManager, globals::GlobalManager, macros::unsupported, memory::MemoryManager, pc::ProgramCounter, stack::{FrameOperandStack, GlobalStack, LocalStore, StackSection}, table::TableManager,
+    HaltError, Value,
+    blocks::{Block, BlockManager},
+    compiler::{BlockParams, WackasmFunctionBody},
+    executor::FunctionScopedResult,
+    functions::FunctionManager,
+    globals::GlobalManager,
+    macros::unsupported,
+    memory::MemoryManager,
+    pc::ProgramCounter,
+    stack::{FrameOperandStack, GlobalStack, LocalStore, StackSection},
+    table::TableManager,
 };
 
 macro_rules! type_indexes {
@@ -46,7 +56,6 @@ pub(crate) enum TableValue {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub(crate) struct FunctionFrame {
     pub(crate) function_index: FunctionIndex,
-    pub(crate) block_lookup: Arc<BlockManager>,
     pub(crate) locals: LocalStore,
     pub(crate) code: Rc<WackasmFunctionBody>,
     pub(crate) pc: ProgramCounter,
@@ -89,46 +98,10 @@ impl WackasmModule {
 
         Ok(())
     }
-
-    pub(crate) fn block_break(
-        &mut self,
-        blocks: &BlockManager,
-        stack: &mut FrameOperandStack,
-        pc: &mut ProgramCounter,
-        relative_depth: u32,
-    ) -> Result<Option<FunctionScopedResult>, HaltError> {
-        let target = stack.len_sections() - 1 - relative_depth as usize;
-        let block = stack
-            .peek_section(Some(target))
-            .ok_or_else(|| anyhow!("no block to escape when br_if"))?;
-
-        match block {
-            StackSection::Block(block_index) => {
-                let block = blocks.get(block_index)?;
-                match block {
-                    Block::Block { end, .. } | Block::If { end, .. } => {
-                        let return_params = block.return_params(&self.functions)?;
-                        stack.return_section(return_params.unwrap_or(&[]), Some(target))?;
-                        *pc = *end + 1;
-                    }
-                    // Keep the loop's section and skip re-executing the `loop` opcode
-                    Block::Loop { start, .. } => {
-                        let call_params = block.call_params(&self.functions)?;
-                        stack.reset_section(call_params.as_deref().unwrap_or(&[]), target)?;
-                        *pc = *start + 1;
-                    }
-                }
-            }
-            StackSection::Function(_) => {
-                return Ok(Some(FunctionScopedResult::FunctionReturn));
-            }
-        }
-
-        Ok(None)
-    }
-
+    
     pub fn new(data: &[u8]) -> Result<Self, HaltError> {
-        wasmparser::Validator::new().validate_all(data)?;
+        let mut validator = wasmparser::Validator::new();
+        let mut allocs = FuncValidatorAllocations::default();
 
         let payloads = wasmparser::Parser::new(0)
             .parse_all(data)
@@ -144,6 +117,12 @@ impl WackasmModule {
         let mut start_func = None;
 
         for payload in payloads {
+            if let ValidPayload::Func(func, body) = validator.payload(&payload)? {
+                let func_validator = func.into_validator(std::mem::take(&mut allocs));
+                allocs = functions.process_function_body_block(body, func_validator)?;
+                continue;
+            }
+
             match payload {
                 Payload::Version { .. } => {
                     // todo
@@ -192,9 +171,7 @@ impl WackasmModule {
                     unchecked_range: _,
                     size: _,
                 } => {} // noop because we don't need to do anything
-                Payload::CodeSectionEntry(code_section) => {
-                    functions.process_function_body_block(code_section)?;
-                }
+                Payload::CodeSectionEntry(_) => unreachable!("handled via ValidPayload::Func"),
                 Payload::MemorySection(raw_memories) => {
                     memories.process_memory_section(raw_memories)?;
                 }

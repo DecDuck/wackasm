@@ -7,7 +7,7 @@ use wasmparser::Operator;
 use crate::{
     HaltError, Value, WackasmModule,
     blocks::{Block, BlockManager},
-    compiler::WackasmOperator,
+    compiler::{WackasmOperator, WackasmTableTarget},
     functions::FunctionManager,
     macros::{
         f32_load, f32_store, f64_load, f64_store, i32_binop, i32_load, i32_store, i64_binop,
@@ -63,6 +63,7 @@ impl WackasmExecutor {
     pub fn call_export(&mut self, name: &str, arguments: Vec<Value>) -> Result<(), HaltError> {
         self.output.take();
         self.callstack.clear();
+        self.stack.clear();
 
         let function = self
             .module
@@ -178,8 +179,6 @@ impl WackasmExecutor {
         for _ in 0..instructions {
             *instructions_executed += 1;
             let operator = function_frame.code.get(pc);
-            #[cfg(feature = "op-profile")]
-            crate::profiling::begin(operator);
             match operator {
                 WackasmOperator::Nop => {}
                 // Gets
@@ -342,136 +341,57 @@ impl WackasmExecutor {
                     ));
                 }
 
-                // Control flow
-                WackasmOperator::If {
-                    idx,
-                    params,
-                    false_target,
-                    has_else,
-                } => {
-                    let condition = self.stack.pop_i32()?;
-                    let condition = condition != 0;
-
-                    let mut start_block = false;
-
-                    if condition {
-                        // Jump to next instruction
-                        pc += 1;
-                        start_block = true;
-                    } else {
-                        pc = *false_target as usize;
-                        if *has_else {
-                            start_block = true;
-                            // Jump after else instruction
-                        }
-                    }
-
-                    if start_block {
-                        self.module.start_block(&mut self.stack, &params, idx)?;
-                    }
-
-                    // Skip PC increment
+                WackasmOperator::Jump { target } => {
+                    pc = *target as usize;
                     continue;
                 }
-
-                // Jump to end block if we hit an else
-                WackasmOperator::Else { end } => {
-                    // Jump to end block which will handle block frame cleanup
-                    pc = *end;
-
-                    // Skip PC incremenet
+                WackasmOperator::JumpIf { target } => {
+                    if self.stack.pop_i32()? != 0 {
+                        pc = *target as usize;
+                        continue;
+                    }
+                }
+                WackasmOperator::JumpIfEqz { target } => {
+                    if self.stack.pop_i32()? == 0 {
+                        pc = *target as usize;
+                        continue;
+                    }
+                }
+                WackasmOperator::Br { target, drop_keep } => {
+                    self.stack.drop_keep(*drop_keep);
+                    pc = *target as usize;
                     continue;
                 }
+                WackasmOperator::BrIf { target, drop_keep } => {
+                    if self.stack.pop_i32()? != 0 {
+                        self.stack.drop_keep(*drop_keep);
+                        pc = *target as usize;
 
-                WackasmOperator::Block { idx, params } | WackasmOperator::Loop { idx, params } => {
-                    self.module.start_block(&mut self.stack, &params, idx)?;
-                }
-
-                WackasmOperator::BrIf { relative_depth } => {
-                    let condition = self.stack.pop_i32()?;
-                    let branching = condition != 0;
-
-                    if branching {
-                        if let Some(result) = self.module.block_break(
-                            &function_frame.block_lookup,
-                            &mut self.stack,
-                            &mut pc,
-                            *relative_depth,
-                        )? {
-                            return Ok((result, pc));
-                        }
-
-                        // Skip PC increment
                         continue;
                     }
                 }
 
-                WackasmOperator::Br { relative_depth } => {
-                    if let Some(result) = self.module.block_break(
-                        &function_frame.block_lookup,
-                        &mut self.stack,
-                        &mut pc,
-                        *relative_depth,
-                    )? {
-                        return Ok((result, pc));
-                    }
-
-                    // Skip PC increment
-                    continue;
-                }
-
                 WackasmOperator::BrTable { targets } => {
-                    let decider = self.stack.pop_i32()? as u32 as usize;
-                    let target = if decider >= targets.targets.len() {
-                        &targets.default
-                    } else {
-                        targets
-                            .targets
-                            .iter()
-                            .nth(decider as usize)
-                            .ok_or_else(|| {
-                                trap!("no function for index {} in br_table args", decider)
-                            })?
-                    };
-                    if let Some(result) = self.module.block_break(
-                        &function_frame.block_lookup,
-                        &mut self.stack,
-                        &mut pc,
-                        *target,
-                    )? {
-                        return Ok((result, pc));
-                    }
-
-                    // Skip PC increment
-                    continue;
-                }
-
-                // Handle block/function return
-                WackasmOperator::End => {
-                    let section_idx = self
-                        .stack
-                        .peek_section(None)
-                        .ok_or_else(|| trap!("end without any sections under it"))?;
-                    match section_idx {
-                        StackSection::Block(block_idx) => {
-                            let block = function_frame
-                                .block_lookup
-                                .get(&block_idx)
-                                .expect("we can't have exited from a block that doesn't exist");
-
-                            let return_params = block.return_params(&self.module.functions)?;
-
-                            self.stack
-                                .return_section(&return_params.unwrap_or(&[]), None)?
-                                .ok_or_else(|| anyhow!("no block to end from"))?;
-                        }
-                        StackSection::Function(_) => {
+                    let i = self.stack.pop_i32()? as u32 as usize;
+                    match targets[i.min(targets.len() - 1)] {
+                        WackasmTableTarget::Return => {
                             return Ok((FunctionScopedResult::FunctionReturn, pc));
                         }
+                        WackasmTableTarget::Break { target, dk } => {
+                            self.stack.drop_keep(dk);
+                            pc = target as usize;
+                            continue;
+                        }
                     }
                 }
+
                 WackasmOperator::Return => {
                     return Ok((FunctionScopedResult::FunctionReturn, pc));
+                }
+                WackasmOperator::ReturnIf => {
+                    if self.stack.pop_i32()? != 0 {
+                        return Ok((FunctionScopedResult::FunctionReturn, pc));
+                    }
                 }
 
                 // i32 maths

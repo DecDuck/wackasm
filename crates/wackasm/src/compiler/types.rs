@@ -1,7 +1,11 @@
 use serde::{Deserialize, Serialize};
 use wasmparser::{BlockType, BrTable, MemArg};
 
-use crate::{HaltError, macros::unsupported, module::{BlockIndex, FunctionTypeIndex}};
+use crate::{
+    HaltError,
+    macros::unsupported,
+    module::{BlockIndex, FunctionTypeIndex},
+};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WackasmMemArg {
@@ -21,21 +25,13 @@ impl TryFrom<MemArg> for WackasmMemArg {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct WackasmTableTargets {
-    pub(crate) default: u32,
-    pub(crate) targets: Vec<u32>,
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+pub enum WackasmTableTarget {
+    Return,
+    Break { target: u32, dk: DropKeep },
 }
 
-impl WackasmTableTargets {
-    pub fn new(value: &BrTable) -> Result<Self, HaltError> {
-        let targets: Vec<_> = value.targets().into_iter().collect::<Result<Vec<_>, _>>()?;
-        Ok(Self {
-            default: value.default(),
-            targets,
-        })
-    }
-}
+pub type WackasmTableTargets = Vec<WackasmTableTarget>;
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct BlockParams(u32);
@@ -55,78 +51,174 @@ impl BlockParams {
     }
 }
 
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+pub struct DropKeep {
+    pub drop: u16,
+    pub keep: u16,
+}
+
 const _: () = assert!(std::mem::size_of::<WackasmOperator>() <= 16);
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum WackasmOperator {
+    // Compiled block handling
+    Jump {
+        target: u32,
+    },
+    JumpIf {
+        target: u32,
+    },
+    JumpIfEqz {
+        target: u32,
+    },
+
+    BrIf {
+        target: u32,
+        drop_keep: DropKeep,
+    },
+    Br {
+        target: u32,
+        drop_keep: DropKeep,
+    },
+    BrTable {
+        targets: Box<WackasmTableTargets>,
+    },
+
     // Control
     Unreachable,
     Nop,
-    Block { params: BlockParams, idx: BlockIndex },
-    Loop { params: BlockParams, idx: BlockIndex },
-    If { params: BlockParams, idx: BlockIndex, false_target: u32, has_else: bool },
-    Else { end: usize },
-    End,
     Return,
+    ReturnIf,
     Select,
-    Call { function_index: u32 },
-    CallIndirect { table_index: u32 },
-
-    // Br
-    BrIf { relative_depth: u32 },
-    Br { relative_depth: u32 },
-    BrTable { targets: Box<WackasmTableTargets> },
+    Call {
+        function_index: u32,
+    },
+    CallIndirect {
+        table_index: u32,
+    },
 
     // Stack
-    LocalGet { local_index: u32 },
-    LocalSet { local_index: u32 },
+    LocalGet {
+        local_index: u32,
+    },
+    LocalSet {
+        local_index: u32,
+    },
     Drop,
-    LocalTee { local_index: u32 },
-    GlobalGet { global_index: u32 },
-    GlobalSet { global_index: u32 },
+    LocalTee {
+        local_index: u32,
+    },
+    GlobalGet {
+        global_index: u32,
+    },
+    GlobalSet {
+        global_index: u32,
+    },
 
     // Memory
-    MemoryGrow { mem: u32 },
-    MemoryFill { mem: u32 },
+    MemoryGrow {
+        mem: u32,
+    },
+    MemoryFill {
+        mem: u32,
+    },
 
     // Loads
-    I32Load { memarg: WackasmMemArg },
-    I32Load8U { memarg: WackasmMemArg },
-    I32Load8S { memarg: WackasmMemArg },
-    I32Load16U { memarg: WackasmMemArg },
-    I32Load16S { memarg: WackasmMemArg },
+    I32Load {
+        memarg: WackasmMemArg,
+    },
+    I32Load8U {
+        memarg: WackasmMemArg,
+    },
+    I32Load8S {
+        memarg: WackasmMemArg,
+    },
+    I32Load16U {
+        memarg: WackasmMemArg,
+    },
+    I32Load16S {
+        memarg: WackasmMemArg,
+    },
 
-    I64Load { memarg: WackasmMemArg },
-    I64Load8U { memarg: WackasmMemArg },
-    I64Load8S { memarg: WackasmMemArg },
-    I64Load16U { memarg: WackasmMemArg },
-    I64Load16S { memarg: WackasmMemArg },
-    I64Load32U { memarg: WackasmMemArg },
-    I64Load32S { memarg: WackasmMemArg },
+    I64Load {
+        memarg: WackasmMemArg,
+    },
+    I64Load8U {
+        memarg: WackasmMemArg,
+    },
+    I64Load8S {
+        memarg: WackasmMemArg,
+    },
+    I64Load16U {
+        memarg: WackasmMemArg,
+    },
+    I64Load16S {
+        memarg: WackasmMemArg,
+    },
+    I64Load32U {
+        memarg: WackasmMemArg,
+    },
+    I64Load32S {
+        memarg: WackasmMemArg,
+    },
 
-    F32Load { memarg: WackasmMemArg },
-    F64Load { memarg: WackasmMemArg },
-    V128Load { memarg: WackasmMemArg },
+    F32Load {
+        memarg: WackasmMemArg,
+    },
+    F64Load {
+        memarg: WackasmMemArg,
+    },
+    V128Load {
+        memarg: WackasmMemArg,
+    },
 
     // Stores
-    I32Store { memarg: WackasmMemArg },
-    I32Store8 { memarg: WackasmMemArg },
-    I32Store16 { memarg: WackasmMemArg },
+    I32Store {
+        memarg: WackasmMemArg,
+    },
+    I32Store8 {
+        memarg: WackasmMemArg,
+    },
+    I32Store16 {
+        memarg: WackasmMemArg,
+    },
 
-    I64Store { memarg: WackasmMemArg },
-    I64Store8 { memarg: WackasmMemArg },
-    I64Store16 { memarg: WackasmMemArg },
-    I64Store32 { memarg: WackasmMemArg },
+    I64Store {
+        memarg: WackasmMemArg,
+    },
+    I64Store8 {
+        memarg: WackasmMemArg,
+    },
+    I64Store16 {
+        memarg: WackasmMemArg,
+    },
+    I64Store32 {
+        memarg: WackasmMemArg,
+    },
 
-    F32Store { memarg: WackasmMemArg },
-    F64Store { memarg: WackasmMemArg },
-    V128Store { memarg: WackasmMemArg },
+    F32Store {
+        memarg: WackasmMemArg,
+    },
+    F64Store {
+        memarg: WackasmMemArg,
+    },
+    V128Store {
+        memarg: WackasmMemArg,
+    },
 
     // Maths
-    I32Const { value: i32 },
-    I64Const { value: i64 },
-    F32Const { value: f32 },
-    F64Const { value: f64 },
+    I32Const {
+        value: i32,
+    },
+    I64Const {
+        value: i64,
+    },
+    F32Const {
+        value: f32,
+    },
+    F64Const {
+        value: f64,
+    },
     I64ExtendI32U,
     I32WrapI64,
 
@@ -172,5 +264,7 @@ pub enum WackasmOperator {
     I64Eqz,
 
     // Placeholder for operators without an implementation; traps only if executed
-    Unsupported { description: Box<String> },
+    Unsupported {
+        description: Box<String>,
+    },
 }
