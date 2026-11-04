@@ -1,15 +1,14 @@
 use wasmparser::ValType;
 
 use crate::{
-    HaltError, Value,
-    compiler::DropKeep,
-    stack::basic::{LocalOperandStack, OperandStack},
+    HaltError, Value, compiler::DropKeep, stack::basic::{LocalOperandStack, Locals, OperandStack},
 };
 
 mod basic;
 
 pub(crate) type FrameOperandStack = OperandStack;
 pub(crate) type StackHandle<'a> = LocalOperandStack<'a>;
+pub(crate) type LocalsHandle<'a> = Locals<'a>;
 
 pub fn val_type_to_size(val_type: &ValType) -> usize {
     if matches!(val_type, &ValType::V128) {

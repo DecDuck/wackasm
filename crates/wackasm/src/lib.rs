@@ -1,6 +1,7 @@
 #![feature(vec_peek_mut)]
 #![feature(option_reference_flattening)]
 #![feature(explicit_tail_calls)]
+#![feature(try_trait_v2)]
 
 mod blocks;
 mod compiler;
@@ -14,7 +15,9 @@ mod module;
 mod pc;
 mod stack;
 mod table;
-// mod dispatch;
+mod dispatch;
+#[macro_use]
+mod dispatch_macros;
 
 pub use executor::WackasmExecutor;
 pub use module::WackasmModule;
