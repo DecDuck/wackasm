@@ -1,16 +1,17 @@
 use serde::{Deserialize, Serialize};
 use wackasm::{
-    HaltError, Value, imports::{IntoWackasmCall as _, NoResources, WackasmImports, WackasmUntypedCall},
+    HaltError, Value, WackasmExecutor, imports::{IntoWackasmCall as _, NoResources, WackasmImports, WackasmUntypedCall},
 };
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct WasiHandler {}
 
-fn println_i32(ctx: &mut WasiHandler, first_arg: i32) {
-    todo!()
+fn println_i32(ctx: &mut WasiHandler, executor: &mut WackasmExecutor, address: u32) {
+    let str = executor.memory().read_cstr(0, address).expect("failed to read memory");
+    println!("{}", str.to_string_lossy());
 }
 
-fn get_i32(ctx: &mut WasiHandler,) -> (i32,) {
+fn get_i32(ctx: &mut WasiHandler, executor: &mut WackasmExecutor,) -> (i32,) {
     todo!()
 }
 

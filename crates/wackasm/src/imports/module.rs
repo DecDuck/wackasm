@@ -3,13 +3,12 @@ use std::marker::PhantomData;
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 
 use crate::{
-    HaltError, Value,
-    imports::{WackasmLinkerResources, WackasmResource, WackasmValue},
+    HaltError, Value, WackasmExecutor, imports::{WackasmLinkerResources, WackasmResource, WackasmValue},
 };
 use anyhow::anyhow;
 use paste::paste;
 
-pub trait WackasmImports<Ctx, R: WackasmResource>: Serialize + DeserializeOwned {
+pub trait WackasmImports<Ctx, R: WackasmResource>: Serialize + DeserializeOwned + Clone {
     fn get_import_func(
         &self,
         module: &str,
@@ -17,7 +16,7 @@ pub trait WackasmImports<Ctx, R: WackasmResource>: Serialize + DeserializeOwned 
     ) -> Option<Box<dyn WackasmUntypedCall<Ctx, R>>>;
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct NoWackasmImports {}
 impl<R: WackasmResource> WackasmImports<(), R> for NoWackasmImports {
     fn get_import_func(
@@ -36,6 +35,7 @@ pub trait WackasmUntypedCall<Ctx, R: WackasmResource> {
     fn call(
         &self,
         ctx: &mut Ctx,
+        executor: &mut WackasmExecutor,
         resources: &WackasmLinkerResources<R>,
         arguments: Vec<Value>,
     ) -> Result<Vec<Value>, HaltError>;
@@ -46,7 +46,7 @@ macro_rules! impl_typed_fn {
         paste! {
             pub struct [<TypedWackasmFn $($P)* $($R)*>]<Ctx, F, R, $($P),* $($R,)*>
             where
-                F: for<'a> Fn(&mut Ctx, $($P::Out<'a>),*) -> ($($R,)*),
+                F: for<'a> Fn(&mut Ctx, &mut WackasmExecutor, $($P::Out<'a>),*) -> ($($R,)*),
                 R: WackasmResource,
                 $( $P: WackasmValue<R>, )*
                 $( $R: WackasmValue<R>, )*
@@ -57,7 +57,7 @@ macro_rules! impl_typed_fn {
 
             impl<Ctx, F, R, $($P),* $($R,)*> WackasmUntypedCall<Ctx, R> for [<TypedWackasmFn $($P)* $($R)*>]<Ctx, F, R, $($P),* $($R,)*>
             where
-                F: for<'a> Fn(&mut Ctx, $($P::Out<'a>),*) -> ($($R,)*),
+                F: for<'a> Fn(&mut Ctx, &mut WackasmExecutor, $($P::Out<'a>),*) -> ($($R,)*),
                 R: WackasmResource,
                 $( $P: WackasmValue<R>, )*
                 $( $R: WackasmValue<R>, )*
@@ -65,6 +65,7 @@ macro_rules! impl_typed_fn {
                 fn call(
                         &self,
                         ctx: &mut Ctx,
+                        executor: &mut WackasmExecutor,
                         _resources: &WackasmLinkerResources<R>,
                         _arguments: Vec<Value>,
                     ) -> Result<Vec<Value>, HaltError> {
@@ -73,7 +74,7 @@ macro_rules! impl_typed_fn {
                     let [<$P:lower>] = $P::from_wasm_value(_resources, *[<$P:lower>])?;
                     )*
 
-                    let _result = (self.f)(ctx, $( [<$P:lower>] )*);
+                    let _result = (self.f)(ctx, executor, $( [<$P:lower>] )*);
 
                     $(
                     let [<$R:lower>] = _result.${index()};
@@ -86,8 +87,8 @@ macro_rules! impl_typed_fn {
 
             impl<Ctx: 'static, R: 'static, F, $($P: 'static),* $($R: 'static)*> IntoWackasmCall<Ctx, R, ( ($($P,)*), ($($R,)*) )> for F
             where
-                F: Fn(&mut Ctx, $($P),*) -> ($($R,)*)
-                    + for<'a> Fn(&mut Ctx, $($P::Out<'a>),*) -> ($($R,)*)
+                F: Fn(&mut Ctx, &mut WackasmExecutor, $($P),*) -> ($($R,)*)
+                    + for<'a> Fn(&mut Ctx, &mut WackasmExecutor, $($P::Out<'a>),*) -> ($($R,)*)
                     + 'static,
                 R: WackasmResource,
                 $( $P: WackasmValue<R>, )*

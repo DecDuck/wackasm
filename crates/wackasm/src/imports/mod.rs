@@ -2,7 +2,7 @@ mod module;
 mod resource;
 mod value;
 
-use std::{collections::HashMap, fmt::Arguments};
+use std::collections::HashMap;
 
 use anyhow::anyhow;
 pub use module::*;
@@ -10,15 +10,14 @@ pub use resource::*;
 use serde::{Deserialize, Deserializer, Serialize};
 pub use value::*;
 
-use crate::{HaltError, Value};
+use crate::{HaltError, Value, WackasmExecutor};
 #[derive(Serialize, Deserialize)]
 pub struct WackasmLinkerResources<R: WackasmResource> {
     #[serde(deserialize_with = "deserialize_reactivated")]
     resources: HashMap<Value, R>,
 }
 
-#[derive(Serialize, Deserialize)]
-pub struct WackasmLinker<Ctx, I: WackasmImports<Ctx, R>, R: WackasmResource> {
+pub struct WackasmHostBridge<Ctx, I: WackasmImports<Ctx, R>, R: WackasmResource> {
     ctx: Ctx,
     imports: I,
     resources: WackasmLinkerResources<R>,
@@ -34,7 +33,7 @@ impl<R: WackasmResource> WackasmLinkerResources<R> {
     }
 }
 
-impl<Ctx, I: WackasmImports<Ctx, R>, R: WackasmResource> WackasmLinker<Ctx, I, R> {
+impl<Ctx: Clone, I: WackasmImports<Ctx, R>, R: WackasmResource> WackasmHostBridge<Ctx, I, R> {
     pub fn new(ctx: Ctx, imports: I) -> Self {
         Self {
             ctx,
@@ -49,8 +48,9 @@ impl<Ctx, I: WackasmImports<Ctx, R>, R: WackasmResource> WackasmLinker<Ctx, I, R
         &mut self.resources
     }
 
-    pub(crate) fn call_untyped(
+    pub fn call_untyped(
         &mut self,
+        executor: &mut WackasmExecutor,
         module: &str,
         name: &str,
         args: Vec<Value>,
@@ -59,7 +59,7 @@ impl<Ctx, I: WackasmImports<Ctx, R>, R: WackasmResource> WackasmLinker<Ctx, I, R
             .imports
             .get_import_func(module, name)
             .ok_or_else(|| anyhow!("{}.{} not found", module, name))?;
-        let result = func.call(&mut self.ctx, &self.resources, args)?;
+        let result = func.call(&mut self.ctx, executor, &self.resources, args)?;
         Ok(result)
     }
 }

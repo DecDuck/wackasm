@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, ffi::CStr};
 
 use anyhow::anyhow;
 use serde::{Deserialize, Serialize};
@@ -68,13 +68,13 @@ pub struct MemoryManager {
 }
 
 impl MemoryManager {
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Self {
             memories: Vec::new(),
         }
     }
 
-    pub fn process_memory_section(
+    pub(crate) fn process_memory_section(
         &mut self,
         raw_memories: SectionLimited<MemoryType>,
     ) -> Result<(), HaltError> {
@@ -90,7 +90,7 @@ impl MemoryManager {
         Ok(())
     }
 
-    pub fn process_data_section(
+    pub(crate) fn process_data_section(
         &mut self,
         raw_data: SectionLimited<Data>,
     ) -> Result<(), HaltError> {
@@ -132,7 +132,7 @@ impl MemoryManager {
         Ok(())
     }
 
-    pub fn grow(&mut self, mem: u32, amount: i32) -> Result<i32, HaltError> {
+    pub(crate) fn grow(&mut self, mem: u32, amount: i32) -> Result<i32, HaltError> {
         let memory = self
             .memories
             .get_mut(mem as usize)
@@ -167,7 +167,7 @@ impl MemoryManager {
         Ok(prev.try_into()?)
     }
 
-    pub fn fill(
+    pub(crate) fn fill(
         &mut self,
         mem: u32,
         start: usize,
@@ -241,5 +241,78 @@ impl MemoryManager {
         value.write_le_slice(destination);
 
         Ok(())
+    }
+
+    pub(crate) fn memcpy(
+        &mut self,
+        source: u32,
+        target: u32,
+        dest: usize,
+        src: usize,
+        length: usize,
+    ) -> Result<(), HaltError> {
+        let src_end = src
+            .checked_add(length)
+            .ok_or_else(|| trap!("out of bounds memory access"))?;
+        let dest_end = dest
+            .checked_add(length)
+            .ok_or_else(|| trap!("out of bounds memory access"))?;
+
+        if source != target {
+            let [src_mem, dest_mem] = self
+                .memories
+                .get_disjoint_mut([source as usize, target as usize])
+                .map_err(|_| trap!("out of bounds memory access"))?;
+
+            let source_range = src_mem
+                .buffer
+                .get(src..src_end)
+                .ok_or_else(|| trap!("out of bounds memory access"))?;
+            let target_range = dest_mem
+                .buffer
+                .get_mut(dest..dest_end)
+                .ok_or_else(|| trap!("out of bounds memory access"))?;
+            target_range.copy_from_slice(source_range);
+        } else {
+            let memory = self
+                .memories
+                .get_mut(source as usize)
+                .ok_or_else(|| anyhow!("no linear memory for index {}", source))?;
+
+            if src_end > memory.buffer.len() || dest_end > memory.buffer.len() {
+                return Err(trap!("out of bounds memory access"));
+            }
+            memory.buffer.copy_within(src..src_end, dest);
+        }
+
+        Ok(())
+    }
+}
+
+impl MemoryManager {
+    /// Raw view of a linear memory. Index 0 is the default memory.
+    pub fn bytes(&self, mem: u32) -> Option<&[u8]> {
+        self.memories.get(mem as usize).map(|m| m.buffer.as_slice())
+    }
+
+    pub fn read_bytes(&self, mem: u32, addr: u32, len: u32) -> Result<&[u8], HaltError> {
+        let start = addr as usize;
+        let end = start
+            .checked_add(len as usize)
+            .ok_or_else(|| trap!("out of bounds memory access"))?;
+        self.bytes(mem)
+            .ok_or_else(|| anyhow!("no linear memory for index {}", mem))?
+            .get(start..end)
+            .ok_or_else(|| trap!("out of bounds memory access"))
+    }
+
+    /// Reads a NUL-terminated string starting at `addr`.
+    pub fn read_cstr(&self, mem: u32, addr: u32) -> Result<&CStr, HaltError> {
+        let tail = self
+            .bytes(mem)
+            .ok_or_else(|| anyhow!("no linear memory for index {}", mem))?
+            .get(addr as usize..)
+            .ok_or_else(|| trap!("out of bounds memory access"))?;
+        CStr::from_bytes_until_nul(tail).map_err(|_| trap!("unterminated string"))
     }
 }

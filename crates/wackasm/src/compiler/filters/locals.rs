@@ -5,7 +5,6 @@ use crate::{
     HaltError,
     compiler::{WackasmOperator, compile::Compiler, filter::CompilerFilter},
     functions::FunctionManager,
-    macros::trap,
 };
 
 pub struct LocalsPass {}

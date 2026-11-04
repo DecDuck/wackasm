@@ -3,6 +3,7 @@
 #![feature(explicit_tail_calls)]
 #![feature(try_trait_v2)]
 #![feature(macro_metavar_expr)]
+#![deny(unused_must_use)]
 
 mod blocks;
 mod compiler;
@@ -25,6 +26,7 @@ mod dispatch_macros;
 mod tests;
 
 pub use executor::WackasmExecutor;
+pub use executor::HostYield;
 pub use module::WackasmModule;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;

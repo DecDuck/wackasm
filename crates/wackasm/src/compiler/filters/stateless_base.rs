@@ -46,6 +46,9 @@ impl CompilerFilter for StatelessBasePass {
 
             // Memory
             Operator::MemoryGrow { mem } => WackasmOperator::MemoryGrow { mem },
+            Operator::MemoryCopy { dst_mem, src_mem } => {
+                WackasmOperator::MemoryCopy { dst_mem, src_mem }
+            }
             Operator::MemoryFill { mem } => WackasmOperator::MemoryFill { mem },
 
             // Loads
@@ -136,6 +139,7 @@ impl CompilerFilter for StatelessBasePass {
             Operator::F64Const { value } => WackasmOperator::F64Const {
                 value: f64::from_bits(value.bits()),
             },
+            Operator::I32Extend8S => WackasmOperator::I32Extend8S,
             Operator::I64ExtendI32U => WackasmOperator::I64ExtendI32U,
             Operator::I32WrapI64 => WackasmOperator::I32WrapI64,
 
@@ -148,12 +152,14 @@ impl CompilerFilter for StatelessBasePass {
             Operator::I32Shl => WackasmOperator::I32Shl,
             Operator::I32And => WackasmOperator::I32And,
             Operator::I32Xor => WackasmOperator::I32Xor,
+            Operator::I32Rotr => WackasmOperator::I32Rotr,
 
             // i32 comparators
             Operator::I32GtS => WackasmOperator::I32GtS,
             Operator::I32LtS => WackasmOperator::I32LtS,
             Operator::I32LtU => WackasmOperator::I32LtU,
             Operator::I32GtU => WackasmOperator::I32GtU,
+            Operator::I32GeS => WackasmOperator::I32GeS,
             Operator::I32LeU => WackasmOperator::I32LeU,
             Operator::I32Ne => WackasmOperator::I32Ne,
             Operator::I32GeU => WackasmOperator::I32GeU,

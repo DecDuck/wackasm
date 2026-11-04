@@ -34,7 +34,9 @@ impl WasmiBaseline {
             .consume_fuel(true);
         let engine = wasmi::Engine::new(&config);
         let module = wasmi::Module::new(&engine, WASM)?;
-        let linker = wasmi::Linker::new(&engine);
+        let mut linker = wasmi::Linker::new(&engine);
+        // compute.wasm imports this for `print_prime_benchmark`; the benchmarked export never calls it.
+        linker.func_wrap("test", "print_i32", |_: i32| {})?;
         Ok(Self {
             engine,
             module,

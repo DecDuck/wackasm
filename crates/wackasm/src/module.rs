@@ -2,13 +2,16 @@ use std::{collections::HashMap, rc::Rc, sync::Arc};
 
 use anyhow::anyhow;
 use serde::{Deserialize, Serialize};
-use wasmparser::{ExternalKind, FuncType, FuncValidatorAllocations, FunctionBody, Payload, ValType, ValidPayload};
+use wasmparser::{
+    ExternalKind, FuncType, FuncValidatorAllocations, FunctionBody, Payload, ValType, ValidPayload,
+};
 
 use crate::{
     HaltError, Value,
     compiler::WackasmFunctionBody,
     functions::FunctionManager,
     globals::GlobalManager,
+    imports::{NoResources, NoWackasmImports, WackasmHostBridge, WackasmImports, WackasmResource},
     macros::unsupported,
     memory::MemoryManager,
     pc::ProgramCounter,
@@ -50,14 +53,41 @@ pub(crate) enum TableValue {
     FuncRef(FunctionIndex),
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub(crate) enum FunctionFrame {
+    Internal(InternalFunctionFrame),
+    Import {
+        module: String,
+        name: String,
+        args: Vec<Value>,
+        should_return: usize,
+    },
+}
+
+impl FunctionFrame {
+    pub fn on_internal_frame(&mut self, modifier: impl FnOnce(&mut InternalFunctionFrame)) {
+        match self {
+            FunctionFrame::Internal(internal_function_frame) => modifier(internal_function_frame),
+            FunctionFrame::Import { .. } => {}
+        }
+    }
+
+    pub fn is_import_frame(&self) -> bool {
+        match self {
+            FunctionFrame::Import { .. } => true,
+            _ => false,
+        }
+    }
+}
+
 #[derive(Clone, Copy, Debug, Serialize, Deserialize)]
-pub(crate) struct FunctionFrame {
+pub struct InternalFunctionFrame {
     pub(crate) function_index: FunctionIndex,
     pub(crate) pc: ProgramCounter,
     pub(crate) stack_base: usize,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize)]
 pub struct WackasmModule {
     pub(crate) exports: HashMap<String, ExportIndex>,
     pub(crate) tables: TableManager,
@@ -68,6 +98,12 @@ pub struct WackasmModule {
 }
 
 impl WackasmModule {
+    pub fn new(data: &[u8]) -> Result<Self, HaltError> {
+        Self::with_linker(data, None)
+    }
+}
+
+impl WackasmModule {
     pub fn val_type_to_value(val_type: &ValType) -> Value {
         match val_type {
             ValType::Ref(_) => Value::NULL_REF,
@@ -75,7 +111,7 @@ impl WackasmModule {
         }
     }
 
-    pub fn new(data: &[u8]) -> Result<Self, HaltError> {
+    pub fn with_linker(data: &[u8], linker: Option<()>) -> Result<Self, HaltError> {
         let mut validator = wasmparser::Validator::new();
         let mut allocs = FuncValidatorAllocations::default();
 

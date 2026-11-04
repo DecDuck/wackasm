@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize, de::DeserializeOwned};
 
 use crate::{
     HaltError, Value,
-    imports::{WackasmImports, WackasmLinker, WackasmLinkerResources, WackasmValue},
+    imports::{WackasmImports, WackasmHostBridge, WackasmLinkerResources, WackasmValue},
 };
 
 /// A rebuildable handle to some external resource,

@@ -3,7 +3,7 @@ use std::{convert::Infallible, hint::unreachable_unchecked, ops::FromResidual};
 use anyhow::anyhow;
 
 use crate::{
-    HaltError, Value, compiler::{RuntimeWackasmOperator, WackasmFunctionBody, WackasmOperator, WackasmTableTarget}, functions::FunctionManager, globals::GlobalManager, macros::{
+    HaltError, Value, compiler::{RuntimeWackasmOperator, WackasmFunctionBody, WackasmOperator, WackasmTableTarget}, functions::FunctionManager, globals::GlobalManager, imports::{WackasmImports, WackasmHostBridge, WackasmResource}, macros::{
         f32_load, f32_store, f64_load, f64_store, i32_binop, i32_load, i32_store, i64_binop,
         i64_cmp, i64_load, i64_store, trap, unsupported, v128_load, v128_store,
     }, memory::MemoryManager, module::{FunctionTypeIndex, GlobalIndex, TableIndex, TableValue}, ops, stack::{LocalsHandle, RuntimeStack, StackHandle}, table::TableManager,
@@ -19,10 +19,10 @@ pub(crate) struct DispatchCtx<'a> {
 
     // We pass the exit value back through here, so the entirety of
     // dispatch and tail calls can stay in registers.
-    pub(crate) exit: Option<Exit<'a>>
+    pub(crate) exit: Option<Exit<'a>>,
 }
 
-impl DispatchCtx<'_> {
+impl<'a> DispatchCtx<'a> {
     #[inline(always)]
     fn at(&self, index: u32) -> *const RuntimeWackasmOperator {
         // SAFETY: the compiler only emits jump targets that are inside this function's code
@@ -117,6 +117,13 @@ ops!(|ctx, pc, stack, locals| match op {
         let amount = stack.pop_i32();
         let result = ctx.memories.grow(*mem, amount)?;
         stack.push(Value(result as u64));
+    }
+    memory_copy @ MemoryCopy { dst_mem, src_mem } => {
+        let length = stack.pop_i32() as u32 as usize;
+        let source = stack.pop_i32() as u32 as usize;
+        let destination = stack.pop_i32() as u32 as usize;
+        ctx.memories
+            .memcpy(*src_mem, *dst_mem, destination, source, length)?;
     }
     memory_fill @ MemoryFill { mem } => {
         let amount = stack.pop_i32() as u32 as usize;
@@ -363,10 +370,16 @@ ops!(|ctx, pc, stack, locals| match op {
     i32_or @ I32Or => {
         i32_binop!(stack, i32, |lhs, rhs| lhs | rhs)
     }
+    i32_rotr @ I32Rotr => {
+        i32_binop!(stack, i32, |lhs, rhs| lhs.rotate_right(rhs as u32))
+    }
 
     // i32 comparators
     i32_gt_s @ I32GtS => {
         i32_binop!(stack, i32, |lhs, rhs| lhs > rhs)
+    }
+    i32_ge_s @ I32GeS => {
+        i32_binop!(stack, i32, |lhs, rhs| lhs >= rhs)
     }
     i32_lt_s @ I32LtS => {
         i32_binop!(stack, i32, |lhs, rhs| lhs < rhs)
@@ -456,6 +469,10 @@ ops!(|ctx, pc, stack, locals| match op {
             let bottom = stack.pop();
             stack.push(if cond { top } else { bottom });
         }
+    }
+    i32_extend_8_s @ I32Extend8S => {
+        let value = stack.pop_i32();
+        stack.push(Value(value as i8 as u64));
     }
     i64_extend_i32_u @ I64ExtendI32U => {
         let value = stack.pop_i32();

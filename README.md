@@ -6,7 +6,13 @@ In more words, `wackasm` was built so that you could run a WASM module that uses
 
 ## performance
 
-I am not good at writing WASM interpreters, so for this reason, the interpreter is slow. It benchmarks against `wasmi`, probably the fastest WASM interpreter, and gets about 50% of that performance... which is not *prohibitively* slow, especially for my intended use case, but there is definitely performance headroom not taken advantage of.
+I am not good at writing WASM interpreters, so for this reason, the interpreter is slow. It benchmarks against `wasmi`, probably the fastest WASM interpreter, and gets about **30-50%** of that performance... which is not *prohibitively* slow, especially for my intended use case, but there is definitely performance headroom not taken advantage of.
+
+Also host/import functions are definitely lower than native WASM functions, so use them sparingly or do as much work as possible host side.
+
+## imports
+
+For the suspend/restore functionality, `wackasm` helps you out with opaque handles to host-side resources that are given an opportunity to *reactivate* when the engine gets deserialized. So for stuff like file handles and open sockets, you can re-open them when necessary (and you can use `Drop` to finialise them).
 
 ## support
 

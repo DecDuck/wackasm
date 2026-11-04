@@ -1,7 +1,9 @@
 use wasmparser::ValType;
 
 use crate::{
-    HaltError, Value, compiler::DropKeep, stack::basic::{LocalOperandStack, Locals, OperandStack},
+    HaltError, Value,
+    compiler::DropKeep,
+    stack::basic::{LocalOperandStack, Locals, OperandStack},
 };
 
 mod basic;
@@ -33,6 +35,7 @@ pub(crate) trait GlobalStack {
     fn push_all(&mut self, values: &[Value]);
     /// Pulls values from the top of the stack, and returns them.
     fn pull_results(&mut self, types: &[ValType]) -> Result<Vec<Value>, HaltError>;
+    fn pull_results_size(&mut self, size: usize) -> Result<Vec<Value>, HaltError>;
     /// Equivalent to drop_keep where the drop is enough to move the keep values
     /// down to target
     fn unwind_to(&mut self, target: usize, keep: usize);
@@ -53,7 +56,6 @@ pub(crate) trait RuntimeStack {
     /// Essentially keeps the top {keep} values while dropping the {drop} values
     /// after that
     fn drop_keep(&mut self, dk: DropKeep);
-
 
     #[inline(always)]
     fn pop_i32(&mut self) -> i32 {

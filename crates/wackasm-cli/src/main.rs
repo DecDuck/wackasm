@@ -1,10 +1,13 @@
 use std::{fs::File, path::PathBuf, time::Instant};
 
+use anyhow::anyhow;
 use serde::{Deserialize, Serialize};
 use wackasm::{
-    Value, WackasmExecutor, WackasmModule,
-    imports::{NoResources, WackasmResource},
+    HostYield, Value, WackasmExecutor, WackasmModule,
+    imports::{NoResources, WackasmHostBridge, WackasmResource},
 };
+
+use crate::wasi::WasiHandler;
 
 pub mod wasi;
 
@@ -42,10 +45,11 @@ impl WackasmResource for CliResources {
 pub fn main() -> Result<(), anyhow::Error> {
     let contents = std::fs::read("./compute/target/wasm32-unknown-unknown/release/compute.wasm")?;
     let module = WackasmModule::new(&contents)?;
-    let mut executor: WackasmExecutor = WackasmExecutor::new(module)?;
+    let mut host_bridge = WackasmHostBridge::new(WasiHandler {}, WasiHandler {});
+    let mut executor = WackasmExecutor::new(module)?;
 
     executor.call_export(
-        "run_prime_benchmark",
+        "print_prime_benchmark",
         vec![Value::from_i32(1000000), Value::from_i32(80)],
     )?;
 
@@ -66,7 +70,19 @@ pub fn main() -> Result<(), anyhow::Error> {
 
     executor.set_fuel(isize::MAX);
     let start = Instant::now();
-    executor.execute()?;
+    loop {
+        match executor.execute()? {
+            HostYield::OutOfFuel => unreachable!(),
+            HostYield::Return => break,
+            HostYield::ImportCall { module, name, args, should_return } => {
+                let result = host_bridge.call_untyped(&mut executor, &module, &name, args)?;
+                if result.len() != should_return {
+                    Err(anyhow!("host_bridge returned wrong result len"))?
+                }
+                executor.import_return(&result)?;
+            }
+        }
+    }
     let time = start.elapsed();
 
     let consumed_fuel = isize::MAX - executor.get_fuel();

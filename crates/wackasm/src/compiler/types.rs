@@ -120,6 +120,10 @@ pub enum WackasmOperator {
     MemoryGrow {
         mem: u32,
     },
+    MemoryCopy {
+        dst_mem: u32,
+        src_mem: u32,
+    },
     MemoryFill {
         mem: u32,
     },
@@ -220,6 +224,7 @@ pub enum WackasmOperator {
     F64Const {
         value: f64,
     },
+    I32Extend8S,
     I64ExtendI32U,
     I32WrapI64,
 
@@ -232,12 +237,14 @@ pub enum WackasmOperator {
     I32Shl,
     I32And,
     I32Xor,
+    I32Rotr,
 
     // i32 comparators
     I32GtS,
     I32LtU,
     I32GtU,
     I32LtS,
+    I32GeS,
     I32LeU,
     I32Ne,
     I32GeU,

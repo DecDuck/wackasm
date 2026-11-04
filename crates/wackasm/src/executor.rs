@@ -7,7 +7,7 @@ use anyhow::anyhow;
 use serde::{Deserialize, Deserializer, Serialize};
 
 use crate::{
-    HaltError, Value, WackasmModule, compiler::RuntimeWackasmOperator, dispatch::{DispatchCtx, Exit, dispatch}, imports::{NoResources, NoWackasmImports, WackasmImports, WackasmLinker, WackasmResource}, module::{ExportIndex, FunctionFrame, FunctionIndex}, pc::ProgramCounter, stack::{
+    HaltError, Value, WackasmModule, compiler::RuntimeWackasmOperator, dispatch::{DispatchCtx, Exit, dispatch}, macros::trap, memory::MemoryManager, module::{ExportIndex, FunctionFrame, FunctionIndex}, pc::ProgramCounter, stack::{
         FrameOperandStack, GlobalStack as _, RuntimeStack as _, StackHandle, val_types_to_size,
     },
 };
@@ -15,14 +15,12 @@ use crate::{
 const MAX_FUEL_BEFORE_SYNC: isize = 100_000;
 
 #[derive(Serialize, Deserialize)]
-pub struct WackasmExecutor<Ctx = (), I: WackasmImports<Ctx, R> = NoWackasmImports, R: WackasmResource = NoResources> {
+pub struct WackasmExecutor {
     stack: FrameOperandStack,
     fuel: AtomicIsize,
     module: WackasmModule,
     callstack: Vec<FunctionFrame>,
     output: Option<Vec<Value>>,
-
-    linker: Option<WackasmLinker<Ctx, I, R>>,
 }
 
 pub enum FunctionScopedResult {
@@ -31,21 +29,25 @@ pub enum FunctionScopedResult {
     FunctionCall { function_index: u32 },
 }
 
-impl WackasmExecutor {
-    pub fn new(module: WackasmModule) -> Result<Self, HaltError> {
-        WackasmExecutor::with_linker(module, None)
-    }
+pub enum HostYield {
+    OutOfFuel,
+    Return,
+    ImportCall {
+        module: String,
+        name: String,
+        args: Vec<Value>,
+        should_return: usize,
+    },
 }
 
-impl<Ctx, I: WackasmImports<Ctx, R>, R: WackasmResource> WackasmExecutor<Ctx, I, R> {
-    pub fn with_linker(module: WackasmModule, linker: Option<WackasmLinker<Ctx, I, R>>) -> Result<Self, HaltError> {
+impl WackasmExecutor {
+    pub fn new(module: WackasmModule) -> Result<Self, HaltError> {
         let mut me = Self {
             stack: FrameOperandStack::new(10_000),
             fuel: AtomicIsize::new(isize::MAX),
             module,
             callstack: Vec::new(),
             output: None,
-            linker
         };
 
         if let Some(start_func) = me.module.start_func.take() {
@@ -60,7 +62,6 @@ impl<Ctx, I: WackasmImports<Ctx, R>, R: WackasmResource> WackasmExecutor<Ctx, I,
 
         Ok(me)
     }
-
 
     /// Resets the executor and queues the function for running
     pub fn call_export(&mut self, name: &str, arguments: Vec<Value>) -> Result<(), HaltError> {
@@ -78,26 +79,55 @@ impl<Ctx, I: WackasmImports<Ctx, R>, R: WackasmResource> WackasmExecutor<Ctx, I,
             _ => return Err(HaltError::Error(anyhow!("not a function"))),
         };
 
-        self.module.functions.call_internal(
-            &mut self.callstack,
-            &mut self.stack,
-            *function,
-            Some(arguments),
-        )
+        self.module
+            .functions
+            .call_internal(
+                &mut self.callstack,
+                &mut self.stack,
+                *function,
+                Some(arguments),
+            )?
+            .map_or(Ok(()), |_| {
+                Err(anyhow!("got a host yield while calling export"))
+            })?;
+
+        Ok(())
     }
 
     // runs X instructions, decrementing fuel
-    fn incremental_execute(&mut self, fuel: isize) -> Result<isize, HaltError> {
+    fn incremental_execute(
+        &mut self,
+        fuel: isize,
+    ) -> Result<(isize, Option<HostYield>), HaltError> {
         let (function_result, pc, local_stack, fuel_remaining) =
             self.incremental_execute_function(fuel)?;
         let local_stack = local_stack.into_raw();
         self.stack.reconcile(local_stack);
 
-        // Update PC
-        self.callstack
+        // Update PC or return ImportCall
+        match self
+            .callstack
             .last_mut()
             .ok_or_else(|| anyhow!("callstack empty"))?
-            .pc = pc;
+        {
+            FunctionFrame::Internal(frame) => frame.pc = pc,
+            FunctionFrame::Import {
+                module,
+                name,
+                args,
+                should_return,
+            } => {
+                return Ok((
+                    fuel,
+                    Some(HostYield::ImportCall {
+                        module: module.to_owned(),
+                        name: name.to_owned(),
+                        args: args.to_vec(),
+                        should_return: *should_return,
+                    }),
+                ));
+            }
+        }
 
         match function_result {
             FunctionScopedResult::OutOfFuel => {} // nothing, just continue
@@ -107,6 +137,15 @@ impl<Ctx, I: WackasmImports<Ctx, R>, R: WackasmResource> WackasmExecutor<Ctx, I,
                     .callstack
                     .pop()
                     .expect("incremental_execute_function would have errored by now");
+
+                let function_frame = match function_frame {
+                    FunctionFrame::Internal(internal_function_frame) => internal_function_frame,
+                    FunctionFrame::Import { .. } => {
+                        return Err(trap!(
+                            "got function return while import frame on stop of callstack"
+                        ));
+                    }
+                };
 
                 let function_type = self
                     .module
@@ -126,16 +165,18 @@ impl<Ctx, I: WackasmImports<Ctx, R>, R: WackasmResource> WackasmExecutor<Ctx, I,
             FunctionScopedResult::FunctionCall { function_index } => {
                 let function_index = FunctionIndex(function_index);
 
-                self.module.functions.call_internal(
+                if let Some(host_yield) = self.module.functions.call_internal(
                     &mut self.callstack,
                     &mut self.stack,
                     function_index,
                     None,
-                )?;
+                )? {
+                    return Ok((fuel_remaining, Some(host_yield)));
+                }
             }
         }
 
-        Ok(fuel_remaining)
+        Ok((fuel_remaining, None))
     }
 
     pub fn set_fuel(&self, fuel: isize) {
@@ -146,17 +187,42 @@ impl<Ctx, I: WackasmImports<Ctx, R>, R: WackasmResource> WackasmExecutor<Ctx, I,
         self.fuel.load(Ordering::Relaxed)
     }
 
-    pub fn execute(&mut self) -> Result<(), HaltError> {
+    pub fn memory(&self) -> &MemoryManager {
+        &self.module.memories
+    }
+
+    pub fn execute(&mut self) -> Result<HostYield, HaltError> {
         while self.callstack.len() > 0 {
             let remaining_fuel = self.fuel.load(Ordering::Relaxed);
             let target_fuel = remaining_fuel.min(MAX_FUEL_BEFORE_SYNC);
-            if target_fuel == 0 {
-                break;
+            if target_fuel <= 0 {
+                return Ok(HostYield::OutOfFuel);
             }
-            let remaining_fuel = self.incremental_execute(target_fuel)?;
+            let (remaining_fuel, host_yield) = self.incremental_execute(target_fuel)?;
             let fuel_difference = target_fuel - remaining_fuel;
             self.fuel.fetch_sub(fuel_difference, Ordering::Relaxed);
+
+            if let Some(host_yield) = host_yield {
+                return Ok(host_yield);
+            }
         }
+
+        Ok(HostYield::Return)
+    }
+
+    pub fn import_return(&mut self, results: &[Value]) -> Result<(), HaltError> {
+        if self
+            .callstack
+            .last()
+            .map(|v| !v.is_import_frame())
+            .unwrap_or(true)
+        {
+            return Err(trap!("callstack empty or not expecting import return"));
+        }
+
+        self.callstack.pop(); // Remove the dummy frame
+        self.stack.push_all(results);
+
         Ok(())
     }
 
@@ -176,11 +242,19 @@ impl<Ctx, I: WackasmImports<Ctx, R>, R: WackasmResource> WackasmExecutor<Ctx, I,
             .last_mut()
             .ok_or_else(|| anyhow!("callstack empty"))?;
 
+        let function_frame = match function_frame {
+            FunctionFrame::Internal(internal_function_frame) => internal_function_frame,
+            FunctionFrame::Import { .. } => {
+                return Err(trap!("expected import call return before continuing"));
+            }
+        };
+
         let base = function_frame.stack_base;
         let code_view = &self
             .module
             .functions
-            .get_function_code(&function_frame.function_index)?
+            .get_function(&function_frame.function_index)?
+            .as_internal()?
             .runtime[..];
 
         let (stack, locals) = self.stack.handle(base);
@@ -236,4 +310,3 @@ impl<Ctx, I: WackasmImports<Ctx, R>, R: WackasmResource> WackasmExecutor<Ctx, I,
         };
     }
 }
-

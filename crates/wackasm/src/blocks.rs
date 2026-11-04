@@ -1,4 +1,3 @@
-use std::{collections::HashMap, hash::Hash};
 
 use anyhow::anyhow;
 use serde::{Deserialize, Serialize};
@@ -118,7 +117,7 @@ impl PartialBlock {
         match self {
             PartialBlock::Block { start, .. } => *start,
             PartialBlock::Loop { start, .. } => *start,
-            PartialBlock::If { start, r#else, .. } => *start,
+            PartialBlock::If { start, .. } => *start,
         }
     }
 }

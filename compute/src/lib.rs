@@ -1,3 +1,23 @@
+use std::ffi::CString;
+use std::ffi::c_char;
+
+#[cfg(target_arch = "wasm32")]
+#[link(wasm_import_module = "test")]
+unsafe extern "C" {
+    #[link_name = "print_i32"]
+    fn host_print_i32(value: *const c_char);
+}
+
+/// Prints via the host's `test.print_i32` import when running as WASM.
+fn print_i32(value: *const c_char) {
+    #[cfg(target_arch = "wasm32")]
+    unsafe {
+        host_print_i32(value)
+    }
+    #[cfg(not(target_arch = "wasm32"))]
+    println!("{value}");
+}
+
 pub fn count_primes(limit: u32) -> u32 {
     if limit < 2 {
         return 0;
@@ -32,9 +52,21 @@ pub extern "C" fn run_prime_benchmark(limit: u32, rounds: u32) -> u64 {
         .sum()
 }
 
+/// Same as [`run_prime_benchmark`], but reports each round's prime count to the host.
+#[unsafe(no_mangle)]
+pub extern "C" fn print_prime_benchmark(limit: u32, rounds: u32) -> u64 {
+    (0..rounds)
+        .map(|round| {
+            let count = count_primes(limit.saturating_sub(round));
+            print_i32(CString::new(format!("oh my god we got {} primes!", count)).unwrap().as_ptr());
+            u64::from(count)
+        })
+        .sum()
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{count_primes, run_prime_benchmark};
+    use super::{count_primes, print_prime_benchmark, run_prime_benchmark};
 
     #[test]
     fn counts_primes_for_small_limits() {
@@ -48,5 +80,10 @@ mod tests {
     #[test]
     fn benchmark_repeats_with_decreasing_limits() {
         assert_eq!(run_prime_benchmark(10, 2), 8);
+    }
+
+    #[test]
+    fn print_benchmark_matches_benchmark() {
+        assert_eq!(print_prime_benchmark(10, 2), run_prime_benchmark(10, 2));
     }
 }

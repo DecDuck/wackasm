@@ -54,9 +54,13 @@ impl GlobalStack for OperandStack {
         self.len = target + keep;
     }
 
-    #[inline(always)]
     fn pull_results(&mut self, types: &[ValType]) -> Result<Vec<Value>, HaltError> {
         let type_len = val_types_to_size(types);
+        self.pull_results_size(type_len)
+    }
+
+    #[inline(always)]
+    fn pull_results_size(&mut self, type_len: usize) -> Result<Vec<Value>, HaltError> {
         let start = self
             .len
             .checked_sub(type_len)
