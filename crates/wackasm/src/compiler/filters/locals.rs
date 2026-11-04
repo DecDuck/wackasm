@@ -77,7 +77,7 @@ impl CompilerFilter for LocalsPass {
             },
             _ => return Ok(false),
         };
-        compiler.func_body.inner.push(operator);
+        compiler.func_body.inner.as_mut().unwrap().push(operator);
         Ok(true)
     }
 }

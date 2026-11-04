@@ -4,12 +4,7 @@ use anyhow::anyhow;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    HaltError, Value, WackasmModule,
-    compiler::WackasmOperator,
-    dispatch::{DispatchCtx, Exit, dispatch},
-    module::{ExportIndex, FunctionFrame, FunctionIndex},
-    pc::ProgramCounter,
-    stack::{
+    HaltError, Value, WackasmModule, compiler::{RuntimeWackasmOperator, WackasmOperator}, dispatch::{DispatchCtx, Exit, dispatch}, module::{ExportIndex, FunctionFrame, FunctionIndex}, pc::ProgramCounter, stack::{
         FrameOperandStack, GlobalStack as _, RuntimeStack as _, StackHandle, val_types_to_size,
     },
 };
@@ -173,7 +168,7 @@ impl WackasmExecutor {
             .module
             .functions
             .get_function_code(&function_frame.function_index)?
-            .inner[..];
+            .runtime[..];
 
         let (stack, locals) = self.stack.handle(base);
 
@@ -190,7 +185,7 @@ impl WackasmExecutor {
         let base_ptr = code_view.as_ptr();
         let pc = unsafe { base_ptr.add(function_frame.pc) };
 
-        let to_index = |p: *const WackasmOperator| -> ProgramCounter {
+        let to_index = |p: *const RuntimeWackasmOperator| -> ProgramCounter {
             debug_assert!(
                 p >= base_ptr && p <= base_ptr.wrapping_add(code_view.len()),
                 "program counter went out of bounds"

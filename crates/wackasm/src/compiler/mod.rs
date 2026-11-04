@@ -12,12 +12,15 @@ mod compile;
 mod filter;
 mod filters;
 mod types;
+mod dispatch;
 
 pub(crate) use types::*;
+pub(crate) use dispatch::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WackasmFunctionBody {
-    pub(crate) inner: Vec<WackasmOperator>,
+    pub(crate) inner: Option<Vec<WackasmOperator>>,
+    pub(crate) runtime: Vec<RuntimeWackasmOperator>,
     max_stack_operands: u32,
     pub(crate) params_slots: usize,
     pub(crate) local_defaults: Box<[Value]>,
@@ -27,7 +30,8 @@ pub struct WackasmFunctionBody {
 impl WackasmFunctionBody {
     pub fn empty() -> Self {
         Self {
-            inner: Vec::new(),
+            runtime: Vec::new(),
+            inner: Some(Vec::new()),
             max_stack_operands: 0,
             params_slots: 0,
             local_defaults: Box::new([]),

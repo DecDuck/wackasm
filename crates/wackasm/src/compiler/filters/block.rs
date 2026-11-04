@@ -213,7 +213,12 @@ impl CompilerFilter for BlockPass {
         };
 
         if let Some(wackasm_operator) = wackasm_operator {
-            compiler.func_body.inner.push(wackasm_operator);
+            compiler
+                .func_body
+                .inner
+                .as_mut()
+                .unwrap()
+                .push(wackasm_operator);
         }
 
         return Ok(true);

@@ -43,15 +43,18 @@ macro_rules! ops {
     (@parse [($d:tt) $ctx:ident, $pc:ident, $stack:ident, $locals:ident] [$(
         [$name:ident $variant:ident [$($field:ident)*] $body:tt]
     )*]) => {
+        pub(crate) fn handler_for(op: &WackasmOperator) -> WackasmOperatorHandler {
+            match op {
+                $( WackasmOperator::$variant { .. } => $name, )*
+            }
+        }
+
         #[macro_export]
         macro_rules! dispatch {
             ($d c:expr, $d p:expr, $d s:expr, $d l:expr) => {{
-                let (ctx, pc, stack, locals) = ($d c, $d p, $d s, $d l);
-                match unsafe { &*pc } {
-                    $( WackasmOperator::$variant { .. } => become $name(ctx, pc, stack, locals), )*
-                    #[allow(unreachable_patterns)]
-                    op => unimplemented!("{op:?}"), // swap for unreachable_unchecked() once complete
-                }
+                let op: *const RuntimeWackasmOperator = unsafe { &*$d p };
+                let handler = unsafe { (*op).handler };
+                become handler($d c, $d p, $d s, $d l)
             }};
         }
 
@@ -59,12 +62,12 @@ macro_rules! ops {
             #[allow(unused_variables, unused_mut, unreachable_code)]
             fn $name<'a>(
                 $ctx: &mut DispatchCtx<'a>,
-                $pc: *const WackasmOperator,
+                $pc: *const RuntimeWackasmOperator,
                 mut $stack: StackHandle<'a>,
                 $locals: LocalsHandle<'a>,
             ) -> Result<(), HaltError> {
                 // `{ .. }` matches unit variants too.
-                let WackasmOperator::$variant { $($field,)* .. } = (unsafe { &*$pc }) else {
+                let WackasmOperator::$variant { $($field,)* .. } = (unsafe { &(*$pc).op }) else {
                     unsafe { unreachable_unchecked() }
                 };
                 $body;
