@@ -1,0 +1,22 @@
+[package]
+name = "wackasm"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+anyhow = "1.0.104"
+serde = { version = "1.0.229", features = ["derive", "rc"] }
+self_cell = "1.2"
+wasmparser = "0.262.0"
+serde_arrays = "0.2.0"
+
+[dev-dependencies]
+bitcode = { version = "0.6.9", features = ["serde"] }
+criterion = "0.5"
+
+[[bench]]
+name = "fuel_per_second"
+harness = false
+
+[package.metadata.patch]
+crates = ["wasmparser"]
