@@ -1,4 +1,4 @@
-use crate::{Value, WackasmExecutor, WackasmModule};
+use crate::{Value, WackasmExecutor, WackasmModule, imports::NoResources};
 
 static WASM: &[u8] =
     include_bytes!("../../../../compute/target/wasm32-unknown-unknown/release/compute.wasm");
@@ -7,7 +7,7 @@ static WASM: &[u8] =
 pub fn suspension_test() {
     // baseline: run to completion
     let module = WackasmModule::new(WASM).expect("failed to parse wasm");
-    let mut executor = WackasmExecutor::new(module).expect("failed to create executor");
+    let mut executor: WackasmExecutor = WackasmExecutor::new(module).expect("failed to create executor");
 
     executor.set_fuel(isize::MAX);
     executor
@@ -22,7 +22,7 @@ pub fn suspension_test() {
     let correct = executor.get_result().expect("no result");
 
     let module = WackasmModule::new(WASM).expect("failed to parse wasm");
-    let mut executor = WackasmExecutor::new(module).expect("failed to create executor");
+    let mut executor: WackasmExecutor = WackasmExecutor::new(module).expect("failed to create executor");
 
     executor
         .call_export(

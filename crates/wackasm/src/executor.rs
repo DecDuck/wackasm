@@ -1,23 +1,28 @@
-use std::sync::atomic::{AtomicIsize, Ordering};
+use std::{
+    collections::HashMap,
+    sync::atomic::{AtomicIsize, Ordering},
+};
 
 use anyhow::anyhow;
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
 
 use crate::{
-    HaltError, Value, WackasmModule, compiler::{RuntimeWackasmOperator, WackasmOperator}, dispatch::{DispatchCtx, Exit, dispatch}, module::{ExportIndex, FunctionFrame, FunctionIndex}, pc::ProgramCounter, stack::{
+    HaltError, Value, WackasmModule, compiler::RuntimeWackasmOperator, dispatch::{DispatchCtx, Exit, dispatch}, imports::{NoResources, NoWackasmImports, WackasmImports, WackasmLinker, WackasmResource}, module::{ExportIndex, FunctionFrame, FunctionIndex}, pc::ProgramCounter, stack::{
         FrameOperandStack, GlobalStack as _, RuntimeStack as _, StackHandle, val_types_to_size,
     },
 };
 
 const MAX_FUEL_BEFORE_SYNC: isize = 100_000;
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct WackasmExecutor {
+#[derive(Serialize, Deserialize)]
+pub struct WackasmExecutor<Ctx = (), I: WackasmImports<Ctx, R> = NoWackasmImports, R: WackasmResource = NoResources> {
     stack: FrameOperandStack,
     fuel: AtomicIsize,
     module: WackasmModule,
     callstack: Vec<FunctionFrame>,
     output: Option<Vec<Value>>,
+
+    linker: Option<WackasmLinker<Ctx, I, R>>,
 }
 
 pub enum FunctionScopedResult {
@@ -28,12 +33,19 @@ pub enum FunctionScopedResult {
 
 impl WackasmExecutor {
     pub fn new(module: WackasmModule) -> Result<Self, HaltError> {
+        WackasmExecutor::with_linker(module, None)
+    }
+}
+
+impl<Ctx, I: WackasmImports<Ctx, R>, R: WackasmResource> WackasmExecutor<Ctx, I, R> {
+    pub fn with_linker(module: WackasmModule, linker: Option<WackasmLinker<Ctx, I, R>>) -> Result<Self, HaltError> {
         let mut me = Self {
             stack: FrameOperandStack::new(10_000),
             fuel: AtomicIsize::new(isize::MAX),
             module,
             callstack: Vec::new(),
             output: None,
+            linker
         };
 
         if let Some(start_func) = me.module.start_func.take() {
@@ -48,6 +60,7 @@ impl WackasmExecutor {
 
         Ok(me)
     }
+
 
     /// Resets the executor and queues the function for running
     pub fn call_export(&mut self, name: &str, arguments: Vec<Value>) -> Result<(), HaltError> {
@@ -223,3 +236,4 @@ impl WackasmExecutor {
         };
     }
 }
+

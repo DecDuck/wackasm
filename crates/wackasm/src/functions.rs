@@ -3,20 +3,45 @@ use serde::{Deserialize, Serialize};
 use std::rc::Rc;
 use wasmparser::{
     FuncType, FuncValidator, FuncValidatorAllocations, FunctionBody, Imports, RecGroup,
-    SectionLimited, ValType, ValidatorResources,
+    SectionLimited, TypeRef, ValType, ValidatorResources,
 };
 
 use crate::{
-    HaltError, Value, compiler::WackasmFunctionBody, macros::trap, module::{FunctionFrame, FunctionIndex, FunctionTypeIndex}, pc::ProgramCounter, stack::{FrameOperandStack, GlobalStack as _, RuntimeStack as _},
+    HaltError, Value,
+    compiler::WackasmFunctionBody,
+    macros::trap,
+    module::{FunctionFrame, FunctionIndex, FunctionTypeIndex},
+    pc::ProgramCounter,
+    stack::{FrameOperandStack, GlobalStack as _, RuntimeStack as _},
 };
 
 const MAX_CALL_DEPTH: usize = 10_000;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+pub enum WackasmFunction {
+    Internal(WackasmFunctionBody),
+    Import {
+        module: String,
+        name: String,
+        args: usize,
+        returns: usize,
+    },
+}
+
+impl WackasmFunction {
+    pub fn as_internal(&self) -> Result<&WackasmFunctionBody, HaltError> {
+        match self {
+            WackasmFunction::Internal(wackasm_function_body) => Ok(wackasm_function_body),
+            _ => Err(anyhow!("expected internal function").into()),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub(crate) struct FunctionManager {
     pub(crate) function_type_indexes: Vec<FuncType>,
     pub(crate) function_types: Vec<FunctionTypeIndex>,
-    pub(crate) function_bodies: Vec<WackasmFunctionBody>,
+    pub(crate) function_bodies: Vec<WackasmFunction>,
 }
 
 impl FunctionManager {
@@ -62,7 +87,8 @@ impl FunctionManager {
     ) -> Result<&WackasmFunctionBody, HaltError> {
         self.function_bodies
             .get(function_index.0 as usize)
-            .ok_or_else(|| anyhow!("internally inconsistent function index").into())
+            .ok_or_else(|| anyhow!("internally inconsistent function index"))?
+            .as_internal()
     }
 
     fn get_next_function_index(&self) -> FunctionIndex {
@@ -73,6 +99,73 @@ impl FunctionManager {
         &mut self,
         imports: SectionLimited<Imports>,
     ) -> Result<(), HaltError> {
+        for import in imports {
+            let import = import?;
+            match import {
+                Imports::Single(_, import) => {
+                    let func_type_index = match import.ty {
+                        TypeRef::Func(func) => func,
+                        _ => Err(anyhow!("non-function imports unsupported"))?,
+                    };
+                    let func_type =
+                        self.function_type_idx_type(&FunctionTypeIndex(func_type_index))?;
+
+                    let args = func_type.params().len();
+                    let returns = func_type.results().len();
+                    self.function_bodies.push(WackasmFunction::Import {
+                        module: import.module.to_owned(),
+                        name: import.name.to_owned(),
+                        args,
+                        returns,
+                    });
+                }
+                Imports::Compact1 { module, items } => {
+                    for import in items {
+                        let import = import?;
+                        let func_type_index = match import.ty {
+                            TypeRef::Func(func) => func,
+                            _ => Err(anyhow!("non-function imports unsupported"))?,
+                        };
+
+                        let func_type =
+                            self.function_type_idx_type(&FunctionTypeIndex(func_type_index))?;
+
+                        let args = func_type.params().len();
+                        let returns = func_type.results().len();
+
+                        self.function_bodies.push(WackasmFunction::Import {
+                            module: module.to_owned(),
+                            name: import.name.to_owned(),
+                            args,
+                            returns,
+                        });
+                    }
+                }
+                Imports::Compact2 { module, ty, names } => {
+                    let func_type_index = match ty {
+                        TypeRef::Func(func) => func,
+                        _ => Err(anyhow!("non-function imports unsupported"))?,
+                    };
+
+                    let func_type =
+                        self.function_type_idx_type(&FunctionTypeIndex(func_type_index))?;
+
+                    let args = func_type.params().len();
+                    let returns = func_type.results().len();
+
+                    for name in names {
+                        let name = name?;
+
+                        self.function_bodies.push(WackasmFunction::Import {
+                            module: module.to_owned(),
+                            name: name.to_owned(),
+                            args,
+                            returns,
+                        });
+                    }
+                }
+            }
+        }
         Ok(())
     }
 
@@ -141,7 +234,8 @@ impl FunctionManager {
         // Save function body for later
         let (function_body, allocs) =
             WackasmFunctionBody::compile(&code_section, func_validator, self, local_types, params)?;
-        self.function_bodies.push(function_body);
+        self.function_bodies
+            .push(WackasmFunction::Internal(function_body));
 
         Ok(allocs)
     }
