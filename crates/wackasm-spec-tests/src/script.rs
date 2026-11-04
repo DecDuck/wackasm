@@ -7,7 +7,7 @@ use wast::{
 use crate::{
     Outcome, Summary,
     runtime::{RuntimeError, ScriptRunner, classify_runtime_error},
-    values::{convert_expected, value_matches},
+    values::{convert_expected, results_match},
 };
 
 pub fn run_source(source: &str) -> Summary {
@@ -272,16 +272,7 @@ fn run_assert_return(
             return Outcome::Failed(format!("expected a return value, got a trap: {error}"));
         }
     };
-    if actual.len() == expected.len()
-        && actual
-            .iter()
-            .zip(expected.iter())
-            .all(|(actual, expected)| {
-                expected
-                    .iter()
-                    .any(|expected| value_matches(actual, expected))
-            })
-    {
+    if results_match(&actual, &expected) {
         Outcome::Passed
     } else {
         Outcome::Failed(format!("expected {expected:?}, got {actual:?}"))

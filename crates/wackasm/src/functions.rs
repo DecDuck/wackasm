@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use std::rc::Rc;
 use wasmparser::{
     FuncType, FuncValidator, FuncValidatorAllocations, FunctionBody, Imports, RecGroup,
-    SectionLimited, ValidatorResources,
+    SectionLimited, ValType, ValidatorResources,
 };
 
 use crate::{
@@ -12,7 +12,7 @@ use crate::{
     macros::trap,
     module::{FunctionFrame, FunctionIndex, FunctionTypeIndex},
     pc::ProgramCounter,
-    stack::{FrameOperandStack, GlobalStack as _, LocalStore},
+    stack::{FrameOperandStack, GlobalStack as _, LocalStore, val_types_to_size},
 };
 
 const MAX_CALL_DEPTH: usize = 10_000;
@@ -140,10 +140,7 @@ impl FunctionManager {
             })?;
         let params = function_type.params();
         for param in params {
-            function_state.locals.insert(
-                function_state.locals.len() as u32,
-                WackasmModule::val_type_to_value(param),
-            );
+            Self::declare_local(&mut function_state.locals, param);
         }
 
         // Create locals
@@ -151,10 +148,7 @@ impl FunctionManager {
         for local in locals {
             let (count, val_type) = local?;
             for _ in 0..count {
-                function_state.locals.insert(
-                    function_state.locals.len() as u32,
-                    WackasmModule::val_type_to_value(&val_type),
-                );
+                Self::declare_local(&mut function_state.locals, &val_type);
             }
         }
 
@@ -165,6 +159,14 @@ impl FunctionManager {
 
         self.init_function_frames.push(function_state);
         Ok(allocs)
+    }
+
+    fn declare_local(locals: &mut LocalStore, val_type: &ValType) {
+        let index = locals.len() as u32;
+        match val_type {
+            ValType::V128 => locals.insert_wide(index, 0),
+            _ => locals.insert(index, WackasmModule::val_type_to_value(val_type)),
+        }
     }
 
     pub(crate) fn call_internal(
@@ -213,10 +215,11 @@ impl FunctionManager {
 
         let params = function_type.params();
         let arguments = if let Some(arguments) = arguments {
-            if arguments.len() != params.len() {
+            let expected_slots = val_types_to_size(params);
+            if arguments.len() != expected_slots {
                 return Err(HaltError::Error(anyhow!(
-                    "invalid amount of arguments, expected {}, got {}",
-                    params.len(),
+                    "invalid amount of argument slots, expected {}, got {}",
+                    expected_slots,
                     arguments.len()
                 )));
             }
@@ -232,12 +235,9 @@ impl FunctionManager {
         for (index, val_type) in params.into_iter().enumerate() {
             match val_type {
                 wasmparser::ValType::V128 => {
-                    let low = arguments.next().unwrap().0;
-                    let high = arguments.next().unwrap().0;
-                    let mut result = [0u8; 16];
-                    result[0..8].copy_from_slice(&low.to_le_bytes());
-                    result[8..].copy_from_slice(&high.to_le_bytes());
-                    function.locals.set_wide(index as u32, u128::from_le_bytes(result))?;
+                    let high = arguments.next().unwrap().0 as u128;
+                    let low = arguments.next().unwrap().0 as u128;
+                    function.locals.set_wide(index as u32, (high << 64) | low)?;
                 }
                 _ => {
                     let value = arguments.next().unwrap();

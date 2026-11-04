@@ -1,10 +1,9 @@
-use wasmparser::Operator;
+use wasmparser::{Operator, ValType, WasmModuleResources as _};
 
 use crate::{
     HaltError,
     compiler::{WackasmOperator, compile::Compiler, filter::CompilerFilter},
     functions::FunctionManager,
-    macros::trap,
 };
 
 pub struct LocalsPass {}
@@ -17,15 +16,16 @@ impl CompilerFilter for LocalsPass {
         _pc: usize,
         operator: Operator,
     ) -> Result<bool, HaltError> {
-        let is_wide = compiler
-            .func_validator
-            .get_operand_type(0)
-            .flatten()
-            .map(|val_type| match val_type {
-                wasmparser::ValType::V128 => true,
-                _ => false,
-            })
-            .unwrap_or(false);
+        let validator = &compiler.func_validator;
+        // Gets read the local/global's declared type; everything else consumes the top operand.
+        let is_wide = match operator {
+            Operator::LocalGet { local_index } => validator.get_local_type(local_index),
+            Operator::GlobalGet { global_index } => validator
+                .resources()
+                .global_at(global_index)
+                .map(|global| global.content_type),
+            _ => validator.get_operand_type(0).flatten(),
+        } == Some(ValType::V128);
 
         let operator = match operator {
             Operator::LocalGet { local_index } => match is_wide {
