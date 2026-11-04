@@ -11,6 +11,7 @@ use wasmparser::Operator;
 use crate::{
     HaltError, Value, WackasmModule,
     blocks::{Block, BlockManager},
+    functions::FunctionManager,
     macros::{
         f32_load, f32_store, f64_load, f64_store, i32_binop, i32_load, i32_store, i64_binop,
         i64_cmp, i64_load, i64_store, trap, unsupported, v128_load, v128_store,
@@ -20,13 +21,14 @@ use crate::{
         TableIndex, TableValue,
     },
     pc::ProgramCounterHandle,
-    stack::{BlockAwareStack as _, FrameOperandStack},
+    stack::{FrameOperandStack, GlobalStack as _, StackSection},
 };
 
 const MAX_INSTRUCTIONS_IN_LOOP: isize = 500;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct WackasmExecutor {
+    stack: FrameOperandStack,
     fuel: AtomicIsize,
     module: WackasmModule,
     callstack: Vec<FunctionFrame>,
@@ -42,6 +44,7 @@ pub enum FunctionScopedResult {
 impl WackasmExecutor {
     pub fn new(module: WackasmModule) -> Result<Self, HaltError> {
         let mut me = Self {
+            stack: FrameOperandStack::new(100),
             fuel: AtomicIsize::new(isize::MAX),
             module,
             callstack: Vec::new(),
@@ -49,7 +52,12 @@ impl WackasmExecutor {
         };
 
         if let Some(start_func) = me.module.start_func.take() {
-            me.module.functions.call_internal(&mut me.callstack, start_func, Some(Vec::new()))?;
+            me.module.functions.call_internal(
+                &mut me.callstack,
+                &mut me.stack,
+                start_func,
+                Some(Vec::new()),
+            )?;
         }
 
         Ok(me)
@@ -70,39 +78,49 @@ impl WackasmExecutor {
             _ => return Err(HaltError::Error(anyhow!("not a function"))),
         };
 
-        self.module
-            .functions
-            .call_internal(&mut self.callstack, *function, Some(arguments))
+        self.module.functions.call_internal(
+            &mut self.callstack,
+            &mut self.stack,
+            *function,
+            Some(arguments),
+        )
     }
 
     fn block_break(
-        operand_stack: &mut FrameOperandStack,
-        block_lookup: &BlockManager,
+        stack: &mut FrameOperandStack,
+        blocks: &BlockManager,
+        functions: &FunctionManager,
         pc: &mut ProgramCounterHandle<'_>,
         relative_depth: u32,
-    ) -> Result<(), HaltError> {
-        for _ in 0..relative_depth {
-            operand_stack
-                .return_block(&[])?
-                .ok_or_else(|| anyhow!("no block to escape when br_if"))?;
+    ) -> Result<Option<FunctionScopedResult>, HaltError> {
+        let target = stack.len_sections() - 1 - relative_depth as usize;
+        let block = stack
+            .peek_section(Some(target))
+            .ok_or_else(|| anyhow!("no block to escape when br_if"))?;
+
+        match block {
+            StackSection::Block(block_index) => {
+                let block = blocks.get(block_index)?;
+                match block {
+                    Block::Block { end, .. } | Block::If { end, .. } => {
+                        let return_params = block.return_params(functions)?;
+                        stack.return_section(return_params.unwrap_or(&[]), Some(target))?;
+                        pc.set_pc(*end + 1);
+                    }
+                    // Keep the loop's section and skip re-executing the `loop` opcode
+                    Block::Loop { start, .. } => {
+                        let call_params = block.call_params(functions)?;
+                        stack.reset_section(call_params.as_deref().unwrap_or(&[]), target)?;
+                        pc.set_pc(*start + 1);
+                    }
+                }
+            }
+            StackSection::Function(_) => {
+                return Ok(Some(FunctionScopedResult::FunctionReturn));
+            }
         }
 
-        // Based on top block, either jump back to start of loop or jump to end of block
-        let last_block_idx = operand_stack
-            .peek_block()
-            .ok_or_else(|| anyhow!("no block for br_if"))?;
-        let last_block = block_lookup.get(last_block_idx)?;
-
-        match last_block {
-            Block::Loop { start, .. } => {
-                pc.set_pc(*start + 1);
-            }
-            Block::If { end, .. } | Block::Block { end, .. } => {
-                pc.set_pc(*end);
-            }
-        }
-
-        Ok(())
+        Ok(None)
     }
 
     // runs X instructions, decrementing fuel
@@ -117,7 +135,7 @@ impl WackasmExecutor {
             FunctionScopedResult::OutOfFuel => {} // nothing, just continue
             FunctionScopedResult::FunctionReturn => {
                 // Now we get to pop the function frame and push the results to
-                let mut function_frame = self
+                let function_frame = self
                     .callstack
                     .pop()
                     .expect("incremental_execute_function would have errored by now");
@@ -128,24 +146,23 @@ impl WackasmExecutor {
                     .function_type_idx(&function_frame.function_index)?;
 
                 let result_types = function_type.results();
-                let results = function_frame
-                    .stack
-                    .pull_reversed_from_stack(result_types)?;
 
-                if let Some(mut next_frame) = self.callstack.peek_mut() {
-                    next_frame.stack.push_reversed_all(results)?;
+                if let Some(section) = self.stack.return_function(result_types)? {
+                    section.expect_function()?;
                 } else {
-                    let mut results = results;
-                    results.reverse();
+                    let results = self.stack.pull_results(result_types)?;
                     self.output = Some(results);
                 }
             }
             FunctionScopedResult::FunctionCall { function_index } => {
                 let function_index = FunctionIndex(function_index);
 
-                self.module
-                    .functions
-                    .call_internal(&mut self.callstack, function_index, None)?;
+                self.module.functions.call_internal(
+                    &mut self.callstack,
+                    &mut self.stack,
+                    function_index,
+                    None,
+                )?;
             }
         }
 
@@ -198,125 +215,125 @@ impl WackasmExecutor {
                 // Gets
                 Operator::LocalGet { local_index } => {
                     let local = *function_frame.locals.get(&local_index)?;
-                    function_frame.stack.push(local)?;
+                    self.stack.push(local)?;
                 }
                 Operator::LocalSet { local_index } => {
-                    let value = function_frame.stack.pop()?;
+                    let value = self.stack.pop()?;
                     function_frame.locals.set_checked(*local_index, value)?;
                 }
                 Operator::Drop => {
-                    function_frame.stack.pop()?;
+                    self.stack.pop()?;
                 }
                 Operator::LocalTee { local_index } => {
-                    let value = function_frame.stack.peek()?;
+                    let value = self.stack.peek()?;
                     function_frame
                         .locals
                         .set_checked(*local_index, value.clone())?;
                 }
                 Operator::GlobalGet { global_index } => {
                     let global = self.module.globals.get(&GlobalIndex(*global_index))?;
-                    function_frame.stack.push(global.inner.clone())?;
+                    self.stack.push(global.inner.clone())?;
                 }
                 Operator::GlobalSet { global_index } => {
-                    let value = function_frame.stack.pop()?;
+                    let value = self.stack.pop()?;
                     self.module
                         .globals
                         .set(&GlobalIndex(*global_index), value)?;
                 }
 
                 Operator::MemoryGrow { mem } => {
-                    let amount = function_frame.stack.pop_i32()?;
+                    let amount = self.stack.pop_i32()?;
                     let result = self.module.memories.grow(*mem, amount)?;
-                    function_frame.stack.push(Value(result as u64))?;
+                    self.stack.push(Value(result as u64))?;
                 }
                 Operator::MemoryFill { mem } => {
-                    let amount = function_frame.stack.pop_i32()? as u32 as usize;
-                    let value = function_frame.stack.pop_i32()? as u8;
-                    let offset = function_frame.stack.pop_i32()? as u32 as usize;
+                    let amount = self.stack.pop_i32()? as u32 as usize;
+                    let value = self.stack.pop_i32()? as u8;
+                    let offset = self.stack.pop_i32()? as u32 as usize;
                     self.module.memories.fill(*mem, offset, amount, value)?;
                 }
 
                 // memory load
                 Operator::I32Load { memarg } => {
-                    i32_load!(function_frame.stack, self.module.memories, memarg, i32)
+                    i32_load!(self.stack, self.module.memories, memarg, i32)
                 }
                 Operator::I32Load8U { memarg } => {
-                    i32_load!(function_frame.stack, self.module.memories, memarg, u8)
+                    i32_load!(self.stack, self.module.memories, memarg, u8)
                 }
                 Operator::I32Load8S { memarg } => {
-                    i32_load!(function_frame.stack, self.module.memories, memarg, i8)
+                    i32_load!(self.stack, self.module.memories, memarg, i8)
                 }
                 Operator::I32Load16U { memarg } => {
-                    i32_load!(function_frame.stack, self.module.memories, memarg, u16)
+                    i32_load!(self.stack, self.module.memories, memarg, u16)
                 }
                 Operator::I32Load16S { memarg } => {
-                    i32_load!(function_frame.stack, self.module.memories, memarg, i16)
+                    i32_load!(self.stack, self.module.memories, memarg, i16)
                 }
 
                 Operator::I64Load { memarg } => {
-                    i64_load!(function_frame.stack, self.module.memories, memarg, i64);
+                    i64_load!(self.stack, self.module.memories, memarg, i64);
                 }
                 Operator::I64Load8U { memarg } => {
-                    i64_load!(function_frame.stack, self.module.memories, memarg, u8)
+                    i64_load!(self.stack, self.module.memories, memarg, u8)
                 }
                 Operator::I64Load8S { memarg } => {
-                    i64_load!(function_frame.stack, self.module.memories, memarg, i8);
+                    i64_load!(self.stack, self.module.memories, memarg, i8);
                 }
                 Operator::I64Load16U { memarg } => {
-                    i64_load!(function_frame.stack, self.module.memories, memarg, u16);
+                    i64_load!(self.stack, self.module.memories, memarg, u16);
                 }
                 Operator::I64Load16S { memarg } => {
-                    i64_load!(function_frame.stack, self.module.memories, memarg, i16);
+                    i64_load!(self.stack, self.module.memories, memarg, i16);
                 }
                 Operator::I64Load32U { memarg } => {
-                    i64_load!(function_frame.stack, self.module.memories, memarg, u32);
+                    i64_load!(self.stack, self.module.memories, memarg, u32);
                 }
                 Operator::I64Load32S { memarg } => {
-                    i64_load!(function_frame.stack, self.module.memories, memarg, i32);
+                    i64_load!(self.stack, self.module.memories, memarg, i32);
                 }
 
                 Operator::F32Load { memarg } => {
-                    f32_load!(function_frame.stack, self.module.memories, memarg)
+                    f32_load!(self.stack, self.module.memories, memarg)
                 }
                 Operator::F64Load { memarg } => {
-                    f64_load!(function_frame.stack, self.module.memories, memarg)
+                    f64_load!(self.stack, self.module.memories, memarg)
                 }
                 Operator::V128Load { memarg } => {
-                    v128_load!(function_frame.stack, self.module.memories, memarg)
+                    v128_load!(self.stack, self.module.memories, memarg)
                 }
 
                 // memory store
                 Operator::I32Store { memarg } => {
-                    i32_store!(function_frame.stack, self.module.memories, memarg, i32)
+                    i32_store!(self.stack, self.module.memories, memarg, i32)
                 }
                 Operator::I32Store8 { memarg } => {
-                    i32_store!(function_frame.stack, self.module.memories, memarg, u8)
+                    i32_store!(self.stack, self.module.memories, memarg, u8)
                 }
                 Operator::I32Store16 { memarg } => {
-                    i32_store!(function_frame.stack, self.module.memories, memarg, u16)
+                    i32_store!(self.stack, self.module.memories, memarg, u16)
                 }
 
                 Operator::I64Store { memarg } => {
-                    i64_store!(function_frame.stack, self.module.memories, memarg, i64)
+                    i64_store!(self.stack, self.module.memories, memarg, i64)
                 }
                 Operator::I64Store8 { memarg } => {
-                    i64_store!(function_frame.stack, self.module.memories, memarg, u8)
+                    i64_store!(self.stack, self.module.memories, memarg, u8)
                 }
                 Operator::I64Store16 { memarg } => {
-                    i64_store!(function_frame.stack, self.module.memories, memarg, u16)
+                    i64_store!(self.stack, self.module.memories, memarg, u16)
                 }
                 Operator::I64Store32 { memarg } => {
-                    i64_store!(function_frame.stack, self.module.memories, memarg, u32)
+                    i64_store!(self.stack, self.module.memories, memarg, u32)
                 }
 
                 Operator::F32Store { memarg } => {
-                    f32_store!(function_frame.stack, self.module.memories, memarg)
+                    f32_store!(self.stack, self.module.memories, memarg)
                 }
                 Operator::F64Store { memarg } => {
-                    f64_store!(function_frame.stack, self.module.memories, memarg)
+                    f64_store!(self.stack, self.module.memories, memarg)
                 }
                 Operator::V128Store { memarg } => {
-                    v128_store!(function_frame.stack, self.module.memories, memarg)
+                    v128_store!(self.stack, self.module.memories, memarg)
                 }
 
                 // Handle function call
@@ -330,7 +347,7 @@ impl WackasmExecutor {
                     type_index: _,
                     table_index,
                 } => {
-                    let func_index_index = function_frame.stack.pop_i32()?;
+                    let func_index_index = self.stack.pop_i32()?;
                     let table = self
                         .module
                         .tables
@@ -356,7 +373,7 @@ impl WackasmExecutor {
                     let block_index = BlockIndex(pc.inner() as u32);
                     let block = function_frame.block_lookup.get(&block_index)?;
 
-                    let condition = function_frame.stack.pop_i32()?;
+                    let condition = self.stack.pop_i32()?;
                     let condition = condition != 0;
 
                     let (start, else_block, end) = block.if_block()?;
@@ -379,16 +396,17 @@ impl WackasmExecutor {
 
                     if start_block {
                         self.module
-                            .start_block(&mut function_frame.stack, &block, &block_index)?;
+                            .start_block(&mut self.stack, &block, &block_index)?;
                     }
                 }
 
                 // Jump to end block if we hit an else
                 Operator::Else => {
-                    let block_index = function_frame
+                    let block_index = self
                         .stack
-                        .peek_block()
-                        .ok_or_else(|| anyhow!("hit else op not in block"))?;
+                        .peek_section(None)
+                        .ok_or_else(|| anyhow!("hit else op not in block"))?
+                        .expect_block()?;
                     let block = function_frame.block_lookup.get(block_index)?;
 
                     let (_, _, end) = block.if_block()?;
@@ -401,36 +419,42 @@ impl WackasmExecutor {
                     let block = function_frame.block_lookup.get(&block_index)?;
 
                     self.module
-                        .start_block(&mut function_frame.stack, &block, &block_index)?;
+                        .start_block(&mut self.stack, &block, &block_index)?;
                 }
 
                 Operator::BrIf { relative_depth } => {
-                    let condition = function_frame.stack.pop_i32()?;
+                    let condition = self.stack.pop_i32()?;
                     let branching = condition != 0;
 
                     if !branching {
                         continue;
                     }
 
-                    WackasmExecutor::block_break(
-                        &mut function_frame.stack,
+                    if let Some(result) = WackasmExecutor::block_break(
+                        &mut self.stack,
                         &function_frame.block_lookup,
+                        &self.module.functions,
                         &mut pc,
                         *relative_depth,
-                    )?;
+                    )? {
+                        return Ok(result);
+                    }
                 }
 
                 Operator::Br { relative_depth } => {
-                    WackasmExecutor::block_break(
-                        &mut function_frame.stack,
+                    if let Some(result) = WackasmExecutor::block_break(
+                        &mut self.stack,
                         &function_frame.block_lookup,
+                        &self.module.functions,
                         &mut pc,
                         *relative_depth,
-                    )?;
+                    )? {
+                        return Ok(result);
+                    }
                 }
 
                 Operator::BrTable { targets } => {
-                    let decider = function_frame.stack.pop_i32()? as u32;
+                    let decider = self.stack.pop_i32()? as u32;
                     let target = if decider >= targets.len() {
                         targets.default()
                     } else {
@@ -438,41 +462,39 @@ impl WackasmExecutor {
                             trap!("no function for index {} in br_table args", decider)
                         })??
                     };
-                    WackasmExecutor::block_break(
-                        &mut function_frame.stack,
+                    if let Some(result) = WackasmExecutor::block_break(
+                        &mut self.stack,
                         &function_frame.block_lookup,
+                        &self.module.functions,
                         &mut pc,
                         target,
-                    )?;
+                    )? {
+                        return Ok(result);
+                    }
                 }
 
                 // Handle block/function return
                 Operator::End => {
-                    // Block return
-                    if let Some(block_idx) = function_frame.stack.peek_block() {
-                        let block = function_frame
-                            .block_lookup
-                            .get(&block_idx)
-                            .expect("we can't have exited from a block that doesn't exist");
-                        let return_params = match block.ty() {
-                            wasmparser::BlockType::Empty => None,
-                            wasmparser::BlockType::Type(val_type) => Some(vec![val_type.clone()]),
-                            wasmparser::BlockType::FuncType(func_type) => {
-                                let func_type_index = FunctionTypeIndex(*func_type); // This is right, don't change this.
-                                let func_type =
-                                    self.module.functions.function_type_idx_type(&func_type_index)?;
-                                Some(func_type.results().to_vec())
-                            }
-                        };
+                    let section_idx = self
+                        .stack
+                        .peek_section(None)
+                        .ok_or_else(|| trap!("end without any sections under it"))?;
+                    match section_idx {
+                        StackSection::Block(block_idx) => {
+                            let block = function_frame
+                                .block_lookup
+                                .get(&block_idx)
+                                .expect("we can't have exited from a block that doesn't exist");
 
-                        function_frame
-                            .stack
-                            .return_block(&return_params.unwrap_or(Vec::new()))?
-                            .ok_or_else(|| anyhow!("no block to end from"))?;
-                    }
-                    // Function return
-                    else {
-                        return Ok(FunctionScopedResult::FunctionReturn);
+                            let return_params = block.return_params(&self.module.functions)?;
+
+                            self.stack
+                                .return_section(&return_params.unwrap_or(&[]), None)?
+                                .ok_or_else(|| anyhow!("no block to end from"))?;
+                        }
+                        StackSection::Function(_) => {
+                            return Ok(FunctionScopedResult::FunctionReturn);
+                        }
                     }
                 }
                 Operator::Return => {
@@ -481,149 +503,145 @@ impl WackasmExecutor {
 
                 // i32 maths
                 Operator::I32Const { value } => {
-                    function_frame.stack.push(Value((*value) as u64))?;
+                    self.stack.push(Value((*value) as u64))?;
                 }
                 Operator::I64Const { value } => {
-                    function_frame.stack.push(Value((*value) as u64))?;
+                    self.stack.push(Value((*value) as u64))?;
                 }
                 Operator::F32Const { value } => {
-                    function_frame.stack.push(Value(value.bits() as u64))?;
+                    self.stack.push(Value(value.bits() as u64))?;
                 }
                 Operator::F64Const { value } => {
-                    function_frame.stack.push(Value(value.bits()))?;
+                    self.stack.push(Value(value.bits()))?;
                 }
 
                 Operator::I32Add => {
-                    i32_binop!(function_frame.stack, i32, |lhs, rhs| lhs.wrapping_add(rhs))
+                    i32_binop!(self.stack, i32, |lhs, rhs| lhs.wrapping_add(rhs))
                 }
                 Operator::I32Mul => {
-                    i32_binop!(function_frame.stack, i32, |lhs, rhs| lhs.wrapping_mul(rhs))
+                    i32_binop!(self.stack, i32, |lhs, rhs| lhs.wrapping_mul(rhs))
                 }
                 Operator::I32DivU => {
-                    i32_binop!(function_frame.stack, u32, |lhs, rhs| lhs
+                    i32_binop!(self.stack, u32, |lhs, rhs| lhs
                         .checked_div(rhs)
-                        .ok_or_else(
-                        || trap!("integer divide by zero")
-                    )?)
+                        .ok_or_else(|| trap!("integer divide by zero"))?)
                 }
                 Operator::I32Sub => {
-                    i32_binop!(function_frame.stack, i32, |lhs, rhs| lhs.wrapping_sub(rhs))
+                    i32_binop!(self.stack, i32, |lhs, rhs| lhs.wrapping_sub(rhs))
                 }
                 Operator::I32ShrU => {
-                    i32_binop!(function_frame.stack, u32, |lhs, rhs| lhs.wrapping_shr(rhs))
+                    i32_binop!(self.stack, u32, |lhs, rhs| lhs.wrapping_shr(rhs))
                 }
                 Operator::I32Shl => {
-                    i32_binop!(function_frame.stack, u32, |lhs, rhs| lhs.wrapping_shl(rhs))
+                    i32_binop!(self.stack, u32, |lhs, rhs| lhs.wrapping_shl(rhs))
                 }
                 Operator::I32And => {
-                    i32_binop!(function_frame.stack, i32, |lhs, rhs| lhs & rhs)
+                    i32_binop!(self.stack, i32, |lhs, rhs| lhs & rhs)
                 }
                 Operator::I32Xor => {
-                    i32_binop!(function_frame.stack, i32, |lhs, rhs| lhs ^ rhs)
+                    i32_binop!(self.stack, i32, |lhs, rhs| lhs ^ rhs)
                 }
 
                 // i32 comparators
                 Operator::I32GtS => {
-                    i32_binop!(function_frame.stack, i32, |lhs, rhs| lhs > rhs)
+                    i32_binop!(self.stack, i32, |lhs, rhs| lhs > rhs)
                 }
                 Operator::I32LtU => {
-                    i32_binop!(function_frame.stack, u32, |lhs, rhs| lhs < rhs)
+                    i32_binop!(self.stack, u32, |lhs, rhs| lhs < rhs)
                 }
                 Operator::I32GtU => {
-                    i32_binop!(function_frame.stack, u32, |lhs, rhs| lhs > rhs)
+                    i32_binop!(self.stack, u32, |lhs, rhs| lhs > rhs)
                 }
                 Operator::I32LeU => {
-                    i32_binop!(function_frame.stack, u32, |lhs, rhs| lhs <= rhs)
+                    i32_binop!(self.stack, u32, |lhs, rhs| lhs <= rhs)
                 }
                 Operator::I32Ne => {
-                    i32_binop!(function_frame.stack, i32, |a, b| a != b)
+                    i32_binop!(self.stack, i32, |a, b| a != b)
                 }
                 Operator::I32GeU => {
-                    i32_binop!(function_frame.stack, u32, |lhs, rhs| lhs >= rhs)
+                    i32_binop!(self.stack, u32, |lhs, rhs| lhs >= rhs)
                 }
                 Operator::I32Eqz => {
-                    let a = function_frame.stack.pop_i32()?;
+                    let a = self.stack.pop_i32()?;
                     let result = if a == 0 { 1 } else { 0 };
-                    function_frame.stack.push(Value(result as u64))?;
+                    self.stack.push(Value(result as u64))?;
                 }
                 Operator::I32Eq => {
-                    i32_binop!(function_frame.stack, i32, |a, b| a == b)
+                    i32_binop!(self.stack, i32, |a, b| a == b)
                 }
                 Operator::I32Or => {
-                    i32_binop!(function_frame.stack, i32, |a, b| a | b)
+                    i32_binop!(self.stack, i32, |a, b| a | b)
                 }
 
                 // i64 maths
                 Operator::I64Add => {
-                    i64_binop!(function_frame.stack, i64, |lhs, rhs| lhs.wrapping_add(rhs))
+                    i64_binop!(self.stack, i64, |lhs, rhs| lhs.wrapping_add(rhs))
                 }
                 Operator::I64Mul => {
-                    i64_binop!(function_frame.stack, i64, |lhs, rhs| lhs.wrapping_mul(rhs))
+                    i64_binop!(self.stack, i64, |lhs, rhs| lhs.wrapping_mul(rhs))
                 }
                 Operator::I64Sub => {
-                    i64_binop!(function_frame.stack, i64, |lhs, rhs| lhs.wrapping_sub(rhs))
+                    i64_binop!(self.stack, i64, |lhs, rhs| lhs.wrapping_sub(rhs))
                 }
                 Operator::I64ShrU => {
-                    i64_binop!(function_frame.stack, u64, |lhs, rhs| lhs
-                        .wrapping_shr(rhs as u32))
+                    i64_binop!(self.stack, u64, |lhs, rhs| lhs.wrapping_shr(rhs as u32))
                 }
                 Operator::I64Shl => {
-                    i64_binop!(function_frame.stack, u64, |lhs, rhs| lhs
-                        .wrapping_shl(rhs as u32))
+                    i64_binop!(self.stack, u64, |lhs, rhs| lhs.wrapping_shl(rhs as u32))
                 }
                 Operator::I64And => {
-                    i64_binop!(function_frame.stack, i64, |lhs, rhs| lhs & rhs)
+                    i64_binop!(self.stack, i64, |lhs, rhs| lhs & rhs)
                 }
                 Operator::I64Or => {
-                    i64_binop!(function_frame.stack, i64, |lhs, rhs| lhs | rhs)
+                    i64_binop!(self.stack, i64, |lhs, rhs| lhs | rhs)
                 }
 
                 // i64 comparators
                 Operator::I64GtS => {
-                    i64_cmp!(function_frame.stack, i64, |lhs, rhs| lhs > rhs)
+                    i64_cmp!(self.stack, i64, |lhs, rhs| lhs > rhs)
                 }
                 Operator::I64LtU => {
-                    i64_cmp!(function_frame.stack, u64, |lhs, rhs| lhs < rhs)
+                    i64_cmp!(self.stack, u64, |lhs, rhs| lhs < rhs)
                 }
                 Operator::I64GtU => {
-                    i64_cmp!(function_frame.stack, u64, |lhs, rhs| lhs > rhs)
+                    i64_cmp!(self.stack, u64, |lhs, rhs| lhs > rhs)
                 }
                 Operator::I64LeU => {
-                    i64_cmp!(function_frame.stack, u64, |lhs, rhs| lhs <= rhs)
+                    i64_cmp!(self.stack, u64, |lhs, rhs| lhs <= rhs)
                 }
                 Operator::I64GeU => {
-                    i64_cmp!(function_frame.stack, u64, |lhs, rhs| lhs >= rhs)
+                    i64_cmp!(self.stack, u64, |lhs, rhs| lhs >= rhs)
                 }
                 Operator::I64Eq => {
-                    i64_cmp!(function_frame.stack, i64, |lhs, rhs| lhs == rhs)
+                    i64_cmp!(self.stack, i64, |lhs, rhs| lhs == rhs)
                 }
                 Operator::I64Ne => {
-                    i64_cmp!(function_frame.stack, i64, |lhs, rhs| lhs != rhs)
+                    i64_cmp!(self.stack, i64, |lhs, rhs| lhs != rhs)
                 }
                 Operator::I64Eqz => {
-                    let a = function_frame.stack.pop_i64()?;
-                    function_frame.stack.push(Value((a == 0) as u64))?;
+                    let a = self.stack.pop_i64()?;
+                    self.stack.push(Value((a == 0) as u64))?;
                 }
                 Operator::Select => {
-                    let cond = function_frame.stack.pop_i32()?;
-                    let val2 = function_frame.stack.pop()?;
-                    let val1 = function_frame.stack.pop()?;
+                    let cond = self.stack.pop_i32()?;
+                    let val2 = self.stack.pop()?;
+                    let val1 = self.stack.pop()?;
 
                     if cond == 0 {
-                        function_frame.stack.push(val2)?;
+                        self.stack.push(val2)?;
                     } else {
-                        function_frame.stack.push(val1)?;
+                        self.stack.push(val1)?;
                     }
                 }
                 Operator::I64ExtendI32U => {
-                    let value = function_frame.stack.pop_i32()?;
+                    let value = self.stack.pop_i32()?;
                     let new_value = value as u32 as i64;
-                    function_frame.stack.push(Value(new_value as u64))?;
+                    self.stack.push(Value(new_value as u64))?;
                 }
                 Operator::I32WrapI64 => {
-                    let value = function_frame.stack.pop_i64()?;
+                    let value = self.stack.pop_i64()?;
                     let value = value as i32;
-                    function_frame.stack.push(Value(value as u64))?;
+                    self.stack.push(Value(value as u64))?;
                 }
                 _ => return Err(unsupported!("unsupported operator: {:?}", operator)),
             }

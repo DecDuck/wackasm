@@ -3,6 +3,7 @@ use std::{
     mem::discriminant,
 };
 
+use anyhow::anyhow;
 use serde::{Deserialize, Serialize};
 use wasmparser::ValType;
 
@@ -10,27 +11,28 @@ use crate::{
     HaltError, Value,
     macros::trap,
     module::BlockIndex,
-    stack::{BlockAwareStack, MAX_OPERAND_STACK_SIZE, basic::OperandStack},
+    stack::{GlobalStack, MAX_OPERAND_STACK_SIZE, StackSection, basic::OperandStack},
 };
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct FlatBlockAwareStack {
     stack: OperandStack,
     current_floor: usize,
-    blocks: Vec<(BlockIndex, usize)>,
+
+    sections: Vec<(StackSection, usize)>,
 }
 
 impl FlatBlockAwareStack {
-    pub fn new(blocks: usize) -> Self {
+    pub fn new(sections: usize) -> Self {
         Self {
-            stack: OperandStack::new(MAX_OPERAND_STACK_SIZE * (blocks + 1)),
+            stack: OperandStack::new(MAX_OPERAND_STACK_SIZE * (sections + 1)),
             current_floor: 0,
-            blocks: Vec::with_capacity(blocks),
+            sections: Vec::with_capacity(sections),
         }
     }
 }
 
-impl BlockAwareStack for FlatBlockAwareStack {
+impl GlobalStack for FlatBlockAwareStack {
     fn push(&mut self, value: Value) -> Result<(), HaltError> {
         self.stack.push(value)
     }
@@ -43,62 +45,101 @@ impl BlockAwareStack for FlatBlockAwareStack {
         self.stack.pop()
     }
 
-    fn push_reversed_all(&mut self, values: Vec<Value>) -> Result<(), HaltError> {
-        self.stack.push_reversed_all(values)
-    }
-
-    fn pull_reversed_from_stack(&mut self, returns: &[ValType]) -> Result<Vec<Value>, HaltError> {
-        if self.stack.len().saturating_sub(returns.len()) < self.current_floor {
-            return Err(trap!("stack underflow"));
-        }
-
-        self.stack.pull_reversed_from_stack(returns)
-    }
-
     fn peek(&mut self) -> Result<&Value, HaltError> {
-        if self.stack.len() <= self.current_floor {
-            return Err(trap!("stack underflow"));
-        }
-
         self.stack.peek()
     }
 
-    fn push_block(
+    fn push_section(
         &mut self,
-        block_idx: BlockIndex,
+        section: StackSection,
         pull_from_parent: Option<&[ValType]>,
     ) -> Result<(), crate::HaltError> {
         self.current_floor = self.stack.len() - pull_from_parent.map_or(0, |v| v.len());
-        self.blocks.push((block_idx, self.current_floor));
+        self.sections.push((section, self.current_floor));
 
         Ok(())
     }
 
-    fn return_block(&mut self, preserve: &[ValType]) -> Result<Option<BlockIndex>, HaltError> {
-        let Some((index, floor)) = self.blocks.pop() else {
+    fn return_section(
+        &mut self,
+        preserve: &[ValType],
+        position: Option<usize>,
+    ) -> Result<Option<StackSection>, HaltError> {
+        let pos = match position {
+            Some(p) => p,
+            None => match self.sections.len().checked_sub(1) {
+                Some(p) => p,
+                None => return Ok(None),
+            },
+        };
+        let (section, floor) = self
+            .sections
+            .get(pos)
+            .ok_or_else(|| anyhow!("invalid return_section position"))?
+            .clone();
+
+        let len = self.stack.len();
+        if len < floor + preserve.len() {
+            return Err(trap!("stack underflow"));
+        }
+
+        self.stack
+            .get_mut()
+            .copy_within(len - preserve.len()..len, floor);
+        self.stack.set_len(floor + preserve.len());
+
+        self.sections.truncate(pos);
+        self.current_floor = self.sections.last().map_or(0, |v| v.1);
+
+        Ok(Some(section))
+    }
+
+    fn reset_section(&mut self, preserve: &[ValType], pos: usize) -> Result<(), HaltError> {
+        let floor = self
+            .sections
+            .get(pos)
+            .ok_or_else(|| anyhow!("invalid reset_section position"))?
+            .1;
+
+        let len = self.stack.len();
+        if len < floor + preserve.len() {
+            return Err(trap!("stack underflow"));
+        }
+
+        self.stack
+            .get_mut()
+            .copy_within(len - preserve.len()..len, floor);
+        self.stack.set_len(floor + preserve.len());
+
+        self.sections.truncate(pos + 1);
+        self.current_floor = floor;
+
+        Ok(())
+    }
+
+    fn return_function(&mut self, preserve: &[ValType]) -> Result<Option<StackSection>, HaltError> {
+        let Some(pos) = self
+            .sections
+            .iter()
+            .rposition(|(s, _)| matches!(s, StackSection::Function(_)))
+        else {
             return Ok(None);
         };
 
-        if preserve.len() > 0 {
-            if self.stack.len() < floor + preserve.len() {
-                return Err(trap!("stack underflow"));
-            }
-
-            let source_bottom = self.stack.len() - preserve.len();
-            let source_top = self.stack.len();
-
-            self.stack
-                .get_mut()
-                .copy_within(source_bottom..source_top, floor);
-        }
-
-        self.stack.set_len(floor + preserve.len());
-        self.current_floor = self.blocks.last().map_or(0, |v| v.1);
-
-        Ok(Some(index))
+        self.return_section(preserve, Some(pos))
     }
 
-    fn peek_block(&self) -> Option<&BlockIndex> {
-        self.blocks.last().map(|v| &v.0)
+    fn peek_section(&self, pos: Option<usize>) -> Option<&StackSection> {
+        self.sections
+            .get(pos.unwrap_or(self.sections.len().saturating_sub(1)))
+            .map(|v| &v.0)
+    }
+
+    fn pull_results(&mut self, types: &[ValType]) -> Result<Vec<Value>, HaltError> {
+        self.stack.pull_results(types)
+    }
+
+    fn len_sections(&self) -> usize {
+        self.sections.len()
     }
 }

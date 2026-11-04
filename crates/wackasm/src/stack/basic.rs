@@ -2,7 +2,7 @@ use anyhow::anyhow;
 use serde::{Deserialize, Serialize};
 use wasmparser::ValType;
 
-use crate::{HaltError, Value, macros::trap, module::BlockIndex, stack::BlockAwareStack};
+use crate::{HaltError, Value, macros::trap, module::BlockIndex, stack::GlobalStack};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub(crate) struct OperandStack {
@@ -10,7 +10,7 @@ pub(crate) struct OperandStack {
     len: usize,
 }
 
-impl BlockAwareStack for OperandStack {
+impl GlobalStack for OperandStack {
     fn push(&mut self, value: Value) -> Result<(), HaltError> {
         if self.len == self.inner.len() {
             return Err(trap!("stack overflow"));
@@ -21,74 +21,69 @@ impl BlockAwareStack for OperandStack {
         Ok(())
     }
 
-    fn push_reversed_all(&mut self, mut values: Vec<Value>) -> Result<(), HaltError> {
-        if values.is_empty() {
-            return Ok(());
-        }
-
-        values.reverse();
-        let start = self.len;
-        let end = start
-            .checked_add(values.len())
-            .ok_or_else(|| trap!("stack overflow"))?;
-
-        if end > self.inner.len() {
-            return Err(trap!("stack overflow"));
-        }
-
-        let destination = self
-            .inner
-            .get_mut(start..end)
-            .ok_or_else(|| trap!("stack overflow"))?;
-        destination.copy_from_slice(&values);
-
-        self.len = end;
-
-        Ok(())
-    }
-
-    fn pull_reversed_from_stack(&mut self, returns: &[ValType]) -> Result<Vec<Value>, HaltError> {
-        let mut results = Vec::with_capacity(returns.len());
-
-        for rtn in returns.iter().rev() {
-            results.push(self.pop()?);
-        }
-
-        Ok(results)
-    }
-
     #[inline]
     fn pop(&mut self) -> Result<Value, HaltError> {
-        if self.len == 0 {
-            return Err(anyhow!("stack underflow").into());
-        }
-
         self.len -= 1;
         Ok(self.inner[self.len]) // - 1 not required to access by index here because we -1 above
     }
 
     #[inline]
     fn peek(&mut self) -> Result<&Value, HaltError> {
-        if self.len == 0 {
-            return Err(anyhow!("stack underflow").into());
-        }
         Ok(&self.inner[self.len - 1])
     }
 
-    // We don't implement block functions
-    fn push_block(
+    fn pull_results(&mut self, types: &[ValType]) -> Result<Vec<Value>, HaltError> {
+        let start = self
+            .len()
+            .checked_sub(types.len())
+            .ok_or_else(|| trap!("stack underflow"))?;
+        let end = self.len();
+        self.len = start;
+        Ok(self
+            .inner
+            .get(start..end)
+            .ok_or_else(|| trap!("stack under or overflow"))?
+            .iter()
+            .cloned()
+            .collect())
+    }
+
+    fn push_section(
         &mut self,
-        block_idx: crate::module::BlockIndex,
+        section: super::StackSection,
         pull_from_parent: Option<&[ValType]>,
     ) -> Result<(), HaltError> {
         todo!()
     }
-    fn return_block(&mut self, preserve: &[ValType]) -> Result<Option<BlockIndex>, HaltError> {
+
+    fn return_section(
+        &mut self,
+        preserve: &[ValType],
+        position: Option<usize>,
+    ) -> Result<Option<super::StackSection>, HaltError> {
         todo!()
     }
-    fn peek_block(&self) -> Option<&crate::module::BlockIndex> {
+
+    fn reset_section(&mut self, preserve: &[ValType], pos: usize) -> Result<(), HaltError> {
         todo!()
     }
+
+    fn peek_section(&self, position: Option<usize>) -> Option<&super::StackSection> {
+        todo!()
+    }
+
+    fn return_function(
+        &mut self,
+        preserve: &[ValType],
+    ) -> Result<Option<super::StackSection>, HaltError> {
+        todo!()
+    }
+
+    fn len_sections(&self) -> usize {
+        todo!()
+    }
+
+    // We don't implement block functions
 }
 
 impl OperandStack {
