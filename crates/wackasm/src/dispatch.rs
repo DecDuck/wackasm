@@ -25,6 +25,9 @@ pub(crate) struct DispatchCtx<'a> {
     pub(crate) functions: &'a FunctionManager, // CallIndirect type check
     pub(crate) code: &'a [WackasmOperator],
     pub(crate) fuel: isize,
+
+    // We pass the exit value back through here, so the entirety of
+    // dispatch and tail calls can stay in registers.
     pub(crate) exit: Option<Exit<'a>>
 }
 
