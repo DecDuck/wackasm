@@ -5,16 +5,7 @@ use serde::{Deserialize, Serialize};
 use wasmparser::{ExternalKind, FuncType, FunctionBody, Payload, ValType};
 
 use crate::{
-    HaltError, Value,
-    blocks::{Block, BlockManager},
-    compiler::{BlockParams, WackasmFunctionBody},
-    functions::FunctionManager,
-    globals::GlobalManager,
-    macros::unsupported,
-    memory::MemoryManager,
-    pc::ProgramCounter,
-    stack::{FrameOperandStack, GlobalStack, LocalStore, StackSection},
-    table::TableManager,
+    HaltError, Value, blocks::{Block, BlockManager}, compiler::{BlockParams, WackasmFunctionBody}, executor::FunctionScopedResult, functions::FunctionManager, globals::GlobalManager, macros::unsupported, memory::MemoryManager, pc::ProgramCounter, stack::{FrameOperandStack, GlobalStack, LocalStore, StackSection}, table::TableManager,
 };
 
 macro_rules! type_indexes {
@@ -97,6 +88,43 @@ impl WackasmModule {
         operand_stack.push_section(StackSection::Block(*idx), block_params)?;
 
         Ok(())
+    }
+
+    pub(crate) fn block_break(
+        &mut self,
+        blocks: &BlockManager,
+        stack: &mut FrameOperandStack,
+        pc: &mut ProgramCounter,
+        relative_depth: u32,
+    ) -> Result<Option<FunctionScopedResult>, HaltError> {
+        let target = stack.len_sections() - 1 - relative_depth as usize;
+        let block = stack
+            .peek_section(Some(target))
+            .ok_or_else(|| anyhow!("no block to escape when br_if"))?;
+
+        match block {
+            StackSection::Block(block_index) => {
+                let block = blocks.get(block_index)?;
+                match block {
+                    Block::Block { end, .. } | Block::If { end, .. } => {
+                        let return_params = block.return_params(&self.functions)?;
+                        stack.return_section(return_params.unwrap_or(&[]), Some(target))?;
+                        *pc = *end + 1;
+                    }
+                    // Keep the loop's section and skip re-executing the `loop` opcode
+                    Block::Loop { start, .. } => {
+                        let call_params = block.call_params(&self.functions)?;
+                        stack.reset_section(call_params.as_deref().unwrap_or(&[]), target)?;
+                        *pc = *start + 1;
+                    }
+                }
+            }
+            StackSection::Function(_) => {
+                return Ok(Some(FunctionScopedResult::FunctionReturn));
+            }
+        }
+
+        Ok(None)
     }
 
     pub fn new(data: &[u8]) -> Result<Self, HaltError> {

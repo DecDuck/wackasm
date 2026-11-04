@@ -17,9 +17,10 @@ op-profile = []
 [dev-dependencies]
 bitcode = { version = "0.6.9", features = ["serde"] }
 criterion = "0.5"
+wasmi = "2.0.0"
 
 [[bench]]
-name = "fuel_per_second"
+name = "percent_of_wasmi"
 harness = false
 
 [package.metadata.patch]

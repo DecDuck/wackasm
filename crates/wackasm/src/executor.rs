@@ -82,43 +82,6 @@ impl WackasmExecutor {
         )
     }
 
-    fn block_break(
-        stack: &mut FrameOperandStack,
-        blocks: &BlockManager,
-        functions: &FunctionManager,
-        pc: &mut ProgramCounter,
-        relative_depth: u32,
-    ) -> Result<Option<FunctionScopedResult>, HaltError> {
-        let target = stack.len_sections() - 1 - relative_depth as usize;
-        let block = stack
-            .peek_section(Some(target))
-            .ok_or_else(|| anyhow!("no block to escape when br_if"))?;
-
-        match block {
-            StackSection::Block(block_index) => {
-                let block = blocks.get(block_index)?;
-                match block {
-                    Block::Block { end, .. } | Block::If { end, .. } => {
-                        let return_params = block.return_params(functions)?;
-                        stack.return_section(return_params.unwrap_or(&[]), Some(target))?;
-                        *pc = *end + 1;
-                    }
-                    // Keep the loop's section and skip re-executing the `loop` opcode
-                    Block::Loop { start, .. } => {
-                        let call_params = block.call_params(functions)?;
-                        stack.reset_section(call_params.as_deref().unwrap_or(&[]), target)?;
-                        *pc = *start + 1;
-                    }
-                }
-            }
-            StackSection::Function(_) => {
-                return Ok(Some(FunctionScopedResult::FunctionReturn));
-            }
-        }
-
-        Ok(None)
-    }
-
     // runs X instructions, decrementing fuel
     fn incremental_execute(&mut self, instructions: usize) -> Result<isize, HaltError> {
         let mut instructions_executed = 0;
@@ -429,10 +392,9 @@ impl WackasmExecutor {
                     let branching = condition != 0;
 
                     if branching {
-                        if let Some(result) = WackasmExecutor::block_break(
-                            &mut self.stack,
+                        if let Some(result) = self.module.block_break(
                             &function_frame.block_lookup,
-                            &self.module.functions,
+                            &mut self.stack,
                             &mut pc,
                             *relative_depth,
                         )? {
@@ -445,10 +407,9 @@ impl WackasmExecutor {
                 }
 
                 WackasmOperator::Br { relative_depth } => {
-                    if let Some(result) = WackasmExecutor::block_break(
-                        &mut self.stack,
+                    if let Some(result) = self.module.block_break(
                         &function_frame.block_lookup,
-                        &self.module.functions,
+                        &mut self.stack,
                         &mut pc,
                         *relative_depth,
                     )? {
@@ -472,10 +433,9 @@ impl WackasmExecutor {
                                 trap!("no function for index {} in br_table args", decider)
                             })?
                     };
-                    if let Some(result) = WackasmExecutor::block_break(
-                        &mut self.stack,
+                    if let Some(result) = self.module.block_break(
                         &function_frame.block_lookup,
-                        &self.module.functions,
+                        &mut self.stack,
                         &mut pc,
                         *target,
                     )? {
