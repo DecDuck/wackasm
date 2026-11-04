@@ -13,7 +13,6 @@ mod locals;
 mod tests;
 
 const MAX_OPERAND_STACK_SIZE: usize = 200;
-const MAX_STACK_POOL: usize = 10;
 
 pub(crate) use locals::LocalStore;
 

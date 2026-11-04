@@ -38,10 +38,6 @@ impl GlobalStack for FlatBlockAwareStack {
     }
 
     fn pop(&mut self) -> Result<Value, HaltError> {
-        if self.stack.len() <= self.current_floor {
-            return Err(trap!("stack underflow"));
-        }
-
         self.stack.pop()
     }
 

@@ -16,8 +16,7 @@ cargo build \
     --lib
 
 cargo flamegraph \
-    --no-inline \
     --manifest-path "$script_directory/crates/wackasm-cli/Cargo.toml" \
     --bin wackasm \
-    --cmd 'record -F 99 -e cpu-clock --call-graph dwarf' \
+    --cmd 'record -F 997 -e cpu-clock --call-graph dwarf' \
     --output "$script_directory/flamegraph.svg"
