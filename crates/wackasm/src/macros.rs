@@ -28,7 +28,7 @@ pub(crate) use unsupported;
 /// ```
 macro_rules! i32_binop {
     ($stack:expr, $ty:ty, |$lhs:ident, $rhs:ident| $body:expr) => {{
-        use $crate::stack::OperandStackFns as _;
+        use $crate::stack::BlockAwareStack as _;
         let stack = &mut $stack;
         let $rhs = stack.pop_i32()? as $ty;
         let $lhs = stack.pop_i32()? as $ty;
@@ -45,7 +45,7 @@ pub(crate) use i32_binop;
 /// ```
 macro_rules! i64_binop {
     ($stack:expr, $ty:ty, |$lhs:ident, $rhs:ident| $body:expr) => {{
-        use $crate::stack::OperandStackFns as _;
+        use $crate::stack::BlockAwareStack as _;
         let stack = &mut $stack;
         let $rhs = stack.pop_i64()? as $ty;
         let $lhs = stack.pop_i64()? as $ty;
@@ -62,7 +62,7 @@ pub(crate) use i64_binop;
 /// ```
 macro_rules! i64_cmp {
     ($stack:expr, $ty:ty, |$lhs:ident, $rhs:ident| $body:expr) => {{
-        use $crate::stack::OperandStackFns as _;
+        use $crate::stack::BlockAwareStack as _;
         let stack = &mut $stack;
         let $rhs = stack.pop_i64()? as $ty;
         let $lhs = stack.pop_i64()? as $ty;
@@ -79,7 +79,7 @@ pub(crate) use i64_cmp;
 /// ```
 macro_rules! i32_load {
     ($stack:expr, $memories:expr, $memarg:expr, $width:ty) => {{
-        use $crate::stack::OperandStackFns as _;
+        use $crate::stack::BlockAwareStack as _;
         let stack = &mut $stack;
         let address = stack.pop_i32()? as u32;
         let value: $width = $memories.load($memarg, address)?;
@@ -96,7 +96,7 @@ pub(crate) use i32_load;
 /// ```
 macro_rules! i64_load {
     ($stack:expr, $memories:expr, $memarg:expr, $width:ty) => {{
-        use $crate::stack::OperandStackFns as _;
+        use $crate::stack::BlockAwareStack as _;
         let stack = &mut $stack;
         let address = stack.pop_i32()? as u32;
         let value: $width = $memories.load($memarg, address)?;
@@ -108,7 +108,7 @@ pub(crate) use i64_load;
 
 macro_rules! f32_load {
     ($stack:expr, $memories:expr, $memarg:expr) => {{
-        use $crate::stack::OperandStackFns as _;
+        use $crate::stack::BlockAwareStack as _;
         let stack = &mut $stack;
         let address = stack.pop_i32()? as u32;
         let value: f32 = $memories.load($memarg, address)?;
@@ -120,7 +120,7 @@ pub(crate) use f32_load;
 
 macro_rules! f64_load {
     ($stack:expr, $memories:expr, $memarg:expr) => {{
-        use $crate::stack::OperandStackFns as _;
+        use $crate::stack::BlockAwareStack as _;
         let stack = &mut $stack;
         let address = stack.pop_i32()? as u32;
         let value: f64 = $memories.load($memarg, address)?;
@@ -132,7 +132,7 @@ pub(crate) use f64_load;
 
 macro_rules! v128_load {
     ($stack:expr, $memories:expr, $memarg:expr) => {{
-        use $crate::stack::OperandStackFns as _;
+        use $crate::stack::BlockAwareStack as _;
         let stack = &mut $stack;
         let address = stack.pop_i32()? as u32;
         let value: u128 = $memories.load($memarg, address)?;
@@ -149,7 +149,7 @@ pub(crate) use v128_load;
 /// ```
 macro_rules! i32_store {
     ($stack:expr, $memories:expr, $memarg:expr, $width:ty) => {{
-        use $crate::stack::OperandStackFns as _;
+        use $crate::stack::BlockAwareStack as _;
         let stack = &mut $stack;
         let value = stack.pop_i32()?;
         let address = stack.pop_i32()? as u32;
@@ -166,7 +166,7 @@ pub(crate) use i32_store;
 /// ```
 macro_rules! i64_store {
     ($stack:expr, $memories:expr, $memarg:expr, $width:ty) => {{
-        use $crate::stack::OperandStackFns as _;
+        use $crate::stack::BlockAwareStack as _;
         let stack = &mut $stack;
         let value = stack.pop_i64()?;
         let address = stack.pop_i32()? as u32;
@@ -178,7 +178,7 @@ pub(crate) use i64_store;
 
 macro_rules! f32_store {
     ($stack:expr, $memories:expr, $memarg:expr) => {{
-        use $crate::stack::OperandStackFns as _;
+        use $crate::stack::BlockAwareStack as _;
         let stack = &mut $stack;
         let value = stack.pop_f32()?;
         let address = stack.pop_i32()? as u32;
@@ -190,7 +190,7 @@ pub(crate) use f32_store;
 
 macro_rules! f64_store {
     ($stack:expr, $memories:expr, $memarg:expr) => {{
-        use $crate::stack::OperandStackFns as _;
+        use $crate::stack::BlockAwareStack as _;
         let stack = &mut $stack;
         let value = stack.pop_f64()?;
         let address = stack.pop_i32()? as u32;
@@ -202,7 +202,7 @@ pub(crate) use f64_store;
 
 macro_rules! v128_store {
     ($stack:expr, $memories:expr, $memarg:expr) => {{
-        use $crate::stack::OperandStackFns as _;
+        use $crate::stack::BlockAwareStack as _;
         let stack = &mut $stack;
         let value = stack.pop_v128()?;
         let address = stack.pop_i32()? as u32;

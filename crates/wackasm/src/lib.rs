@@ -12,6 +12,8 @@ mod operator;
 mod pc;
 mod stack;
 mod table;
+use std::hash::Hash;
+
 pub use executor::WackasmExecutor;
 pub use module::WackasmModule;
 use serde::{Deserialize, Serialize};
