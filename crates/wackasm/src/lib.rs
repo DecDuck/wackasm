@@ -15,6 +15,7 @@ mod table;
 pub use executor::WackasmExecutor;
 pub use module::WackasmModule;
 use serde::{Deserialize, Serialize};
+use thiserror::Error;
 
 use crate::module::FunctionIndex;
 
@@ -39,5 +40,33 @@ impl Value {
     /// Returns whether this value contains a non-null function reference.
     pub fn is_func_ref(&self) -> bool {
         matches!(self, Self::FuncRef(_))
+    }
+}
+
+#[derive(Debug, Error)]
+pub enum HaltError {
+    #[error("trap triggered: {0}")]
+    Trap(anyhow::Error),
+    #[error("executor error: {0}")]
+    Error(anyhow::Error),
+    #[error("unsupported: {0}")]
+    Unsupported(anyhow::Error),
+}
+
+impl From<anyhow::Error> for HaltError {
+    fn from(value: anyhow::Error) -> Self {
+        HaltError::Error(value)
+    }
+}
+
+impl From<wasmparser::BinaryReaderError> for HaltError {
+    fn from(value: wasmparser::BinaryReaderError) -> Self {
+        HaltError::Error(value.into())
+    }
+}
+
+impl From<std::num::TryFromIntError> for HaltError {
+    fn from(value: std::num::TryFromIntError) -> Self {
+        HaltError::Error(value.into())
     }
 }

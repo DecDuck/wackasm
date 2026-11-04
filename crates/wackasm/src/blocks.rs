@@ -4,7 +4,12 @@ use anyhow::anyhow;
 use serde::{Deserialize, Serialize};
 use wasmparser::{BlockType, Operator, ValType};
 
-use crate::{module::BlockIndex, operator::OperatorView};
+use crate::{
+    HaltError,
+    macros::unsupported,
+    module::BlockIndex,
+    operator::OperatorView,
+};
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub(crate) enum Block {
@@ -35,12 +40,12 @@ impl Block {
         }
     }
 
-    pub fn if_block(&self) -> Result<(usize, Option<usize>, usize), anyhow::Error> {
+    pub fn if_block(&self) -> Result<(usize, Option<usize>, usize), HaltError> {
         match self {
             Block::If {
                 start, r#else, end, ..
             } => Ok((*start, r#else.clone(), *end)),
-            _ => Err(anyhow!("not an if block")),
+            _ => Err(anyhow!("not an if block").into()),
         }
     }
 }
@@ -86,7 +91,7 @@ impl PartialBlock {
 
 pub(crate) fn lookahead_find_blocks(
     code: &OperatorView,
-) -> Result<BlockManager, anyhow::Error> {
+) -> Result<BlockManager, HaltError> {
     let mut results = BlockManager::new();
     let mut stack = Vec::new();
     for (position, operator) in code.read().enumerate() {
@@ -121,7 +126,8 @@ pub(crate) fn lookahead_find_blocks(
                     _ => {
                         return Err(anyhow!(
                             "hit an else while not in an if block or an if block with an existing else"
-                        ));
+                        )
+                        .into());
                     }
                 }
             }
@@ -132,8 +138,8 @@ pub(crate) fn lookahead_find_blocks(
                     results.insert(BlockIndex(start_position as u32), finished_block);
                 }
             }
-            Operator::Try { blockty } => return Err(anyhow!("try not supported")),
-            Operator::TryTable { try_table } => return Err(anyhow!("try table not supported")),
+            Operator::Try { .. } => return Err(unsupported!("try not supported")),
+            Operator::TryTable { .. } => return Err(unsupported!("try table not supported")),
             _ => {}
         }
     }
@@ -151,11 +157,11 @@ impl BlockManager {
         Self { blocks: Vec::new() }
     }
 
-    pub fn get(&self, block_index: &BlockIndex) -> Result<&Block, anyhow::Error> {
+    pub fn get(&self, block_index: &BlockIndex) -> Result<&Block, HaltError> {
         self.blocks
             .get(block_index.0 as usize)
             .flatten_ref()
-            .ok_or_else(|| anyhow!("no block for block_index {:?}", block_index))
+            .ok_or_else(|| anyhow!("no block for block_index {:?}", block_index).into())
     }
 
     pub fn insert(&mut self, block_index: BlockIndex, block: Block) {

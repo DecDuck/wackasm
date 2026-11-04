@@ -3,7 +3,8 @@ use serde::{Deserialize, Serialize};
 use wasmparser::ValType;
 
 use crate::{
-    Value,
+    HaltError, Value,
+    macros::trap,
     stack::{MAX_OPERAND_STACK_SIZE, OperandStackFns},
 };
 
@@ -40,9 +41,9 @@ mod boxed_array {
 }
 
 impl OperandStackFns for OperandStack {
-    fn push(&mut self, value: Value) -> Result<(), anyhow::Error> {
+    fn push(&mut self, value: Value) -> Result<(), HaltError> {
         if self.len == MAX_OPERAND_STACK_SIZE {
-            return Err(anyhow!("stack overflow"));
+            return Err(trap!("stack overflow"));
         }
 
         self.len += 1;
@@ -50,7 +51,7 @@ impl OperandStackFns for OperandStack {
         Ok(())
     }
 
-    fn push_reversed_all(&mut self, mut values: Vec<Value>) -> Result<(), anyhow::Error> {
+    fn push_reversed_all(&mut self, mut values: Vec<Value>) -> Result<(), HaltError> {
         if values.is_empty() {
             return Ok(());
         }
@@ -59,16 +60,16 @@ impl OperandStackFns for OperandStack {
         let start = self.len;
         let end = start
             .checked_add(values.len())
-            .ok_or_else(|| anyhow!("stack overflow"))?;
+            .ok_or_else(|| trap!("stack overflow"))?;
 
         if end > MAX_OPERAND_STACK_SIZE {
-            return Err(anyhow!("stack overflow"));
+            return Err(trap!("stack overflow"));
         }
 
         let destination = self
             .inner
             .get_mut(start..end)
-            .ok_or_else(|| anyhow!("stack overflow"))?;
+            .ok_or_else(|| trap!("stack overflow"))?;
         destination.copy_from_slice(&values);
 
         self.len = end;
@@ -79,7 +80,7 @@ impl OperandStackFns for OperandStack {
     fn pull_reversed_from_stack(
         &mut self,
         returns: &[ValType],
-    ) -> Result<Vec<Value>, anyhow::Error> {
+    ) -> Result<Vec<Value>, HaltError> {
         let mut results = Vec::with_capacity(returns.len());
 
         for rtn in returns.iter().rev() {
@@ -97,9 +98,9 @@ impl OperandStackFns for OperandStack {
     }
 
     #[inline]
-    fn pop(&mut self) -> Result<Value, anyhow::Error> {
+    fn pop(&mut self) -> Result<Value, HaltError> {
         if self.len == 0 {
-            return Err(anyhow!("stack underflow"));
+            return Err(anyhow!("stack underflow").into());
         }
 
         self.len -= 1;
@@ -107,52 +108,52 @@ impl OperandStackFns for OperandStack {
     }
 
     #[inline]
-    fn peek(&mut self) -> Result<&Value, anyhow::Error> {
+    fn peek(&mut self) -> Result<&Value, HaltError> {
         if self.len == 0 {
-            return Err(anyhow!("stack underflow"));
+            return Err(anyhow!("stack underflow").into());
         }
         Ok(&self.inner[self.len - 1])
     }
 
     #[inline]
-    fn pop_i32(&mut self) -> Result<i32, anyhow::Error> {
+    fn pop_i32(&mut self) -> Result<i32, HaltError> {
         let value = self.pop()?;
         match value {
             Value::I32(v) => Ok(v),
-            _ => Err(anyhow!("invalid type, expected i32")),
+            _ => Err(anyhow!("invalid type, expected i32").into()),
         }
     }
 
     #[inline]
-    fn pop_i64(&mut self) -> Result<i64, anyhow::Error> {
+    fn pop_i64(&mut self) -> Result<i64, HaltError> {
         let value = self.pop()?;
         match value {
             Value::I64(v) => Ok(v),
-            _ => Err(anyhow!("invalid type, expected i64")),
+            _ => Err(anyhow!("invalid type, expected i64").into()),
         }
     }
 
-    fn pop_f32(&mut self) -> Result<f32, anyhow::Error> {
+    fn pop_f32(&mut self) -> Result<f32, HaltError> {
         let value = self.pop()?;
         match value {
             Value::F32(v) => Ok(v),
-            _ => Err(anyhow!("invalid type, expected f32")),
+            _ => Err(anyhow!("invalid type, expected f32").into()),
         }
     }
 
-    fn pop_f64(&mut self) -> Result<f64, anyhow::Error> {
+    fn pop_f64(&mut self) -> Result<f64, HaltError> {
         let value = self.pop()?;
         match value {
             Value::F64(v) => Ok(v),
-            _ => Err(anyhow!("invalid type, expected f64")),
+            _ => Err(anyhow!("invalid type, expected f64").into()),
         }
     }
 
-    fn pop_v128(&mut self) -> Result<u128, anyhow::Error> {
+    fn pop_v128(&mut self) -> Result<u128, HaltError> {
         let value = self.pop()?;
         match value {
             Value::V128(v) => Ok(v),
-            _ => Err(anyhow!("invalid type, expected v128")),
+            _ => Err(anyhow!("invalid type, expected v128").into()),
         }
     }
 }

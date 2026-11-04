@@ -129,6 +129,30 @@ fn assert_trap_requires_a_trapping_execution() {
 }
 
 #[test]
+fn classifies_traps_and_unsupported_features_by_error_kind() {
+    let summary = run_source(
+        r#"
+            (module
+                (memory 1)
+                (func (export "oob") (result i32) i32.const 65536 i32.load)
+                (func (export "unsupported") (result f32) f32.const 1 f32.const 2 f32.add))
+            (assert_trap (invoke "oob") "out of bounds memory access")
+            (assert_return (invoke "oob") (i32.const 0))
+            (assert_trap (invoke "unsupported") "unreachable")
+            (module (global f32 (f32.const 1)))
+        "#,
+    );
+    assert_eq!(
+        summary,
+        Summary {
+            passed: 2,
+            failed: 1,
+            unsupported: 2
+        }
+    );
+}
+
+#[test]
 fn validates_invalid_and_malformed_assertions() {
     let invalid =
         run_source(r#"(assert_invalid (module (func (result i32) f32.const 0)) "type mismatch")"#);
@@ -156,7 +180,7 @@ fn validates_invalid_and_malformed_assertions() {
 fn unsupported_execution_is_reported_and_later_directives_continue() {
     let summary = run_source(
         r#"
-            (module (func (export "unsupported") (result f32) f32.const 0))
+            (module (func (export "unsupported") (result f32) f32.const 1 f32.const 2 f32.add))
             (invoke "unsupported")
             (module (func (export "answer") (result i32) i32.const 42))
             (assert_return (invoke "answer") (i32.const 42))

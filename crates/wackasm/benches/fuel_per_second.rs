@@ -3,12 +3,12 @@ use std::hint::black_box;
 use criterion::{BatchSize, Criterion, Throughput, criterion_group, criterion_main};
 use wackasm::{Value, WackasmExecutor, WackasmModule};
 
-const WASM_PATH: &str = "compute/target/wasm32-unknown-unknown/release/compute.wasm";
+const WASM_PATH: &str = "/home/decduck/wackasm/compute/target/wasm32-unknown-unknown/release/compute.wasm";
 
 fn suspended_executor() -> anyhow::Result<Vec<u8>> {
     let contents = std::fs::read(WASM_PATH)?;
     let module = WackasmModule::new(&contents)?;
-    let mut executor = WackasmExecutor::new(module);
+    let mut executor = WackasmExecutor::new(module)?;
 
     executor.call_export(
         "run_prime_benchmark",

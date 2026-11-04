@@ -7,8 +7,9 @@ use wasmparser::{
 };
 
 use crate::{
-    Value,
+    HaltError, Value,
     const_expr::resolve_const_expr,
+    macros::{trap, unsupported},
     module::{FunctionIndex, TableIndex, TableValue},
 };
 
@@ -27,7 +28,7 @@ impl TableManager {
     pub fn process_table_section(
         &mut self,
         raw_tables: SectionLimited<Table>,
-    ) -> Result<(), anyhow::Error> {
+    ) -> Result<(), HaltError> {
         for (index, table) in raw_tables.into_iter().enumerate() {
             let table = table?;
             let index = TableIndex(index as u32);
@@ -39,7 +40,10 @@ impl TableManager {
                     match value {
                         Value::FuncRef(function_index) => TableValue::FuncRef(function_index),
                         _ => {
-                            return Err(anyhow!("value {:?} not supported for table init", value));
+                            return Err(unsupported!(
+                                "value {:?} not supported for table init",
+                                value
+                            ));
                         }
                     }
                 }
@@ -53,7 +57,7 @@ impl TableManager {
     pub fn process_element_section(
         &mut self,
         raw_elements: SectionLimited<Element>,
-    ) -> Result<(), anyhow::Error> {
+    ) -> Result<(), HaltError> {
         for element in raw_elements {
             let element = element?;
             match element.kind {
@@ -66,7 +70,7 @@ impl TableManager {
                     let offset = match offset {
                         Value::I32(value) => value,
                         _ => {
-                            return Err(anyhow!(
+                            return Err(unsupported!(
                                 "const value {:?} not supported for element table offset",
                                 offset
                             ));
@@ -82,17 +86,27 @@ impl TableManager {
                         ElementItems::Functions(fn_indexes) => {
                             for (local_offset, fn_index) in fn_indexes.into_iter().enumerate() {
                                 let fn_index = fn_index?;
-                                let true_offset = offset as usize + local_offset;
-                                table_value[true_offset] =
-                                    TableValue::FuncRef(FunctionIndex(fn_index))
+                                let true_offset = (offset as u32 as usize)
+                                    .checked_add(local_offset)
+                                    .ok_or_else(|| trap!("out of bounds table access"))?;
+                                let slot = table_value
+                                    .get_mut(true_offset)
+                                    .ok_or_else(|| trap!("out of bounds table access"))?;
+                                *slot = TableValue::FuncRef(FunctionIndex(fn_index));
                             }
                         }
-                        ElementItems::Expressions(ref_type, section_limited) => todo!(),
+                        ElementItems::Expressions(..) => {
+                            return Err(unsupported!("element expressions are not supported"));
+                        }
                     }
                 }
 
-                ElementKind::Passive => todo!(),
-                ElementKind::Declared => todo!(),
+                ElementKind::Passive => {
+                    return Err(unsupported!("passive element segments are not supported"));
+                }
+                ElementKind::Declared => {
+                    return Err(unsupported!("declared element segments are not supported"));
+                }
             }
         }
         Ok(())

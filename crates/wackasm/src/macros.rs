@@ -1,3 +1,23 @@
+/// Builds a [`HaltError::Trap`](crate::HaltError::Trap) for WebAssembly-defined
+/// runtime traps (out of bounds accesses, division by zero, etc).
+macro_rules! trap {
+    ($($arg:tt)*) => {
+        $crate::HaltError::Trap(::anyhow::anyhow!($($arg)*))
+    };
+}
+
+pub(crate) use trap;
+
+/// Builds a [`HaltError::Unsupported`](crate::HaltError::Unsupported) for valid
+/// WebAssembly that wackasm does not implement yet.
+macro_rules! unsupported {
+    ($($arg:tt)*) => {
+        $crate::HaltError::Unsupported(::anyhow::anyhow!($($arg)*))
+    };
+}
+
+pub(crate) use unsupported;
+
 /// Pops `rhs` then `lhs` as i32 (cast to `$ty`), evaluates `$body`, and pushes
 /// the result back as an i32. Works for arithmetic (`$ty` result) and
 /// comparisons (`bool` result).

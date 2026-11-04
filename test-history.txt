@@ -10,3 +10,5 @@
 - total: 17200 passed, 8697 failed, 38927 unsupported
 - total: 17236 passed, 8723 failed, 38865 unsupported
 - total: 17461 passed, 8721 failed, 38642 unsupported
+- total: 17452 passed, 3399 failed, 43973 unsupported
+- total: 18501 passed, 914 failed, 45409 unsupported
