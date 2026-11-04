@@ -7,12 +7,7 @@ use wasmparser::{
 };
 
 use crate::{
-    HaltError, Value,
-    compiler::WackasmFunctionBody,
-    macros::trap,
-    module::{FunctionFrame, FunctionIndex, FunctionTypeIndex},
-    pc::ProgramCounter,
-    stack::{FrameOperandStack, GlobalStack as _},
+    HaltError, Value, compiler::WackasmFunctionBody, macros::trap, module::{FunctionFrame, FunctionIndex, FunctionTypeIndex}, pc::ProgramCounter, stack::{FrameOperandStack, GlobalStack as _, RuntimeStack as _},
 };
 
 const MAX_CALL_DEPTH: usize = 10_000;
@@ -161,8 +156,6 @@ impl FunctionManager {
         if callstack.len() >= MAX_CALL_DEPTH {
             return Err(trap!("call stack exhausted"));
         }
-
-        let mut stack = stack.handle();
 
         let code_body = self.get_function_code(&function_index)?;
 

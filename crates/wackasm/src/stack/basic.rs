@@ -1,3 +1,5 @@
+use std::marker::PhantomData;
+
 use anyhow::anyhow;
 use serde::{Deserialize, Serialize};
 use wasmparser::ValType;
@@ -6,7 +8,7 @@ use crate::{
     HaltError, Value,
     compiler::DropKeep,
     macros::trap,
-    stack::{GlobalStack, val_types_to_size},
+    stack::{GlobalStack, RuntimeStack, StackHandle, val_types_to_size},
 };
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -15,80 +17,44 @@ pub(crate) struct OperandStack {
     len: usize,
 }
 
-pub(crate) struct LocalOperandStack<'a> {
-    inner: &'a mut [Value],
-    len: usize,
-    writeback_len: &'a mut usize,
-}
-
-impl<'a> Drop for LocalOperandStack<'a> {
-    fn drop(&mut self) {
-        *self.writeback_len = self.len;
+impl GlobalStack for OperandStack {
+    fn reconcile(&mut self, handle: *mut Value) {
+        let start = self.inner.as_ptr();
+        let len = unsafe { handle.offset_from_unsigned(start) };
+        debug_assert!(len <= self.inner.len(), "stack handle ran past the buffer");
+        self.len = len;
     }
-}
 
-impl OperandStack {
     #[inline(always)]
-    pub(crate) fn handle(&mut self) -> LocalOperandStack<'_> {
-        LocalOperandStack {
-            len: self.len,
-            inner: &mut self.inner[..],
-            writeback_len: &mut self.len,
-        }
-    }
-}
-
-impl<'a> GlobalStack for LocalOperandStack<'a> {
     fn len(&self) -> usize {
         self.len
     }
 
+    #[inline(always)]
     fn clear(&mut self) {
         self.len = 0;
     }
 
+    #[inline(always)]
+    fn space(&self) -> usize {
+        self.inner.len() - self.len
+    }
+
+    #[inline(always)]
     fn push_all(&mut self, values: &[Value]) {
         let end = self.len + values.len();
         self.inner[self.len..end].copy_from_slice(values);
         self.len = end;
     }
 
-    fn push(&mut self, value: Value) {
-        self.len += 1;
-        self.inner[self.len - 1] = value;
-    }
-    fn space(&self) -> usize {
-        self.inner.len() - self.len
-    }
-
-    fn pop(&mut self) -> Value {
-        self.len -= 1;
-        self.inner[self.len] // - 1 not required to access by index here because we -1 above
-    }
-
-    fn peek(&mut self) -> &Value {
-        &self.inner[self.len - 1]
-    }
-    fn peek_wide(&mut self) -> u128 {
-        let low = &self.inner[self.len - 2].0;
-        let high = &self.inner[self.len - 1].0;
-        let mut result = [0u8; 16];
-        result[0..8].copy_from_slice(&low.to_le_bytes());
-        result[8..].copy_from_slice(&high.to_le_bytes());
-        u128::from_le_bytes(result)
-    }
-
-    fn peek_mut(&mut self) -> &mut Value {
-        &mut self.inner[self.len - 1]
-    }
-
-    fn drop_keep(&mut self, dk: DropKeep) {
-        let (drop, keep) = (dk.drop as usize, dk.keep as usize);
+    #[inline(always)]
+    fn unwind_to(&mut self, target: usize, keep: usize) {
         let len = self.len;
-        self.inner.copy_within(len - keep..len, len - keep - drop);
-        self.len = len - drop;
+        self.inner.copy_within(len - keep..len, target);
+        self.len = target + keep;
     }
 
+    #[inline(always)]
     fn pull_results(&mut self, types: &[ValType]) -> Result<Vec<Value>, HaltError> {
         let type_len = val_types_to_size(types);
         let start = self
@@ -105,19 +71,105 @@ impl<'a> GlobalStack for LocalOperandStack<'a> {
             .cloned()
             .collect())
     }
+}
 
-    fn unwind_to(&mut self, target: usize, keep: usize) {
-        let len = self.len;
-        self.inner.copy_within(len - keep..len, target);
-        self.len = target + keep;
+#[repr(transparent)]
+pub(crate) struct LocalOperandStack<'a> {
+    inner: *mut Value,
+    _borrow: PhantomData<&'a mut OperandStack>,
+}
+
+const _: () = assert!(size_of::<LocalOperandStack<'static>>() == size_of::<*mut Value>());
+
+impl<'a> RuntimeStack for LocalOperandStack<'a> {
+    fn into_raw(self) -> *mut Value {
+        self.inner
     }
 
-    fn local_get(&self, base: usize, index: u32) -> Value {
-        self.inner[base + index as usize]
+    #[inline(always)]
+    fn push(&mut self, value: Value) {
+        unsafe {
+            self.inner.write(value);
+            self.inner = self.inner.add(1);
+        }
     }
 
-    fn local_set(&mut self, base: usize, index: u32, value: Value) {
-        self.inner[base + index as usize] = value;
+    #[inline(always)]
+    fn pop(&mut self) -> Value {
+        unsafe {
+            self.inner = self.inner.sub(1);
+            *self.inner // - 1 not required to access by index here because we -1 above
+        }
+    }
+
+    #[inline(always)]
+    fn peek(&mut self) -> &Value {
+        unsafe { &*self.inner.sub(1) }
+    }
+
+    #[inline(always)]
+    fn peek_wide(&mut self) -> u128 {
+        unsafe {
+            let low = (*self.inner.sub(2)).0 as u128;
+            let high = (*self.inner.sub(1)).0 as u128;
+            (high << 64) | low
+        }
+    }
+
+    #[inline(always)]
+    fn peek_mut(&mut self) -> &mut Value {
+        unsafe { &mut *self.inner.sub(1) }
+    }
+
+    #[inline(always)]
+    fn drop_keep(&mut self, dk: DropKeep) {
+        let (drop, keep) = (dk.drop as usize, dk.keep as usize);
+        unsafe {
+            match keep {
+                // Move nothing
+                0 => {}
+                // Move a single value down
+                1 => {
+                    self.inner
+                        .sub(drop + keep)
+                        .write(self.inner.sub(keep).read());
+                }
+                _ => {
+                    let src = self.inner.sub(keep);
+                    let dst = self.inner.sub(keep + drop);
+                    let count = keep;
+                    core::ptr::copy(src, dst, count);
+                }
+            }
+            self.inner = self.inner.sub(drop);
+        }
+    }
+}
+
+#[derive(Clone, Copy)]
+#[repr(transparent)]
+pub(crate) struct Locals<'a> {
+    base: *mut Value,
+    _borrow: PhantomData<&'a mut OperandStack>,
+}
+
+impl Locals<'_> {
+    #[inline(always)]
+    pub fn get(self, slot: u32) -> Value {
+        unsafe { self.base.add(slot as usize).read() }
+    }
+    #[inline(always)]
+    pub fn set(self, slot: u32, value: Value) {
+        unsafe { self.base.add(slot as usize).write(value) }
+    }
+    #[inline(always)]
+    pub fn get_wide(self, slot: u32) -> u128 {
+        (self.get(slot).0 as u128) | ((self.get(slot + 1).0 as u128) << 64)
+    }
+    #[inline(always)]
+    pub fn set_wide(self, slot: u32, v: u128) {
+        self.set(slot, Value(v as u64));
+        self.set(slot + 1, Value((v >> 64) as u64));
     }
 }
 
@@ -127,5 +179,23 @@ impl OperandStack {
             inner: vec![Value(u64::MAX); capacity],
             len: 0,
         }
+    }
+
+    #[inline(always)]
+    pub(crate) fn handle<'a>(
+        &'a mut self,
+        local_base: usize,
+    ) -> (LocalOperandStack<'a>, Locals<'a>) {
+        let pointer = unsafe { self.inner.as_mut_ptr() };
+        (
+            LocalOperandStack {
+                inner: unsafe { pointer.add(self.len) },
+                _borrow: PhantomData,
+            },
+            Locals {
+                base: unsafe { pointer.add(local_base) },
+                _borrow: PhantomData,
+            },
+        )
     }
 }
