@@ -1,18 +1,19 @@
 #![feature(vec_peek_mut)]
+#![feature(option_reference_flattening)]
 
-mod macros;
-mod module;
-mod executor;
-mod stack;
 mod blocks;
+mod const_expr;
+mod executor;
+mod globals;
+mod macros;
+mod memory;
+mod module;
 mod operator;
 mod pc;
-mod const_expr;
-mod memory;
-mod globals;
+mod stack;
 mod table;
-pub use module::WackasmModule;
 pub use executor::WackasmExecutor;
+pub use module::WackasmModule;
 use serde::{Deserialize, Serialize};
 
 use crate::module::FunctionIndex;

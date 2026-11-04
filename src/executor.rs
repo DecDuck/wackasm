@@ -9,15 +9,10 @@ use serde::{Deserialize, Serialize};
 use wasmparser::Operator;
 
 use crate::{
-    Value, WackasmModule,
-    blocks::Block,
-    macros::{i32_binop, i32_load, i32_store, i64_binop, i64_cmp},
-    module::{
+    Value, WackasmModule, blocks::{Block, BlockManager}, macros::{i32_binop, i32_load, i32_store, i64_binop, i64_cmp}, module::{
         BlockIndex, ExportIndex, FunctionFrame, FunctionIndex, FunctionTypeIndex, GlobalIndex,
         TableIndex, TableValue,
-    },
-    pc::ProgramCounterHandle,
-    stack::{BlockAwareOperandStack, OperandStackFns as _},
+    }, pc::ProgramCounterHandle, stack::{BlockAwareOperandStack, OperandStackFns as _},
 };
 
 const MAX_INSTRUCTIONS_IN_LOOP: isize = 500;
@@ -51,7 +46,7 @@ impl WackasmExecutor {
             .module
             .exports
             .get(name)
-            .ok_or(anyhow!("function not found"))?;
+            .ok_or_else(|| anyhow!("function not found"))?;
         let function = match function {
             ExportIndex::Func(function_type_index) => function_type_index,
             _ => return Err(anyhow!("not a function")),
@@ -69,7 +64,7 @@ impl WackasmExecutor {
             .module
             .init_function_frames
             .get(&function_index)
-            .ok_or(anyhow!(
+            .ok_or_else(|| anyhow!(
                 "internal module corruption: cannot lookup initial function state"
             ))?;
         let mut function = function.clone();
@@ -79,7 +74,7 @@ impl WackasmExecutor {
             self.module
                 .function_types
                 .get(&function_index)
-                .ok_or(anyhow!(
+                .ok_or_else(|| anyhow!(
                     "no function type index for function index {:?}",
                     function_index
                 ))?;
@@ -87,7 +82,7 @@ impl WackasmExecutor {
             .module
             .function_type_indexes
             .get(function_type_index)
-            .ok_or(anyhow!(
+            .ok_or_else(|| anyhow!(
                 "no function type for function type index {:?}",
                 function_type_index
             ))?;
@@ -113,7 +108,7 @@ impl WackasmExecutor {
 
     fn block_break(
         operand_stack: &mut BlockAwareOperandStack,
-        block_lookup: &HashMap<BlockIndex, Block>,
+        block_lookup: &BlockManager,
         pc: &mut ProgramCounterHandle<'_>,
         relative_depth: u32,
     ) -> Result<(), anyhow::Error> {
@@ -128,8 +123,7 @@ impl WackasmExecutor {
             .peek_block()
             .ok_or_else(|| anyhow!("no block for br_if"))?;
         let last_block = block_lookup
-            .get(last_block_idx)
-            .ok_or_else(|| anyhow!("no block for block index"))?;
+            .get(last_block_idx)?;
 
         match last_block {
             Block::Loop { start, .. } => {
@@ -153,7 +147,7 @@ impl WackasmExecutor {
         let function_frame = self
             .callstack
             .last_mut()
-            .ok_or(anyhow!("callstack empty"))?;
+            .ok_or_else(|| anyhow!("callstack empty"))?;
 
         for _ in 0..instructions {
             *instructions_executed += 1;
@@ -232,7 +226,7 @@ impl WackasmExecutor {
 
                     let table_value = table
                         .get(func_index_index as u32 as usize)
-                        .ok_or(anyhow!("no function index for {:?}", func_index_index))?;
+                        .ok_or_else(|| anyhow!("no function index for {:?}", func_index_index))?;
 
                     let func_index = match table_value {
                         TableValue::FuncRef(items) => items,
@@ -249,8 +243,7 @@ impl WackasmExecutor {
                     let block_index = BlockIndex(pc.inner() as u32);
                     let block = function_frame
                         .block_lookup
-                        .get(&block_index)
-                        .ok_or_else(|| anyhow!("no block for pc {}", pc.inner()))?
+                        .get(&block_index)?
                         .clone();
 
                     let condition = function_frame.stack.pop_i32()?;
@@ -285,11 +278,10 @@ impl WackasmExecutor {
                     let block_index = function_frame
                         .stack
                         .peek_block()
-                        .ok_or(anyhow!("hit else op not in block"))?;
+                        .ok_or_else(|| anyhow!("hit else op not in block"))?;
                     let block = function_frame
                         .block_lookup
-                        .get(block_index)
-                        .ok_or(anyhow!("no block for current block index?"))?;
+                        .get(block_index)?;
 
                     let (_, _, end) = block.if_block()?;
                     // Jump to end block which will handle block frame cleanup
@@ -300,8 +292,7 @@ impl WackasmExecutor {
                     let block_index = BlockIndex(pc.inner() as u32);
                     let block = function_frame
                         .block_lookup
-                        .get(&block_index)
-                        .ok_or_else(|| anyhow!("no block for pc {}", pc.inner()))?
+                        .get(&block_index)?
                         .clone();
 
                     self.module
@@ -553,7 +544,7 @@ impl WackasmExecutor {
                     .module
                     .init_function_frames
                     .get(&function_index)
-                    .ok_or(anyhow!("no function for {:?}", function_index))?
+                    .ok_or_else(|| anyhow!("no function for {:?}", function_index))?
                     .clone();
 
                 let function_type = self.module.function_idx_type(&function_index)?.clone();

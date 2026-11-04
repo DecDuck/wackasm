@@ -7,7 +7,15 @@ use wasmparser::{
 };
 
 use crate::{
-    Value, blocks::{Block, lookahead_find_blocks}, const_expr::resolve_const_expr, globals::{Global, GlobalManager}, memory::{LinearMemory, MemoryManager}, operator::OperatorView, pc::ProgramCounter, stack::{BlockAwareOperandStack, LocalStore, OperandStackFns}, table::TableManager,
+    Value,
+    blocks::{Block, BlockManager, lookahead_find_blocks},
+    const_expr::resolve_const_expr,
+    globals::{Global, GlobalManager},
+    memory::{LinearMemory, MemoryManager},
+    operator::OperatorView,
+    pc::ProgramCounter,
+    stack::{BlockAwareOperandStack, LocalStore, OperandStackFns},
+    table::TableManager,
 };
 
 macro_rules! type_indexes {
@@ -48,7 +56,7 @@ pub(crate) enum TableValue {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub(crate) struct FunctionFrame {
     pub(crate) function_index: FunctionIndex,
-    pub(crate) block_lookup: Arc<HashMap<BlockIndex, Block>>,
+    pub(crate) block_lookup: Arc<BlockManager>,
     pub(crate) locals: LocalStore,
     pub(crate) code: OperatorView,
 
@@ -96,7 +104,7 @@ impl WackasmModule {
             function_index: FunctionIndex(u32::MAX),
             locals: LocalStore::new(),
             code: OperatorView::empty(),
-            block_lookup: Arc::new(HashMap::new()),
+            block_lookup: Arc::new(BlockManager::new()),
 
             // Runtime state
             stack: BlockAwareOperandStack::new(0),
@@ -108,13 +116,15 @@ impl WackasmModule {
         function_state.function_index = *function_index;
         let function_type_index = function_types
             .get(function_index)
-            .ok_or(anyhow!("no function type for index {:?}", function_index))?;
+            .ok_or_else(|| anyhow!("no function type for index {:?}", function_index))?;
         let function_type = function_type_indexes
             .get(function_type_index)
-            .ok_or(anyhow!(
-                "no concrete type for function type index {:?}",
-                function_type_index
-            ))?;
+            .ok_or_else(|| {
+                anyhow!(
+                    "no concrete type for function type index {:?}",
+                    function_type_index
+                )
+            })?;
         let params = function_type.params();
         for param in params {
             function_state.locals.insert(
@@ -139,8 +149,7 @@ impl WackasmModule {
         function_state.code = OperatorView::new(code_section)?;
         function_state.block_lookup = Arc::new(lookahead_find_blocks(&function_state.code)?);
         // reinit block stack for performance
-        function_state.stack =
-            BlockAwareOperandStack::new(function_state.block_lookup.len());
+        function_state.stack = BlockAwareOperandStack::new(function_state.block_lookup.len());
 
         initial_function_states.push(function_state);
         Ok(())
@@ -176,17 +185,21 @@ impl WackasmModule {
         &self,
         function_index: &FunctionIndex,
     ) -> Result<&FuncType, anyhow::Error> {
-        let function_type_index = self.function_types.get(function_index).ok_or(anyhow!(
-            "no function type index for function index {:?}",
-            function_index
-        ))?;
+        let function_type_index = self.function_types.get(function_index).ok_or_else(|| {
+            anyhow!(
+                "no function type index for function index {:?}",
+                function_index
+            )
+        })?;
         let function_type = self
             .function_type_indexes
             .get(function_type_index)
-            .ok_or(anyhow!(
-                "no function type for function type index {:?}",
-                function_type_index
-            ))?;
+            .ok_or_else(|| {
+                anyhow!(
+                    "no function type for function type index {:?}",
+                    function_type_index
+                )
+            })?;
 
         Ok(function_type)
     }
@@ -198,7 +211,7 @@ impl WackasmModule {
         let function_type = self
             .function_type_indexes
             .get(function_type_index)
-            .ok_or(anyhow!(
+            .ok_or_else(|| anyhow!(
                 "no function type for function type index {:?}",
                 function_type_index
             ))?;

@@ -73,7 +73,7 @@ impl MemoryManager {
                     let linear_memory = self
                         .memories
                         .get_mut(memory_index as usize)
-                        .ok_or(anyhow!("no linear memory for index {}", memory_index))?;
+                        .ok_or_else(|| anyhow!("no linear memory for index {}", memory_index))?;
 
                     let start = usize::try_from(offset_value as u32)?;
                     let end = start
@@ -129,11 +129,13 @@ impl MemoryManager {
             .checked_add(length)
             .ok_or_else(|| anyhow!("memory.fill out of bounds"))?;
 
-        let destination = memory.buffer.get_mut(start..end).ok_or(anyhow!(
-            "failed to get memory region at {} for {} bytes",
-            start,
-            length
-        ))?;
+        let destination = memory.buffer.get_mut(start..end).ok_or_else(|| {
+            anyhow!(
+                "failed to get memory region at {} for {} bytes",
+                start,
+                length
+            )
+        })?;
         destination.fill(value);
 
         Ok(())
