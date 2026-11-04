@@ -33,7 +33,7 @@ impl<R: WackasmResource> WackasmLinkerResources<R> {
     }
 }
 
-impl<Ctx: Clone, I: WackasmImports<Ctx, R>, R: WackasmResource> WackasmHostBridge<Ctx, I, R> {
+impl<Ctx, I: WackasmImports<Ctx, R>, R: WackasmResource> WackasmHostBridge<Ctx, I, R> {
     pub fn new(ctx: Ctx, imports: I) -> Self {
         Self {
             ctx,

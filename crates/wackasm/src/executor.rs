@@ -7,7 +7,15 @@ use anyhow::anyhow;
 use serde::{Deserialize, Deserializer, Serialize};
 
 use crate::{
-    HaltError, Value, WackasmModule, compiler::RuntimeWackasmOperator, dispatch::{DispatchCtx, Exit, dispatch}, macros::trap, memory::MemoryManager, module::{ExportIndex, FunctionFrame, FunctionIndex}, pc::ProgramCounter, stack::{
+    HaltError, Value, WackasmModule,
+    compiler::RuntimeWackasmOperator,
+    dispatch::{DispatchCtx, Exit, dispatch},
+    imports::{WackasmHostBridge, WackasmImports, WackasmResource},
+    macros::trap,
+    memory::MemoryManager,
+    module::{ExportIndex, FunctionFrame, FunctionIndex},
+    pc::ProgramCounter,
+    stack::{
         FrameOperandStack, GlobalStack as _, RuntimeStack as _, StackHandle, val_types_to_size,
     },
 };
@@ -29,6 +37,7 @@ pub enum FunctionScopedResult {
     FunctionCall { function_index: u32 },
 }
 
+#[must_use]
 pub enum HostYield {
     OutOfFuel,
     Return,
@@ -57,7 +66,9 @@ impl WackasmExecutor {
                 start_func,
                 Some(Vec::new()),
             )?;
-            me.execute()?;
+            if !matches!(me.execute()?, HostYield::Return) {
+                return Err(trap!("got a non-return host yield while running _start"));
+            }
         }
 
         Ok(me)
@@ -308,5 +319,30 @@ impl WackasmExecutor {
                 ctx.fuel,
             )),
         };
+    }
+}
+
+impl WackasmExecutor {
+    pub fn execute_with_imports<Ctx, I: WackasmImports<Ctx, R>, R: WackasmResource>(
+        &mut self,
+        host_bridge: &mut WackasmHostBridge<Ctx, I, R>,
+    ) -> Result<HostYield, HaltError> {
+        loop {
+            match self.execute()? {
+                HostYield::ImportCall {
+                    module,
+                    name,
+                    args,
+                    should_return,
+                } => {
+                    let result = host_bridge.call_untyped(self, &module, &name, args)?;
+                    if result.len() != should_return {
+                        Err(anyhow!("host_bridge returned wrong result len"))?
+                    }
+                    self.import_return(&result)?;
+                }
+                v => return Ok(v)
+            }
+        }
     }
 }

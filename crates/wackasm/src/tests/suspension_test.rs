@@ -1,4 +1,11 @@
-use crate::{Value, WackasmExecutor, WackasmModule, imports::NoResources};
+use crate::{
+    HostYield, Value, WackasmExecutor, WackasmModule,
+    imports::{NoResources, NoWackasmImports, WackasmHostBridge},
+};
+
+fn host_bridge() -> WackasmHostBridge<(), NoWackasmImports, NoResources> {
+    WackasmHostBridge::new((), NoWackasmImports {})
+}
 
 static WASM: &[u8] =
     include_bytes!("../../../../compute/target/wasm32-unknown-unknown/release/compute.wasm");
@@ -16,8 +23,11 @@ pub fn suspension_test() {
             vec![Value::from_i32(1000000), Value::from_i32(80)],
         )
         .expect("failed to queue call_export");
-    executor.execute().expect("failed to execute");
-    let fuel_used = executor.get_fuel();
+    let state = executor
+        .execute_with_imports(&mut host_bridge())
+        .expect("failed to execute");
+    assert!(matches!(state, HostYield::Return));
+    let fuel_used = isize::MAX - executor.get_fuel();
 
     let correct = executor.get_result().expect("no result");
 
@@ -31,11 +41,18 @@ pub fn suspension_test() {
         )
         .expect("failed to queue call_export");
 
+    let mut host_bridge = host_bridge();
     let iterations = 5;
     let fuel_per_iterator = fuel_used / iterations;
-    for _ in 0..iterations {
+    loop {
         executor.set_fuel(fuel_per_iterator);
-        executor.execute().expect("failed to continue execution");
+        let state = executor
+            .execute_with_imports(&mut host_bridge)
+            .expect("failed to continue execution");
+        if matches!(state, HostYield::Return) {
+            break;
+        }
+        assert!(matches!(state, HostYield::OutOfFuel));
         let raw_executor = bitcode::serialize(&executor).expect("failed to suspend");
         drop(executor);
         executor = bitcode::deserialize(&raw_executor).expect("failed to resume");

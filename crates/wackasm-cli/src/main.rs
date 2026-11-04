@@ -54,7 +54,7 @@ pub fn main() -> Result<(), anyhow::Error> {
     )?;
 
     executor.set_fuel(10);
-    executor.execute()?;
+    let _ = executor.execute_with_imports(&mut host_bridge)?;
 
     println!("before serialize: {:?}", executor.get_result());
 
@@ -70,19 +70,7 @@ pub fn main() -> Result<(), anyhow::Error> {
 
     executor.set_fuel(isize::MAX);
     let start = Instant::now();
-    loop {
-        match executor.execute()? {
-            HostYield::OutOfFuel => unreachable!(),
-            HostYield::Return => break,
-            HostYield::ImportCall { module, name, args, should_return } => {
-                let result = host_bridge.call_untyped(&mut executor, &module, &name, args)?;
-                if result.len() != should_return {
-                    Err(anyhow!("host_bridge returned wrong result len"))?
-                }
-                executor.import_return(&result)?;
-            }
-        }
-    }
+    let _ = executor.execute_with_imports(&mut host_bridge)?;
     let time = start.elapsed();
 
     let consumed_fuel = isize::MAX - executor.get_fuel();
