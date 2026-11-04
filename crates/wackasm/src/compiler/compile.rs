@@ -1,3 +1,4 @@
+use anyhow::anyhow;
 use wasmparser::Operator;
 
 use crate::{
@@ -33,7 +34,15 @@ pub fn compile(
                 let block = block_lookup.get(&idx)?.clone();
                 WackasmOperator::If { block, idx }
             }
-            Operator::Else => WackasmOperator::Else,
+            Operator::Else => {
+                let block = block_lookup
+                    .find_if_by_else_pc(pc)
+                    .ok_or_else(|| anyhow!("no if statement for else operator at {}", pc))?;
+
+                let (_, _, end) = block.if_block()?;
+
+                WackasmOperator::Else { end }
+            }
             Operator::End => WackasmOperator::End,
             Operator::Return => WackasmOperator::Return,
             Operator::Select => WackasmOperator::Select,

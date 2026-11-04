@@ -42,7 +42,7 @@ pub enum WackasmOperator {
     Block { block: Block, idx: BlockIndex },
     Loop { block: Block, idx: BlockIndex },
     If { block: Block, idx: BlockIndex },
-    Else,
+    Else { end: usize },
     End,
     Return,
     Select,
