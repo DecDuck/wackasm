@@ -66,14 +66,10 @@ impl BlockAwareStack for FlatBlockAwareStack {
     fn push_block(
         &mut self,
         block_idx: BlockIndex,
-        reversed_parameters: Option<Vec<Value>>,
+        pull_from_parent: Option<&[ValType]>,
     ) -> Result<(), crate::HaltError> {
-        self.current_floor = self.stack.len();
+        self.current_floor = self.stack.len() - pull_from_parent.map_or(0, |v| v.len());
         self.blocks.push((block_idx, self.current_floor));
-
-        if let Some(params) = reversed_parameters {
-            self.push_reversed_all(params)?;
-        }
 
         Ok(())
     }

@@ -24,7 +24,6 @@ use crate::{
 };
 
 const MAX_INSTRUCTIONS_IN_LOOP: isize = 500;
-const MAX_CALL_DEPTH: usize = 10_000;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct WackasmExecutor {
@@ -50,7 +49,7 @@ impl WackasmExecutor {
         };
 
         if let Some(start_func) = me.module.start_func.take() {
-            me.call_internal(start_func, Some(Vec::new()))?;
+            me.module.functions.call_internal(&mut me.callstack, start_func, Some(Vec::new()))?;
         }
 
         Ok(me)
@@ -71,77 +70,9 @@ impl WackasmExecutor {
             _ => return Err(HaltError::Error(anyhow!("not a function"))),
         };
 
-        self.call_internal(*function, Some(arguments))
-    }
-
-    fn call_internal(
-        &mut self,
-        function_index: FunctionIndex,
-        arguments: Option<Vec<Value>>,
-    ) -> Result<(), HaltError> {
-        if self.callstack.len() >= MAX_CALL_DEPTH {
-            return Err(trap!("call stack exhausted"));
-        }
-
-        let function = self
-            .module
-            .init_function_frames
-            .get(&function_index)
-            .ok_or_else(|| {
-                anyhow!("internal module corruption: cannot lookup initial function state")
-            })?;
-        let mut function = function.clone();
-
-        // Get function signature
-        let function_type_index =
-            self.module
-                .function_types
-                .get(&function_index)
-                .ok_or_else(|| {
-                    anyhow!(
-                        "no function type index for function index {:?}",
-                        function_index
-                    )
-                })?;
-        let function_type = self
-            .module
-            .function_type_indexes
-            .get(function_type_index)
-            .ok_or_else(|| {
-                anyhow!(
-                    "no function type for function type index {:?}",
-                    function_type_index
-                )
-            })?;
-
-        let params = function_type.params();
-        let arguments = if let Some(arguments) = arguments {
-            if arguments.len() != params.len() {
-                return Err(HaltError::Error(anyhow!(
-                    "invalid amount of arguments, expected {}, got {}",
-                    params.len(),
-                    arguments.len()
-                )));
-            }
-            arguments
-        } else {
-            let mut calling_frame = self.callstack.peek_mut().expect("no calling frame?");
-            let calling_operands_types = function_type.params();
-            let mut arguments = calling_frame
-                .stack
-                .pull_reversed_from_stack(calling_operands_types)?;
-            arguments.reverse();
-            arguments
-        };
-
-        // Insert arguments
-        for (index, value) in arguments.into_iter().enumerate() {
-            function.locals.set_checked(index as u32, value)?;
-        }
-
-        self.callstack.push(function);
-
-        Ok(())
+        self.module
+            .functions
+            .call_internal(&mut self.callstack, *function, Some(arguments))
     }
 
     fn block_break(
@@ -193,7 +124,8 @@ impl WackasmExecutor {
 
                 let function_type = self
                     .module
-                    .function_idx_type(&function_frame.function_index)?;
+                    .functions
+                    .function_type_idx(&function_frame.function_index)?;
 
                 let result_types = function_type.results();
                 let results = function_frame
@@ -211,7 +143,9 @@ impl WackasmExecutor {
             FunctionScopedResult::FunctionCall { function_index } => {
                 let function_index = FunctionIndex(function_index);
 
-                self.call_internal(function_index, None)?;
+                self.module
+                    .functions
+                    .call_internal(&mut self.callstack, function_index, None)?;
             }
         }
 
@@ -526,7 +460,7 @@ impl WackasmExecutor {
                             wasmparser::BlockType::FuncType(func_type) => {
                                 let func_type_index = FunctionTypeIndex(*func_type); // This is right, don't change this.
                                 let func_type =
-                                    self.module.function_type_idx_type(&func_type_index)?;
+                                    self.module.functions.function_type_idx_type(&func_type_index)?;
                                 Some(func_type.results().to_vec())
                             }
                         };
@@ -583,6 +517,9 @@ impl WackasmExecutor {
                 }
                 Operator::I32And => {
                     i32_binop!(function_frame.stack, i32, |lhs, rhs| lhs & rhs)
+                }
+                Operator::I32Xor => {
+                    i32_binop!(function_frame.stack, i32, |lhs, rhs| lhs ^ rhs)
                 }
 
                 // i32 comparators

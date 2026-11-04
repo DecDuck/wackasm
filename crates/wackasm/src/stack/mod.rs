@@ -37,7 +37,7 @@ pub(crate) trait BlockAwareStack {
     fn push_block(
         &mut self,
         block_idx: BlockIndex,
-        reversed_parameters: Option<Vec<Value>>,
+        pull_from_parent: Option<&[ValType]>,
     ) -> Result<(), HaltError>;
 
     fn return_block(&mut self, preserve: &[ValType]) -> Result<Option<BlockIndex>, HaltError>;

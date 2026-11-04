@@ -438,9 +438,10 @@ fn block_pops_down_to_floor_only<S: TestStack>() {
 fn push_block_with_parameters<S: TestStack>() {
     let mut stack = S::create();
     stack.push(Value::from_i32(100)).unwrap();
-    // Parameters are given in reversed order, as from `pull_reversed_from_stack`.
+    stack.push(Value::from_i32(1)).unwrap();
+    stack.push(Value::from_i64(2)).unwrap();
     stack
-        .push_block(BlockIndex(0), Some(vec![Value::from_i64(2), Value::from_i32(1)]))
+        .push_block(BlockIndex(0), Some(&[ValType::I32, ValType::I64]))
         .unwrap();
 
     assert_pop(&mut stack, Value::from_i64(2));
@@ -451,21 +452,19 @@ fn push_block_with_parameters<S: TestStack>() {
 fn push_block_with_empty_parameters<S: TestStack>() {
     let mut stack = S::create();
     stack.push(Value::from_i32(100)).unwrap();
-    stack.push_block(BlockIndex(0), Some(Vec::new())).unwrap();
+    stack.push_block(BlockIndex(0), Some(&[])).unwrap();
     assert_empty(&mut stack);
     assert_eq!(stack.peek_block(), Some(&BlockIndex(0)));
 }
 
-fn block_parameters_from_pull_preserve_order<S: TestStack>() {
-    // Simulates the executor moving block params from the parent into a block.
+fn block_parameters_preserve_order<S: TestStack>() {
     let mut stack = S::create();
     stack.push(Value::from_i32(1)).unwrap();
     stack.push(Value::from_i64(2)).unwrap();
 
-    let params = stack
-        .pull_reversed_from_stack(&[ValType::I32, ValType::I64])
+    stack
+        .push_block(BlockIndex(0), Some(&[ValType::I32, ValType::I64]))
         .unwrap();
-    stack.push_block(BlockIndex(0), Some(params)).unwrap();
 
     assert_eq!(stack.pop_i64().unwrap(), 2);
     assert_eq!(stack.pop_i32().unwrap(), 1);
@@ -590,10 +589,9 @@ fn block_with_parameters_and_results<S: TestStack>() {
     stack.push(Value::from_i32(3)).unwrap();
     stack.push(Value::from_i32(4)).unwrap();
 
-    let params = stack
-        .pull_reversed_from_stack(&[ValType::I32, ValType::I32])
+    stack
+        .push_block(BlockIndex(9), Some(&[ValType::I32, ValType::I32]))
         .unwrap();
-    stack.push_block(BlockIndex(9), Some(params)).unwrap();
 
     let b = stack.pop_i32().unwrap();
     let a = stack.pop_i32().unwrap();
@@ -796,7 +794,7 @@ macro_rules! stack_tests {
                 block_pops_down_to_floor_only,
                 push_block_with_parameters,
                 push_block_with_empty_parameters,
-                block_parameters_from_pull_preserve_order,
+                block_parameters_preserve_order,
                 return_block_without_preserve_discards_values,
                 return_block_preserves_single_value,
                 return_block_preserves_multiple_values_in_order,
