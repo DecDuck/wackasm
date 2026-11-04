@@ -381,10 +381,7 @@ impl WackasmExecutor {
                 }
 
                 // Control flow
-                WackasmOperator::If => {
-                    let block_index = BlockIndex(pc as u32);
-                    let block = function_frame.block_lookup.get(&block_index)?;
-
+                WackasmOperator::If { block, idx } => {
                     let condition = self.stack.pop_i32()?;
                     let condition = condition != 0;
 
@@ -408,7 +405,7 @@ impl WackasmExecutor {
 
                     if start_block {
                         self.module
-                            .start_block(&mut self.stack, &block, &block_index)?;
+                            .start_block(&mut self.stack, &block, idx)?;
                     }
 
                     // Skip PC increment
@@ -432,12 +429,8 @@ impl WackasmExecutor {
                     continue;
                 }
 
-                WackasmOperator::Block | WackasmOperator::Loop => {
-                    let block_index = BlockIndex(pc as u32);
-                    let block = function_frame.block_lookup.get(&block_index)?;
-
-                    self.module
-                        .start_block(&mut self.stack, &block, &block_index)?;
+                WackasmOperator::Block { block, idx } | WackasmOperator::Loop { block, idx } => {
+                    self.module.start_block(&mut self.stack, &block, idx)?;
                 }
 
                 WackasmOperator::BrIf { relative_depth } => {
@@ -575,6 +568,9 @@ impl WackasmExecutor {
                 WackasmOperator::I32GtS => {
                     i32_binop!(self.stack, i32, |lhs, rhs| lhs > rhs)
                 }
+                WackasmOperator::I32LtS => {
+                    i32_binop!(self.stack, i32, |lhs, rhs| lhs < rhs)
+                }
                 WackasmOperator::I32LtU => {
                     i32_binop!(self.stack, u32, |lhs, rhs| lhs < rhs)
                 }
@@ -672,9 +668,12 @@ impl WackasmExecutor {
                     let value = value as i32;
                     self.stack.push(Value(value as u64))?;
                 }
+                WackasmOperator::Unreachable => {
+                    return Err(trap!("unreachable"));
+                }
                 WackasmOperator::Unsupported { description } => {
                     return Err(unsupported!("unsupported operator: {}", description));
-                },
+                }
             }
 
             pc += 1;

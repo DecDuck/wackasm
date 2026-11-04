@@ -5,7 +5,14 @@ use serde::{Deserialize, Serialize};
 use wasmparser::{FuncType, FunctionBody, Import, Imports, RecGroup, SectionLimited};
 
 use crate::{
-    HaltError, Value, WackasmModule, blocks::{BlockManager, lookahead_find_blocks}, compiler::WackasmFunctionBody, macros::trap, module::{FunctionFrame, FunctionIndex, FunctionTypeIndex}, operator::OperatorView, pc::ProgramCounter, stack::{FrameOperandStack, GlobalStack as _, LocalStore, StackSection},
+    HaltError, Value, WackasmModule,
+    blocks::{BlockManager, lookahead_find_blocks},
+    compiler::WackasmFunctionBody,
+    macros::trap,
+    module::{FunctionFrame, FunctionIndex, FunctionTypeIndex},
+    operator::OperatorView,
+    pc::ProgramCounter,
+    stack::{FrameOperandStack, GlobalStack as _, LocalStore, StackSection},
 };
 
 const MAX_CALL_DEPTH: usize = 10_000;
@@ -146,8 +153,8 @@ impl FunctionManager {
         }
 
         // Save function body for later
-        function_state.code = WackasmFunctionBody::compile(&code_section)?;
         function_state.block_lookup = Arc::new(lookahead_find_blocks(&code_section)?);
+        function_state.code = WackasmFunctionBody::compile(&code_section, &function_state.block_lookup)?;
 
         self.init_function_frames.push(function_state);
         Ok(())

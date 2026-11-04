@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use wasmparser::{BrTable, MemArg};
 
-use crate::HaltError;
+use crate::{HaltError, blocks::Block, module::BlockIndex};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WackasmMemArg {
@@ -39,9 +39,9 @@ pub enum WackasmOperator {
     // Control
     Unreachable,
     Nop,
-    Block,
-    Loop,
-    If,
+    Block { block: Block, idx: BlockIndex },
+    Loop { block: Block, idx: BlockIndex },
+    If { block: Block, idx: BlockIndex },
     Else,
     End,
     Return,

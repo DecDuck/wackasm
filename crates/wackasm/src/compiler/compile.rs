@@ -1,17 +1,38 @@
 use wasmparser::Operator;
 
-use crate::{HaltError, compiler::{WackasmFunctionBody, WackasmOperator, WackasmTableTargets}};
+use crate::{
+    HaltError,
+    blocks::BlockManager,
+    compiler::{WackasmFunctionBody, WackasmOperator, WackasmTableTargets},
+    module::BlockIndex,
+};
 
-pub fn compile(code: Vec<Operator<'_>>) -> Result<WackasmFunctionBody, HaltError> {
+pub fn compile(
+    code: Vec<Operator<'_>>,
+    block_lookup: &BlockManager,
+) -> Result<WackasmFunctionBody, HaltError> {
     let mut compiled = Vec::with_capacity(code.len());
-    for operator in code {
+    for (pc, operator) in code.into_iter().enumerate() {
         let compiled_operator = match operator {
             // Control
             Operator::Unreachable => WackasmOperator::Unreachable,
             Operator::Nop => WackasmOperator::Nop,
-            Operator::Block { .. } => WackasmOperator::Block,
-            Operator::Loop { .. } => WackasmOperator::Loop,
-            Operator::If { .. } => WackasmOperator::If,
+            Operator::Block { .. } => {
+                let idx = BlockIndex(pc as u32);
+                let block = block_lookup.get(&idx)?.clone();
+                WackasmOperator::Block { block, idx }
+            }
+            Operator::Loop { .. } => {
+                let idx = BlockIndex(pc as u32);
+                let block = block_lookup.get(&idx)?.clone();
+
+                WackasmOperator::Loop { block, idx }
+            }
+            Operator::If { .. } => {
+                let idx = BlockIndex(pc as u32);
+                let block = block_lookup.get(&idx)?.clone();
+                WackasmOperator::If { block, idx }
+            }
             Operator::Else => WackasmOperator::Else,
             Operator::End => WackasmOperator::End,
             Operator::Return => WackasmOperator::Return,
