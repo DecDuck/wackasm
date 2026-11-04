@@ -1,20 +1,23 @@
 use serde::{Deserialize, Serialize};
-use wasmparser::{BrTable, MemArg};
+use wasmparser::{BlockType, BrTable, MemArg};
 
-use crate::{HaltError, blocks::Block, module::BlockIndex};
+use crate::{HaltError, macros::unsupported, module::{BlockIndex, FunctionTypeIndex}};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WackasmMemArg {
-    pub(crate) offset: u64,
+    pub(crate) offset: u32,
     pub(crate) memory: u32,
 }
 
-impl From<MemArg> for WackasmMemArg {
-    fn from(value: MemArg) -> Self {
-        WackasmMemArg {
-            offset: value.offset,
+impl TryFrom<MemArg> for WackasmMemArg {
+    type Error = HaltError;
+
+    fn try_from(value: MemArg) -> Result<Self, Self::Error> {
+        Ok(WackasmMemArg {
+            offset: u32::try_from(value.offset)
+                .map_err(|_| unsupported!("memarg offset {} exceeds 32 bits", value.offset))?,
             memory: value.memory,
-        }
+        })
     }
 }
 
@@ -34,14 +37,34 @@ impl WackasmTableTargets {
     }
 }
 
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+pub struct BlockParams(u32);
+
+impl BlockParams {
+    pub const NONE: Self = Self(u32::MAX);
+
+    pub fn from_block_type(ty: &BlockType) -> Self {
+        match ty {
+            BlockType::FuncType(i) => Self(*i),
+            _ => Self::NONE,
+        }
+    }
+
+    pub fn get(self) -> Option<FunctionTypeIndex> {
+        (self.0 != u32::MAX).then_some(FunctionTypeIndex(self.0))
+    }
+}
+
+const _: () = assert!(std::mem::size_of::<WackasmOperator>() <= 16);
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum WackasmOperator {
     // Control
     Unreachable,
     Nop,
-    Block { block: Block, idx: BlockIndex },
-    Loop { block: Block, idx: BlockIndex },
-    If { block: Block, idx: BlockIndex },
+    Block { params: BlockParams, idx: BlockIndex },
+    Loop { params: BlockParams, idx: BlockIndex },
+    If { params: BlockParams, idx: BlockIndex, false_target: u32, has_else: bool },
     Else { end: usize },
     End,
     Return,
@@ -52,7 +75,7 @@ pub enum WackasmOperator {
     // Br
     BrIf { relative_depth: u32 },
     Br { relative_depth: u32 },
-    BrTable { targets: WackasmTableTargets },
+    BrTable { targets: Box<WackasmTableTargets> },
 
     // Stack
     LocalGet { local_index: u32 },
@@ -149,5 +172,5 @@ pub enum WackasmOperator {
     I64Eqz,
 
     // Placeholder for operators without an implementation; traps only if executed
-    Unsupported { description: String },
+    Unsupported { description: Box<String> },
 }

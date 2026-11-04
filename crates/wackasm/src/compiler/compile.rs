@@ -2,10 +2,7 @@ use anyhow::anyhow;
 use wasmparser::Operator;
 
 use crate::{
-    HaltError,
-    blocks::BlockManager,
-    compiler::{WackasmFunctionBody, WackasmOperator, WackasmTableTargets},
-    module::BlockIndex,
+    HaltError, blocks::BlockManager, compiler::{BlockParams, WackasmFunctionBody, WackasmOperator, WackasmTableTargets}, module::BlockIndex,
 };
 
 pub fn compile(
@@ -21,18 +18,25 @@ pub fn compile(
             Operator::Block { .. } => {
                 let idx = BlockIndex(pc as u32);
                 let block = block_lookup.get(&idx)?.clone();
-                WackasmOperator::Block { block, idx }
+                let params = BlockParams::from_block_type(block.ty());
+                WackasmOperator::Block { idx, params }
             }
             Operator::Loop { .. } => {
                 let idx = BlockIndex(pc as u32);
                 let block = block_lookup.get(&idx)?.clone();
-
-                WackasmOperator::Loop { block, idx }
+                let params = BlockParams::from_block_type(block.ty());
+                WackasmOperator::Loop { idx, params }
             }
             Operator::If { .. } => {
                 let idx = BlockIndex(pc as u32);
                 let block = block_lookup.get(&idx)?.clone();
-                WackasmOperator::If { block, idx }
+                let params = BlockParams::from_block_type(block.ty());
+                let (_, r#else, end) = block.if_block()?;
+
+                let false_target = r#else.unwrap_or(end) as u32 + 1;
+                let has_else = r#else.is_some();
+
+                WackasmOperator::If { idx, params, false_target, has_else }
             }
             Operator::Else => {
                 let block = block_lookup
@@ -55,7 +59,7 @@ pub fn compile(
             Operator::BrIf { relative_depth } => WackasmOperator::BrIf { relative_depth },
             Operator::Br { relative_depth } => WackasmOperator::Br { relative_depth },
             Operator::BrTable { ref targets } => WackasmOperator::BrTable {
-                targets: WackasmTableTargets::new(targets)?,
+                targets: Box::new(WackasmTableTargets::new(targets)?),
             },
 
             // Stack
@@ -72,81 +76,81 @@ pub fn compile(
 
             // Loads
             Operator::I32Load { memarg } => WackasmOperator::I32Load {
-                memarg: memarg.into(),
+                memarg: memarg.try_into()?,
             },
             Operator::I32Load8U { memarg } => WackasmOperator::I32Load8U {
-                memarg: memarg.into(),
+                memarg: memarg.try_into()?,
             },
             Operator::I32Load8S { memarg } => WackasmOperator::I32Load8S {
-                memarg: memarg.into(),
+                memarg: memarg.try_into()?,
             },
             Operator::I32Load16U { memarg } => WackasmOperator::I32Load16U {
-                memarg: memarg.into(),
+                memarg: memarg.try_into()?,
             },
             Operator::I32Load16S { memarg } => WackasmOperator::I32Load16S {
-                memarg: memarg.into(),
+                memarg: memarg.try_into()?,
             },
             Operator::I64Load { memarg } => WackasmOperator::I64Load {
-                memarg: memarg.into(),
+                memarg: memarg.try_into()?,
             },
             Operator::I64Load8U { memarg } => WackasmOperator::I64Load8U {
-                memarg: memarg.into(),
+                memarg: memarg.try_into()?,
             },
             Operator::I64Load8S { memarg } => WackasmOperator::I64Load8S {
-                memarg: memarg.into(),
+                memarg: memarg.try_into()?,
             },
             Operator::I64Load16U { memarg } => WackasmOperator::I64Load16U {
-                memarg: memarg.into(),
+                memarg: memarg.try_into()?,
             },
             Operator::I64Load16S { memarg } => WackasmOperator::I64Load16S {
-                memarg: memarg.into(),
+                memarg: memarg.try_into()?,
             },
             Operator::I64Load32U { memarg } => WackasmOperator::I64Load32U {
-                memarg: memarg.into(),
+                memarg: memarg.try_into()?,
             },
             Operator::I64Load32S { memarg } => WackasmOperator::I64Load32S {
-                memarg: memarg.into(),
+                memarg: memarg.try_into()?,
             },
             Operator::F32Load { memarg } => WackasmOperator::F32Load {
-                memarg: memarg.into(),
+                memarg: memarg.try_into()?,
             },
             Operator::F64Load { memarg } => WackasmOperator::F64Load {
-                memarg: memarg.into(),
+                memarg: memarg.try_into()?,
             },
             Operator::V128Load { memarg } => WackasmOperator::V128Load {
-                memarg: memarg.into(),
+                memarg: memarg.try_into()?,
             },
 
             // Stores
             Operator::I32Store { memarg } => WackasmOperator::I32Store {
-                memarg: memarg.into(),
+                memarg: memarg.try_into()?,
             },
             Operator::I32Store8 { memarg } => WackasmOperator::I32Store8 {
-                memarg: memarg.into(),
+                memarg: memarg.try_into()?,
             },
             Operator::I32Store16 { memarg } => WackasmOperator::I32Store16 {
-                memarg: memarg.into(),
+                memarg: memarg.try_into()?,
             },
             Operator::I64Store { memarg } => WackasmOperator::I64Store {
-                memarg: memarg.into(),
+                memarg: memarg.try_into()?,
             },
             Operator::I64Store8 { memarg } => WackasmOperator::I64Store8 {
-                memarg: memarg.into(),
+                memarg: memarg.try_into()?,
             },
             Operator::I64Store16 { memarg } => WackasmOperator::I64Store16 {
-                memarg: memarg.into(),
+                memarg: memarg.try_into()?,
             },
             Operator::I64Store32 { memarg } => WackasmOperator::I64Store32 {
-                memarg: memarg.into(),
+                memarg: memarg.try_into()?,
             },
             Operator::F32Store { memarg } => WackasmOperator::F32Store {
-                memarg: memarg.into(),
+                memarg: memarg.try_into()?,
             },
             Operator::F64Store { memarg } => WackasmOperator::F64Store {
-                memarg: memarg.into(),
+                memarg: memarg.try_into()?,
             },
             Operator::V128Store { memarg } => WackasmOperator::V128Store {
-                memarg: memarg.into(),
+                memarg: memarg.try_into()?,
             },
 
             // Maths
@@ -203,7 +207,7 @@ pub fn compile(
             Operator::I64Eqz => WackasmOperator::I64Eqz,
 
             _ => WackasmOperator::Unsupported {
-                description: format!("{:?}", operator),
+                description: Box::new(format!("{:?}", operator)),
             },
         };
         compiled.push(compiled_operator);
