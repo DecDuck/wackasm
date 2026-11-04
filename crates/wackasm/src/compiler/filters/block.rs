@@ -57,7 +57,9 @@ impl BlockPass {
                 (end + 1, block.return_params(functions)?)
             }
             // Loops break back to the start, and take their call params
-            Block::Loop { start, .. } => (start + 1, block.call_params(functions)?),
+            // Branch back directly to the loop instruction, so we hit the consume fuel that
+            // we replace it with
+            Block::Loop { start, .. } => (*start, block.call_params(functions)?),
         };
 
         let frame = validator
@@ -102,7 +104,7 @@ impl CompilerFilter for BlockPass {
             Operator::Block { .. } | Operator::Loop { .. } => {
                 self.block_stack.push(BlockIndex(pc as u32));
 
-                None
+                Some(WackasmOperator::ConsumeFuel)
             }
             Operator::If { .. } => {
                 let idx = BlockIndex(pc as u32);

@@ -67,6 +67,13 @@ impl<'a> FromResidual<Result<Infallible, HaltError>> for Exit<'a> {
 ops!(|ctx, pc, stack, locals| match op {
     nop @ Nop => {}
 
+    fuel @ ConsumeFuel => {
+        if ctx.fuel == 0 {
+            return Exit::OutOfFuel { pc, stack, fuel: ctx.fuel };
+        }
+        ctx.fuel -= 1;
+    }
+
     local_get @ LocalGet { slot } => {
         stack.push(locals.get(*slot));
     }
