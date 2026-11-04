@@ -25,6 +25,7 @@ pub(crate) struct DispatchCtx<'a> {
     pub(crate) functions: &'a FunctionManager, // CallIndirect type check
     pub(crate) code: &'a [WackasmOperator],
     pub(crate) fuel: isize,
+    pub(crate) exit: Option<Exit<'a>>
 }
 
 impl DispatchCtx<'_> {
@@ -39,29 +40,16 @@ pub(crate) enum Exit<'a> {
     OutOfFuel {
         pc: *const WackasmOperator,
         stack: StackHandle<'a>,
-        fuel: isize,
     },
     Call {
         pc: *const WackasmOperator,
         stack: StackHandle<'a>,
-        fuel: isize,
         function_index: u32,
     },
     Return {
         pc: *const WackasmOperator,
         stack: StackHandle<'a>,
-        fuel: isize,
     },
-    Halt(HaltError),
-}
-
-// Lets `?` on `Result<_, HaltError>` (e.g. in the memory macros) halt from a handler.
-impl<'a> FromResidual<Result<Infallible, HaltError>> for Exit<'a> {
-    #[inline(always)]
-    fn from_residual(residual: Result<Infallible, HaltError>) -> Self {
-        let Err(err) = residual;
-        Exit::Halt(err)
-    }
 }
 
 ops!(|ctx, pc, stack, locals| match op {
@@ -69,7 +57,8 @@ ops!(|ctx, pc, stack, locals| match op {
 
     fuel @ ConsumeFuel => {
         if ctx.fuel == 0 {
-            return Exit::OutOfFuel { pc, stack, fuel: ctx.fuel };
+            ctx.exit = Some(Exit::OutOfFuel { pc, stack, });
+            return Ok(())
         }
         ctx.fuel -= 1;
     }
@@ -217,12 +206,12 @@ ops!(|ctx, pc, stack, locals| match op {
     }
 
     call @ Call { function_index } => {
-        return Exit::Call {
+        ctx.exit = Some(Exit::Call {
             pc: unsafe { pc.add(1) },
             stack,
-            fuel: ctx.fuel,
             function_index: *function_index,
-        };
+        });
+        return Ok(())
     }
 
     call_indirect @ CallIndirect {
@@ -233,7 +222,7 @@ ops!(|ctx, pc, stack, locals| match op {
         let table = ctx
             .tables
             .get(&TableIndex(*table_index))
-            .ok_or_else(|| anyhow!("no table for index {}", table_index).into())?;
+            .ok_or_else(|| anyhow!("no table for index {}", table_index))?;
 
         let table_value = table
             .get(func_index_index as u32 as usize)
@@ -253,12 +242,12 @@ ops!(|ctx, pc, stack, locals| match op {
             Err(trap!("indirect call type mismatch"))?;
         }
 
-        return Exit::Call {
+        ctx.exit = Some(Exit::Call {
             pc: unsafe { pc.add(1) },
             stack,
-            fuel: ctx.fuel,
             function_index: func_index.0,
-        };
+        });
+        return Ok(())
     }
 
     jump @ Jump { target } => {
@@ -296,11 +285,11 @@ ops!(|ctx, pc, stack, locals| match op {
         let i = stack.pop_i32() as u32 as usize;
         match targets[i.min(targets.len() - 1)] {
             WackasmTableTarget::Return => {
-                return Exit::Return {
+                ctx.exit = Some(Exit::Return {
                     pc,
                     stack,
-                    fuel: ctx.fuel,
-                };
+                });
+                return Ok(())
             }
             WackasmTableTarget::Break { target, dk } => {
                 stack.drop_keep(dk);
@@ -311,19 +300,19 @@ ops!(|ctx, pc, stack, locals| match op {
     }
 
     ret @ Return => {
-        return Exit::Return {
+        ctx.exit = Some(Exit::Return {
             pc,
             stack,
-            fuel: ctx.fuel,
-        };
+        });
+        return Ok(())
     }
     ret_if @ ReturnIf => {
         if stack.pop_i32() != 0 {
-            return Exit::Return {
+            ctx.exit = Some(Exit::Return {
                 pc,
                 stack,
-                fuel: ctx.fuel,
-            };
+            });
+            return Ok(())
         }
     }
 
@@ -475,10 +464,10 @@ ops!(|ctx, pc, stack, locals| match op {
     }
 
     unreachable @ Unreachable => {
-        return Exit::Halt(trap!("unreachable"));
+        Err(trap!("unreachable"))?;
     }
     unsupported @ Unsupported { description } => {
-        return Exit::Halt(unsupported!("unsupported operator: {}", description));
+        Err(unsupported!("unsupported operator: {}", description))?;
     }
 });
 
@@ -487,6 +476,6 @@ pub fn dispatch<'a>(
     pc: *const WackasmOperator,
     stack: StackHandle<'a>,
     locals: LocalsHandle<'a>,
-) -> Exit<'a> {
+) -> Result<(), HaltError> {
     dispatch!(ctx, pc, stack, locals);
 }

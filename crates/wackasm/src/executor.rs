@@ -184,6 +184,7 @@ impl WackasmExecutor {
             tables: &self.module.tables,
             code: code_view,
             fuel: instructions,
+            exit: None,
         };
 
         let base_ptr = code_view.as_ptr();
@@ -197,29 +198,33 @@ impl WackasmExecutor {
             unsafe { p.offset_from_unsigned(base_ptr) }
         };
 
-        let exit = dispatch(&mut ctx, pc, stack, locals);
-        return match exit {
-            Exit::OutOfFuel { pc, stack, fuel } => {
-                Ok((FunctionScopedResult::OutOfFuel, to_index(pc), stack, fuel))
-            }
+        dispatch(&mut ctx, pc, stack, locals)?;
+        return match ctx
+            .exit
+            .ok_or_else(|| anyhow!("dispatch yieled but no exit value"))?
+        {
+            Exit::OutOfFuel { pc, stack } => Ok((
+                FunctionScopedResult::OutOfFuel,
+                to_index(pc),
+                stack,
+                ctx.fuel,
+            )),
             Exit::Call {
                 pc,
                 stack,
-                fuel,
                 function_index,
             } => Ok((
                 FunctionScopedResult::FunctionCall { function_index },
                 to_index(pc),
                 stack,
-                fuel,
+                ctx.fuel,
             )),
-            Exit::Return { pc, stack, fuel } => Ok((
+            Exit::Return { pc, stack } => Ok((
                 FunctionScopedResult::FunctionReturn,
                 to_index(pc),
                 stack,
-                fuel,
+                ctx.fuel,
             )),
-            Exit::Halt(halt_error) => Err(halt_error),
         };
     }
 }
