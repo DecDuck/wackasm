@@ -1,12 +1,16 @@
 use anyhow::anyhow;
 use wasmparser::ValType;
 
-use crate::{HaltError, Value, module::BlockIndex, stack::{basic::OperandStack, flat::FlatBlockAwareStack}};
+use crate::{
+    HaltError, Value,
+    module::BlockIndex,
+    stack::{basic::OperandStack, flat::FlatBlockAwareStack},
+};
 
 mod basic;
 mod block;
-mod locals;
 mod flat;
+mod locals;
 #[cfg(test)]
 mod tests;
 
@@ -36,49 +40,42 @@ pub(crate) trait BlockAwareStack {
         reversed_parameters: Option<Vec<Value>>,
     ) -> Result<(), HaltError>;
 
-    fn return_block(
-        &mut self,
-        preserve: &[ValType],
-    ) -> Result<Option<BlockIndex>, HaltError>;
+    fn return_block(&mut self, preserve: &[ValType]) -> Result<Option<BlockIndex>, HaltError>;
     fn peek_block(&self) -> Option<&BlockIndex>;
 
     fn pop_i32(&mut self) -> Result<i32, HaltError> {
-        let value = self.pop()?;
-        match value {
-            Value::I32(v) => Ok(v),
-            _ => Err(anyhow!("invalid type, expected i32").into()),
-        }
+        Ok(self.pop()?.0 as i32)
     }
 
     fn pop_i64(&mut self) -> Result<i64, HaltError> {
-        let value = self.pop()?;
-        match value {
-            Value::I64(v) => Ok(v),
-            _ => Err(anyhow!("invalid type, expected i64").into()),
-        }
+        Ok(self.pop()?.0 as i64)
     }
 
     fn pop_f32(&mut self) -> Result<f32, HaltError> {
-        let value = self.pop()?;
-        match value {
-            Value::F32(v) => Ok(v),
-            _ => Err(anyhow!("invalid type, expected f32").into()),
-        }
+        Ok(self.pop()?.as_f32())
     }
 
     fn pop_f64(&mut self) -> Result<f64, HaltError> {
-        let value = self.pop()?;
-        match value {
-            Value::F64(v) => Ok(v),
-            _ => Err(anyhow!("invalid type, expected f64").into()),
-        }
+        Ok(self.pop()?.as_f64())
+    }
+
+    fn push_v128(&mut self, value: u128) -> Result<(), HaltError> {
+        let bytes = value.to_le_bytes();
+        let low = u64::from_le_bytes(bytes[0..8].try_into().unwrap());
+        let high = u64::from_le_bytes(bytes[8..].try_into().unwrap());
+
+        self.push(Value(high))?;
+        self.push(Value(low))?;
+
+        Ok(())
     }
 
     fn pop_v128(&mut self) -> Result<u128, HaltError> {
-        let value = self.pop()?;
-        match value {
-            Value::V128(v) => Ok(v),
-            _ => Err(anyhow!("invalid type, expected v128").into()),
-        }
+        let low = self.pop()?.0;
+        let high = self.pop()?.0;
+        let mut result = [0u8; 16];
+        result[0..8].copy_from_slice(&low.to_le_bytes());
+        result[8..].copy_from_slice(&high.to_le_bytes());
+        Ok(u128::from_le_bytes(result))
     }
 }

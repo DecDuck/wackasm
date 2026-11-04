@@ -9,8 +9,8 @@ pub(crate) fn resolve_const_expr(expr: ConstExpr) -> Result<Value, HaltError> {
     for operand in operands {
         let operand = operand?;
         match operand {
-            Operator::I32Const { value } => return Ok(Value::I32(value)),
-            Operator::I64Const { value } => return Ok(Value::I64(value)),
+            Operator::I32Const { value } => return Ok(Value(value as u64)),
+            Operator::I64Const { value } => return Ok(Value(value as u64)),
             _ => {
                 return Err(unsupported!(
                     "operand {:?} not supported for const exprs",

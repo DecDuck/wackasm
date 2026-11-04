@@ -32,7 +32,7 @@ macro_rules! i32_binop {
         let stack = &mut $stack;
         let $rhs = stack.pop_i32()? as $ty;
         let $lhs = stack.pop_i32()? as $ty;
-        stack.push($crate::Value::I32(($body) as i32))?;
+        stack.push($crate::Value(($body) as u64))?;
     }};
 }
 
@@ -49,7 +49,7 @@ macro_rules! i64_binop {
         let stack = &mut $stack;
         let $rhs = stack.pop_i64()? as $ty;
         let $lhs = stack.pop_i64()? as $ty;
-        stack.push($crate::Value::I64(($body) as i64))?;
+        stack.push($crate::Value(($body) as u64))?;
     }};
 }
 
@@ -66,7 +66,7 @@ macro_rules! i64_cmp {
         let stack = &mut $stack;
         let $rhs = stack.pop_i64()? as $ty;
         let $lhs = stack.pop_i64()? as $ty;
-        stack.push($crate::Value::I32(($body) as i32))?;
+        stack.push($crate::Value(($body) as u64))?;
     }};
 }
 
@@ -83,7 +83,7 @@ macro_rules! i32_load {
         let stack = &mut $stack;
         let address = stack.pop_i32()? as u32;
         let value: $width = $memories.load($memarg, address)?;
-        stack.push($crate::Value::I32(value as i32))?;
+        stack.push($crate::Value(value as u64))?;
     }};
 }
 
@@ -100,7 +100,7 @@ macro_rules! i64_load {
         let stack = &mut $stack;
         let address = stack.pop_i32()? as u32;
         let value: $width = $memories.load($memarg, address)?;
-        stack.push($crate::Value::I64(value as i64))?;
+        stack.push($crate::Value(value as u64))?;
     }};
 }
 
@@ -112,7 +112,7 @@ macro_rules! f32_load {
         let stack = &mut $stack;
         let address = stack.pop_i32()? as u32;
         let value: f32 = $memories.load($memarg, address)?;
-        stack.push($crate::Value::F32(value))?;
+        stack.push($crate::Value::from_f32(value))?;
     }};
 }
 
@@ -124,7 +124,7 @@ macro_rules! f64_load {
         let stack = &mut $stack;
         let address = stack.pop_i32()? as u32;
         let value: f64 = $memories.load($memarg, address)?;
-        stack.push($crate::Value::F64(value))?;
+        stack.push($crate::Value::from_f64(value))?;
     }};
 }
 
@@ -136,7 +136,7 @@ macro_rules! v128_load {
         let stack = &mut $stack;
         let address = stack.pop_i32()? as u32;
         let value: u128 = $memories.load($memarg, address)?;
-        stack.push($crate::Value::V128(value))?;
+        stack.push_v128(value)?;
     }};
 }
 

@@ -56,14 +56,7 @@ impl BlockAwareStack for OperandStack {
         let mut results = Vec::with_capacity(returns.len());
 
         for rtn in returns.iter().rev() {
-            results.push(match rtn {
-                ValType::I32 => Value::I32(self.pop_i32()?),
-                ValType::I64 => Value::I64(self.pop_i64()?),
-                ValType::F32 => Value::F32(self.pop_f32()?),
-                ValType::F64 => Value::F64(self.pop_f64()?),
-                ValType::V128 => Value::V128(self.pop_v128()?),
-                ValType::Ref(_) => self.pop()?, // todo proper validation
-            });
+            results.push(self.pop()?);
         }
 
         Ok(results)
@@ -111,7 +104,7 @@ impl BlockAwareStack for OperandStack {
 impl OperandStack {
     pub fn new(capacity: usize) -> Self {
         Self {
-            inner: vec![Value::Unknown; capacity],
+            inner: vec![Value(u64::MAX); capacity],
             len: 0,
         }
     }

@@ -91,22 +91,6 @@ impl BlockAwareStack for FlatBlockAwareStack {
             let source_bottom = self.stack.len() - preserve.len();
             let source_top = self.stack.len();
 
-            let source = &self.stack.get_mut()[source_bottom..source_top];
-            for (value, ty) in source.iter().zip(preserve) {
-                let ok = matches!(
-                    (value, ty),
-                    (Value::I32(_), ValType::I32)
-                        | (Value::I64(_), ValType::I64)
-                        | (Value::F32(_), ValType::F32)
-                        | (Value::F64(_), ValType::F64)
-                        | (Value::V128(_), ValType::V128)
-                        | (_, ValType::Ref(_)) // matches OperandStack's current (unvalidated) Ref handling
-                );
-                if !ok {
-                    return Err(trap!("type mismatch"));
-                }
-            }
-
             self.stack
                 .get_mut()
                 .copy_within(source_bottom..source_top, floor);

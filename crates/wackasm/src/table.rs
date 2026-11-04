@@ -37,15 +37,7 @@ impl TableManager {
                 TableInit::RefNull => TableValue::NullRef,
                 TableInit::Expr(const_expr) => {
                     let value = resolve_const_expr(const_expr)?;
-                    match value {
-                        Value::FuncRef(function_index) => TableValue::FuncRef(function_index),
-                        _ => {
-                            return Err(unsupported!(
-                                "value {:?} not supported for table init",
-                                value
-                            ));
-                        }
-                    }
+                    TableValue::FuncRef(FunctionIndex(value.0 as u32))
                 }
             };
             let table_values = vec![init_value; table.ty.initial as usize];
@@ -67,15 +59,7 @@ impl TableManager {
                 } => {
                     let table_index = TableIndex(table_index.unwrap_or(0));
                     let offset = resolve_const_expr(offset_expr)?;
-                    let offset = match offset {
-                        Value::I32(value) => value,
-                        _ => {
-                            return Err(unsupported!(
-                                "const value {:?} not supported for element table offset",
-                                offset
-                            ));
-                        }
-                    };
+                    let offset = offset.0 as u32;
 
                     let table_value = self
                         .tables
