@@ -12,6 +12,10 @@ I am not good at writing WASM interpreters, so for this reason, the code is buil
 
 `wackasm` is written with fleshy intelligence, so support for the mundane stuff like SIMD instructions, and a lot of mundane instructions like that, just haven't been done yet. No reason, just haven't.
 
+Of the couple tens of thousands of WASM tests I found, these are the results:
+
+***total: 18501 passed, 914 failed, 45409 unsupported**
+
 ## what's this for?
 
 It's for an WASM OpenComputers architecture. The current ones out there piss me off because I can't write shitty code, i.e. you have to work around the fact that the WASM executors they use can't resume in-process state, so use hacking workarounds that make you write your code differently. 
