@@ -56,8 +56,8 @@ impl OperatorView {
         self.cell.borrow_dependent().iter().cloned()
     }
 
-    pub fn get(&self, index: usize) -> Option<Operator<'_>> {
-        self.cell.borrow_dependent().get(index).cloned()
+    pub fn get(&self, index: usize) -> Option<&Operator<'_>> {
+        self.cell.borrow_dependent().get(index)
     }
 }
 
