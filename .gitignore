@@ -2,3 +2,4 @@
 *.wasm
 /flamegraph.svg
 /perf.data*
+*.tsv

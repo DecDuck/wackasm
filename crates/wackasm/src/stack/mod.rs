@@ -27,5 +27,8 @@ pub(crate) trait OperandStackFns {
     fn pop(&mut self) -> Result<Value, anyhow::Error>;
     fn pop_i32(&mut self) -> Result<i32, anyhow::Error>;
     fn pop_i64(&mut self) -> Result<i64, anyhow::Error>;
+    fn pop_f32(&mut self) -> Result<f32, anyhow::Error>;
+    fn pop_f64(&mut self) -> Result<f64, anyhow::Error>;
+    fn pop_v128(&mut self) -> Result<u128, anyhow::Error>;
     fn peek(&mut self) -> Result<&Value, anyhow::Error>;
 }

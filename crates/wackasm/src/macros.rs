@@ -52,7 +52,7 @@ macro_rules! i64_cmp {
 
 pub(crate) use i64_cmp;
 
-/// Pops an address, loads `size_of::<$width>()` bytes from memory, and pushes the i32.
+/// Pops an address, loads `size_of::<$width>()` bytes, and extends them to i32.
 ///
 /// ```ignore
 /// i32_load!(stack, memories, memarg, u8);
@@ -62,12 +62,65 @@ macro_rules! i32_load {
         use $crate::stack::OperandStackFns as _;
         let stack = &mut $stack;
         let address = stack.pop_i32()? as u32;
-        let value = $memories.load_i32::<{ ::core::mem::size_of::<$width>() }>($memarg, address)?;
-        stack.push($crate::Value::I32(value))?;
+        let value: $width = $memories.load($memarg, address)?;
+        stack.push($crate::Value::I32(value as i32))?;
     }};
 }
 
 pub(crate) use i32_load;
+
+/// Pops an address, loads `size_of::<$width>()` bytes, and extends them to i64.
+///
+/// ```ignore
+/// i64_load!(stack, memories, memarg, u8);
+/// ```
+macro_rules! i64_load {
+    ($stack:expr, $memories:expr, $memarg:expr, $width:ty) => {{
+        use $crate::stack::OperandStackFns as _;
+        let stack = &mut $stack;
+        let address = stack.pop_i32()? as u32;
+        let value: $width = $memories.load($memarg, address)?;
+        stack.push($crate::Value::I64(value as i64))?;
+    }};
+}
+
+pub(crate) use i64_load;
+
+macro_rules! f32_load {
+    ($stack:expr, $memories:expr, $memarg:expr) => {{
+        use $crate::stack::OperandStackFns as _;
+        let stack = &mut $stack;
+        let address = stack.pop_i32()? as u32;
+        let value: f32 = $memories.load($memarg, address)?;
+        stack.push($crate::Value::F32(value))?;
+    }};
+}
+
+pub(crate) use f32_load;
+
+macro_rules! f64_load {
+    ($stack:expr, $memories:expr, $memarg:expr) => {{
+        use $crate::stack::OperandStackFns as _;
+        let stack = &mut $stack;
+        let address = stack.pop_i32()? as u32;
+        let value: f64 = $memories.load($memarg, address)?;
+        stack.push($crate::Value::F64(value))?;
+    }};
+}
+
+pub(crate) use f64_load;
+
+macro_rules! v128_load {
+    ($stack:expr, $memories:expr, $memarg:expr) => {{
+        use $crate::stack::OperandStackFns as _;
+        let stack = &mut $stack;
+        let address = stack.pop_i32()? as u32;
+        let value: u128 = $memories.load($memarg, address)?;
+        stack.push($crate::Value::V128(value))?;
+    }};
+}
+
+pub(crate) use v128_load;
 
 /// Pops a value then an address, and stores the low `size_of::<$width>()` bytes.
 ///
@@ -80,8 +133,44 @@ macro_rules! i32_store {
         let stack = &mut $stack;
         let value = stack.pop_i32()?;
         let address = stack.pop_i32()? as u32;
-        $memories.store_i32::<{ ::core::mem::size_of::<$width>() }>($memarg, address, value)?;
+        $memories.store($memarg, address, value as $width)?;
     }};
 }
 
 pub(crate) use i32_store;
+
+macro_rules! f32_store {
+    ($stack:expr, $memories:expr, $memarg:expr) => {{
+        use $crate::stack::OperandStackFns as _;
+        let stack = &mut $stack;
+        let value = stack.pop_f32()?;
+        let address = stack.pop_i32()? as u32;
+        $memories.store($memarg, address, value)?;
+    }};
+}
+
+pub(crate) use f32_store;
+
+macro_rules! f64_store {
+    ($stack:expr, $memories:expr, $memarg:expr) => {{
+        use $crate::stack::OperandStackFns as _;
+        let stack = &mut $stack;
+        let value = stack.pop_f64()?;
+        let address = stack.pop_i32()? as u32;
+        $memories.store($memarg, address, value)?;
+    }};
+}
+
+pub(crate) use f64_store;
+
+macro_rules! v128_store {
+    ($stack:expr, $memories:expr, $memarg:expr) => {{
+        use $crate::stack::OperandStackFns as _;
+        let stack = &mut $stack;
+        let value = stack.pop_v128()?;
+        let address = stack.pop_i32()? as u32;
+        $memories.store($memarg, address, value)?;
+    }};
+}
+
+pub(crate) use v128_store;

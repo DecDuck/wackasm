@@ -1,0 +1,8 @@
+- total: 14997 passed, 9065 failed, 40762 unsupported
+- total: 15156 passed, 9061 failed, 40607 unsupported
+- total: 15340 passed, 9062 failed, 40422 unsupported
+- total: 15508 passed, 9116 failed, 40200 unsupported
+- total: 15539 passed, 9085 failed, 40200 unsupported
+- total: 15532 passed, 9186 failed, 40106 unsupported
+- total: 15731 passed, 9268 failed, 39825 unsupported
+- total: 16283 passed, 9202 failed, 39339 unsupported

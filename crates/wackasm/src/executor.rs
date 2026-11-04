@@ -9,10 +9,18 @@ use serde::{Deserialize, Serialize};
 use wasmparser::Operator;
 
 use crate::{
-    Value, WackasmModule, blocks::{Block, BlockManager}, macros::{i32_binop, i32_load, i32_store, i64_binop, i64_cmp}, module::{
+    Value, WackasmModule,
+    blocks::{Block, BlockManager},
+    macros::{
+        f32_load, f32_store, f64_load, f64_store, i32_binop, i32_load, i32_store, i64_binop,
+        i64_cmp, i64_load, v128_load, v128_store,
+    },
+    module::{
         BlockIndex, ExportIndex, FunctionFrame, FunctionIndex, FunctionTypeIndex, GlobalIndex,
         TableIndex, TableValue,
-    }, pc::ProgramCounterHandle, stack::{BlockAwareOperandStack, OperandStackFns as _},
+    },
+    pc::ProgramCounterHandle,
+    stack::{BlockAwareOperandStack, OperandStackFns as _},
 };
 
 const MAX_INSTRUCTIONS_IN_LOOP: isize = 500;
@@ -64,9 +72,9 @@ impl WackasmExecutor {
             .module
             .init_function_frames
             .get(&function_index)
-            .ok_or_else(|| anyhow!(
-                "internal module corruption: cannot lookup initial function state"
-            ))?;
+            .ok_or_else(|| {
+                anyhow!("internal module corruption: cannot lookup initial function state")
+            })?;
         let mut function = function.clone();
 
         // Get function signature
@@ -74,18 +82,22 @@ impl WackasmExecutor {
             self.module
                 .function_types
                 .get(&function_index)
-                .ok_or_else(|| anyhow!(
-                    "no function type index for function index {:?}",
-                    function_index
-                ))?;
+                .ok_or_else(|| {
+                    anyhow!(
+                        "no function type index for function index {:?}",
+                        function_index
+                    )
+                })?;
         let function_type = self
             .module
             .function_type_indexes
             .get(function_type_index)
-            .ok_or_else(|| anyhow!(
-                "no function type for function type index {:?}",
-                function_type_index
-            ))?;
+            .ok_or_else(|| {
+                anyhow!(
+                    "no function type for function type index {:?}",
+                    function_type_index
+                )
+            })?;
 
         let params = function_type.params();
         if arguments.len() != params.len() {
@@ -122,8 +134,7 @@ impl WackasmExecutor {
         let last_block_idx = operand_stack
             .peek_block()
             .ok_or_else(|| anyhow!("no block for br_if"))?;
-        let last_block = block_lookup
-            .get(last_block_idx)?;
+        let last_block = block_lookup.get(last_block_idx)?;
 
         match last_block {
             Block::Loop { start, .. } => {
@@ -192,18 +203,70 @@ impl WackasmExecutor {
                     self.module.memories.fill(*mem, offset, amount, value)?;
                 }
 
-                // Memory
+                // memory load
                 Operator::I32Load { memarg } => {
                     i32_load!(function_frame.stack, self.module.memories, memarg, i32)
                 }
                 Operator::I32Load8U { memarg } => {
                     i32_load!(function_frame.stack, self.module.memories, memarg, u8)
                 }
+                Operator::I32Load8S { memarg } => {
+                    i32_load!(function_frame.stack, self.module.memories, memarg, i8)
+                }
+                Operator::I32Load16U { memarg } => {
+                    i32_load!(function_frame.stack, self.module.memories, memarg, u16)
+                }
+                Operator::I32Load16S { memarg } => {
+                    i32_load!(function_frame.stack, self.module.memories, memarg, i16)
+                }
+
+                Operator::I64Load { memarg } => {
+                    i64_load!(function_frame.stack, self.module.memories, memarg, i64);
+                }
+                Operator::I64Load8U { memarg } => {
+                    i64_load!(function_frame.stack, self.module.memories, memarg, u8)
+                }
+                Operator::I64Load8S { memarg } => {
+                    i64_load!(function_frame.stack, self.module.memories, memarg, i8);
+                }
+                Operator::I64Load16U { memarg } => {
+                    i64_load!(function_frame.stack, self.module.memories, memarg, u16);
+                }
+                Operator::I64Load16S { memarg } => {
+                    i64_load!(function_frame.stack, self.module.memories, memarg, i16);
+                }
+                Operator::I64Load32U { memarg } => {
+                    i64_load!(function_frame.stack, self.module.memories, memarg, u32);
+                }
+                Operator::I64Load32S { memarg } => {
+                    i64_load!(function_frame.stack, self.module.memories, memarg, i32);
+                }
+
+                Operator::F32Load { memarg } => {
+                    f32_load!(function_frame.stack, self.module.memories, memarg)
+                }
+                Operator::F64Load { memarg } => {
+                    f64_load!(function_frame.stack, self.module.memories, memarg)
+                }
+                Operator::V128Load { memarg } => {
+                    v128_load!(function_frame.stack, self.module.memories, memarg)
+                }
+
+                // memory store
                 Operator::I32Store8 { memarg } => {
                     i32_store!(function_frame.stack, self.module.memories, memarg, u8)
                 }
                 Operator::I32Store { memarg } => {
                     i32_store!(function_frame.stack, self.module.memories, memarg, i32)
+                }
+                Operator::F32Store { memarg } => {
+                    f32_store!(function_frame.stack, self.module.memories, memarg)
+                }
+                Operator::F64Store { memarg } => {
+                    f64_store!(function_frame.stack, self.module.memories, memarg)
+                }
+                Operator::V128Store { memarg } => {
+                    v128_store!(function_frame.stack, self.module.memories, memarg)
                 }
 
                 // Handle function call
@@ -241,10 +304,7 @@ impl WackasmExecutor {
                 // Control flow
                 Operator::If { blockty: _ } => {
                     let block_index = BlockIndex(pc.inner() as u32);
-                    let block = function_frame
-                        .block_lookup
-                        .get(&block_index)?
-                        .clone();
+                    let block = function_frame.block_lookup.get(&block_index)?.clone();
 
                     let condition = function_frame.stack.pop_i32()?;
                     let condition = condition != 0;
@@ -279,9 +339,7 @@ impl WackasmExecutor {
                         .stack
                         .peek_block()
                         .ok_or_else(|| anyhow!("hit else op not in block"))?;
-                    let block = function_frame
-                        .block_lookup
-                        .get(block_index)?;
+                    let block = function_frame.block_lookup.get(block_index)?;
 
                     let (_, _, end) = block.if_block()?;
                     // Jump to end block which will handle block frame cleanup
@@ -290,10 +348,7 @@ impl WackasmExecutor {
 
                 Operator::Block { blockty: _ } | Operator::Loop { blockty: _ } => {
                     let block_index = BlockIndex(pc.inner() as u32);
-                    let block = function_frame
-                        .block_lookup
-                        .get(&block_index)?
-                        .clone();
+                    let block = function_frame.block_lookup.get(&block_index)?.clone();
 
                     self.module
                         .start_block(&mut function_frame.stack, &block, &block_index)?;
@@ -365,6 +420,12 @@ impl WackasmExecutor {
                 }
                 Operator::I64Const { value } => {
                     function_frame.stack.push(Value::I64(*value))?;
+                }
+                Operator::F32Const { value } => {
+                    function_frame.stack.push(Value::F32((*value).into()))?;
+                }
+                Operator::F64Const { value } => {
+                    function_frame.stack.push(Value::F64((*value).into()))?;
                 }
 
                 Operator::I32Add => {
