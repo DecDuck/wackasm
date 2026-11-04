@@ -1,14 +1,21 @@
-use std::sync::atomic::{AtomicIsize, Ordering};
+use std::{
+    collections::HashMap,
+    sync::atomic::{AtomicIsize, Ordering},
+};
 
-use anyhow::anyhow;
+use anyhow::{Ok, anyhow};
 use serde::{Deserialize, Serialize};
 use wasmparser::{FuncType, Operator};
 
 use crate::{
     Value, WackasmModule,
     blocks::Block,
-    module::{BlockIndex, ExportIndex, FunctionFrame, FunctionIndex, FunctionTypeIndex},
-    stack::OperandStackFns as _,
+    module::{
+        BlockIndex, ExportIndex, FunctionFrame, FunctionIndex, FunctionTypeIndex, TableIndex,
+        TableValue,
+    },
+    pc::ProgramCounterHandle,
+    stack::{BlockAwareOperandStack, OperandStackFns as _},
 };
 
 const MAX_INSTRUCTIONS_IN_LOOP: isize = 100;
@@ -102,6 +109,38 @@ impl WackasmExecutor {
         Ok(())
     }
 
+    fn block_break(
+        operand_stack: &mut BlockAwareOperandStack,
+        block_lookup: &HashMap<BlockIndex, Block>,
+        pc: &mut ProgramCounterHandle<'_>,
+        relative_depth: u32,
+    ) -> Result<(), anyhow::Error> {
+        for _ in 0..relative_depth {
+            let _ = operand_stack
+                .pop_block()
+                .ok_or(anyhow!("no block to escape when br_if"))?;
+        }
+
+        // Based on top block, either jump back to start of loop or jump to end of block
+        let last_block_idx = operand_stack
+            .peek_block()
+            .ok_or_else(|| anyhow!("no block for br_if"))?;
+        let last_block = block_lookup
+            .get(last_block_idx)
+            .ok_or_else(|| anyhow!("no block for block index"))?;
+
+        match last_block {
+            Block::Loop { start, .. } => {
+                pc.set_pc(*start + 1);
+            }
+            Block::If { end, .. } | Block::Block { end, .. } => {
+                pc.set_pc(*end);
+            }
+        }
+
+        Ok(())
+    }
+
     /// Executes up to [`instructions`] instructions within a single
     /// function frame. Adds how many were executed to instructions_executed.
     #[inline]
@@ -135,6 +174,30 @@ impl WackasmExecutor {
                 Operator::Call { function_index } => {
                     // Add one so we resume to the next instruction
                     return Ok(FunctionScopedResult::FunctionCall { function_index });
+                }
+                Operator::CallIndirect {
+                    type_index: _,
+                    table_index,
+                } => {
+                    let func_index_index = function_frame.operand_stack.pop_i32()?;
+                    let table = self
+                        .module
+                        .tables
+                        .get(&TableIndex(table_index))
+                        .ok_or_else(|| anyhow!("no table for index {}", table_index))?;
+
+                    let table_value = table
+                        .get(func_index_index as u32 as usize)
+                        .ok_or(anyhow!("no function index for {:?}", func_index_index))?;
+
+                    let func_index = match table_value {
+                        TableValue::FuncRef(items) => items,
+                        _ => return Err(anyhow!("referenced table must be a funcref table")),
+                    };
+
+                    return Ok(FunctionScopedResult::FunctionCall {
+                        function_index: func_index.0,
+                    });
                 }
 
                 // Control flow
@@ -217,25 +280,21 @@ impl WackasmExecutor {
                         continue;
                     }
 
-                    for _ in 0..relative_depth {
-                        let _ = function_frame
-                            .operand_stack
-                            .pop_block()
-                            .ok_or(anyhow!("no block to escape when br_if"))?;
-                    }
+                    WackasmExecutor::block_break(
+                        &mut function_frame.operand_stack,
+                        &function_frame.block_lookup,
+                        &mut pc,
+                        relative_depth,
+                    )?;
+                }
 
-                    // Based on top block, either jump back to start of loop or jump to end of block
-                    let last_block_idx = function_frame.operand_stack.peek_block().ok_or_else(|| anyhow!("no block for br_if"))?;
-                    let last_block = function_frame.block_lookup.get(last_block_idx).ok_or_else(|| anyhow!("no block for block index"))?;
-
-                    match last_block {
-                        Block::Loop { start, .. } => {
-                            pc.set_pc(*start + 1);
-                        },
-                        Block::If { end, .. } |  Block::Block { end, .. } => {
-                            pc.set_pc(*end);
-                        },
-                    }
+                Operator::Br { relative_depth } => {
+                    WackasmExecutor::block_break(
+                        &mut function_frame.operand_stack,
+                        &function_frame.block_lookup,
+                        &mut pc,
+                        relative_depth,
+                    )?;
                 }
 
                 // Handle block/function return
@@ -286,6 +345,12 @@ impl WackasmExecutor {
                     let a = function_frame.operand_stack.pop_i32()?;
                     let b = function_frame.operand_stack.pop_i32()?;
                     let c = a * b;
+                    function_frame.operand_stack.push(Value::I32(c))?;
+                }
+                Operator::I32Sub => {
+                    let rhs = function_frame.operand_stack.pop_i32()?;
+                    let lhs = function_frame.operand_stack.pop_i32()?;
+                    let c = lhs - rhs;
                     function_frame.operand_stack.push(Value::I32(c))?;
                 }
 
@@ -375,6 +440,10 @@ impl WackasmExecutor {
 
     pub fn set_fuel(&self, fuel: isize) {
         self.fuel.store(fuel, Ordering::Relaxed);
+    }
+
+    pub fn get_fuel(&self) -> isize {
+        self.fuel.load(Ordering::Relaxed)
     }
 
     pub fn execute(&mut self) -> Result<(), anyhow::Error> {

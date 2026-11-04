@@ -3,11 +3,11 @@ use std::time::Instant;
 use wackasm::{Value, WackasmExecutor, WackasmModule};
 
 pub fn main() -> Result<(), anyhow::Error> {
-    let contents = std::fs::read("./examples/locals.wasm")?;
+    let contents = std::fs::read("./examples/table.wasm")?;
     let module = WackasmModule::new(&contents)?;
     let mut executor = WackasmExecutor::new(module);
 
-    executor.call_export("sum_to_n", vec![Value::I32(22)])?;
+    executor.call_export("apply", vec![Value::I32(1), Value::I32(4)])?;
 
     executor.set_fuel(3);
     executor.execute()?;
@@ -21,7 +21,7 @@ pub fn main() -> Result<(), anyhow::Error> {
 
     println!("after serialize: {:?}", executor.get_result());
 
-    executor.set_fuel(100);
+    executor.set_fuel(1_000);
     executor.execute()?;
 
     println!("finish: {:?}", executor.get_result());

@@ -1,3 +1,16 @@
+diff --git a/src/readers/core/elements.rs b/src/readers/core/elements.rs
+index 4d6ac29..93da07b 100644
+--- a/src/readers/core/elements.rs
++++ b/src/readers/core/elements.rs
+@@ -31,7 +31,7 @@ pub struct Element<'a> {
+ }
+ 
+ /// The kind of element segment.
+-#[derive(Clone)]
++#[derive(Clone, Debug)]
+ pub enum ElementKind<'a> {
+     /// The element segment is passive.
+     Passive,
 diff --git a/src/readers/core/operators.rs b/src/readers/core/operators.rs
 index 32df295..ae166bf 100644
 --- a/src/readers/core/operators.rs
