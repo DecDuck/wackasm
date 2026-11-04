@@ -7,15 +7,7 @@ use wasmparser::{
 };
 
 use crate::{
-    Value,
-    blocks::{Block, lookahead_find_blocks},
-    const_expr::resolve_const_expr,
-    globals::{Global, GlobalManager},
-    memory::{LinearMemory, MemoryManager},
-    operator::OperatorView,
-    pc::ProgramCounter,
-    stack::{BlockAwareOperandStack, LocalStore, OperandStackFns},
-    table::TableManager,
+    Value, blocks::{Block, lookahead_find_blocks}, const_expr::resolve_const_expr, globals::{Global, GlobalManager}, memory::{LinearMemory, MemoryManager}, operator::OperatorView, pc::ProgramCounter, stack::{BlockAwareOperandStack, LocalStore, OperandStackFns}, table::TableManager,
 };
 
 macro_rules! type_indexes {

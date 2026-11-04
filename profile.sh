@@ -11,5 +11,4 @@ cargo build \
     --target wasm32-unknown-unknown \
     --lib
 
-output=${1:-flamegraph.svg}
-cargo run --release --bin wackasm -- --profile "$output"
+cargo run --release --bin wackasm

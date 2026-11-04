@@ -15,11 +15,6 @@ impl ProgramCounter {
     pub fn handle<'a>(&'a mut self) -> ProgramCounterHandle<'a> {
         ProgramCounterHandle { target: &mut self.inner, overrride: None }
     }
-
-    #[inline]
-    pub fn inner(&self) -> usize {
-        self.inner
-    }
 }
 
 pub(crate) struct ProgramCounterHandle<'a> {
@@ -39,6 +34,7 @@ impl<'a> ProgramCounterHandle<'a> {
 }
 
 impl<'a> Drop for ProgramCounterHandle<'a> {
+    #[inline(always)]
     fn drop(&mut self) {
         if let Some(overrride) = self.overrride {
             *self.target = overrride;
