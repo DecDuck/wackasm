@@ -1,16 +1,11 @@
 use anyhow::anyhow;
 use serde::{Deserialize, Serialize};
 use wasmparser::{
-    BrTable, FuncValidator, FuncValidatorAllocations, FunctionBody, MemArg, Operator,
-    ValidatorResources,
+    BrTable, FuncValidator, FuncValidatorAllocations, FunctionBody, MemArg, Operator, ValType, ValidatorResources,
 };
 
 use crate::{
-    HaltError,
-    blocks::{BlockManager, lookahead_find_blocks},
-    compiler::compile::Compiler,
-    functions::FunctionManager,
-    pc::ProgramCounter,
+    HaltError, Value, blocks::{BlockManager, lookahead_find_blocks}, compiler::compile::Compiler, functions::FunctionManager, pc::ProgramCounter,
 };
 
 mod compile;
@@ -24,6 +19,9 @@ pub(crate) use types::*;
 pub struct WackasmFunctionBody {
     pub(crate) inner: Vec<WackasmOperator>,
     max_stack_operands: u32,
+    pub(crate) params_slots: usize,
+    pub(crate) local_defaults: Box<[Value]>,
+
 }
 
 impl WackasmFunctionBody {
@@ -31,6 +29,8 @@ impl WackasmFunctionBody {
         Self {
             inner: Vec::new(),
             max_stack_operands: 0,
+            params_slots: 0,
+            local_defaults: Box::new([]),
         }
     }
 
@@ -38,8 +38,13 @@ impl WackasmFunctionBody {
         code: &FunctionBody,
         func_validator: FuncValidator<ValidatorResources>,
         functions: &FunctionManager,
+        locals: Vec<ValType>,
+        params: &[ValType],
     ) -> Result<(Self, FuncValidatorAllocations), HaltError> {
         let mut compiler = Compiler::new(func_validator);
+
+        // pre-pass: create locals + map
+        compiler.create_locals(params, locals);
 
         // pass 1: function lookup
         compiler.block_lookahead(code)?;
@@ -55,8 +60,9 @@ impl WackasmFunctionBody {
     }
 
     pub fn theoretical_max_stack_size(&self) -> u32 {
-        let value = self.max_stack_operands * 2; // v128 takes double size
+        let value = self.max_stack_operands as usize * 2; // v128 takes double size
+        let value = value + self.params_slots + self.local_defaults.len();
 
-        value
+        value as u32
     }
 }

@@ -11,7 +11,10 @@ use crate::{
         f32_load, f32_store, f64_load, f64_store, i32_binop, i32_load, i32_store, i64_binop,
         i64_cmp, i64_load, i64_store, trap, unsupported, v128_load, v128_store,
     },
-    module::{ExportIndex, FunctionFrame, FunctionIndex, GlobalIndex, TableIndex, TableValue},
+    module::{
+        ExportIndex, FunctionFrame, FunctionIndex, FunctionTypeIndex, GlobalIndex, TableIndex,
+        TableValue,
+    },
     pc::ProgramCounter,
     stack::{FrameOperandStack, GlobalStack as _, val_types_to_size},
 };
@@ -50,6 +53,7 @@ impl WackasmExecutor {
                 start_func,
                 Some(Vec::new()),
             )?;
+            me.execute()?;
         }
 
         Ok(me)
@@ -169,7 +173,12 @@ impl WackasmExecutor {
             .ok_or_else(|| anyhow!("callstack empty"))?;
 
         let mut pc = function_frame.pc;
-        let code_view = &self.module.functions.get_function_code(&function_frame.function_index)?.inner[..];
+        let base = function_frame.stack_base;
+        let code_view = &self
+            .module
+            .functions
+            .get_function_code(&function_frame.function_index)?
+            .inner[..];
 
         for _ in 0..instructions {
             *instructions_executed += 1;
@@ -179,22 +188,22 @@ impl WackasmExecutor {
             match operator {
                 WackasmOperator::Nop => {}
                 // Gets
-                WackasmOperator::LocalGet { local_index } => {
-                    let local = *function_frame.locals.get(&local_index)?;
+                WackasmOperator::LocalGet { slot } => {
+                    let local = self.stack.local_get(base, *slot);
                     self.stack.push(local)?;
                 }
-                WackasmOperator::LocalGetWide { local_index } => {
-                    let local = function_frame.locals.get_wide(local_index)?;
+                WackasmOperator::LocalGetWide { slot } => {
+                    let local = self.stack.local_wide_get(base, *slot);
                     self.stack.push_v128(local)?;
                 }
 
-                WackasmOperator::LocalSet { local_index } => {
+                WackasmOperator::LocalSet { slot } => {
                     let value = self.stack.pop()?;
-                    function_frame.locals.set(*local_index, value)?;
+                    self.stack.local_set(base, *slot, value);
                 }
-                WackasmOperator::LocalSetWide { local_index } => {
+                WackasmOperator::LocalSetWide { slot } => {
                     let value = self.stack.pop_v128()?;
-                    function_frame.locals.set_wide(*local_index, value)?;
+                    self.stack.local_wide_set(base, *slot, value);
                 }
 
                 WackasmOperator::Drop => {
@@ -204,13 +213,13 @@ impl WackasmExecutor {
                     self.stack.pop_v128()?;
                 }
 
-                WackasmOperator::LocalTee { local_index } => {
-                    let value = self.stack.peek()?;
-                    function_frame.locals.set(*local_index, value.clone())?;
+                WackasmOperator::LocalTee { slot } => {
+                    let value = *self.stack.peek()?;
+                    self.stack.local_set(base, *slot, value.clone());
                 }
-                WackasmOperator::LocalTeeWide { local_index } => {
+                WackasmOperator::LocalTeeWide { slot } => {
                     let value = self.stack.peek_wide()?;
-                    function_frame.locals.set_wide(*local_index, value)?;
+                    self.stack.local_wide_set(base, *slot, value);
                 }
 
                 WackasmOperator::GlobalGet { global_index } => {
@@ -339,7 +348,10 @@ impl WackasmExecutor {
                         pc,
                     ));
                 }
-                WackasmOperator::CallIndirect { table_index } => {
+                WackasmOperator::CallIndirect {
+                    table_index,
+                    type_index,
+                } => {
                     let func_index_index = self.stack.pop_i32()?;
                     let table = self
                         .module
@@ -355,6 +367,16 @@ impl WackasmExecutor {
                         TableValue::FuncRef(items) => items,
                         TableValue::NullRef => return Err(trap!("uninitialized element")),
                     };
+
+                    // Type check, per spec
+                    let expected = self
+                        .module
+                        .functions
+                        .function_type_idx_type(&FunctionTypeIndex(*type_index))?;
+                    let actual = self.module.functions.function_type_idx(&func_index)?;
+                    if expected != actual {
+                        return Err(trap!("indirect call type mismatch"));
+                    }
 
                     pc += 1;
                     return Ok((

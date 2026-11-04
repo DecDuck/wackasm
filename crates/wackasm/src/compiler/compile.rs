@@ -5,12 +5,12 @@ use std::{
 
 use anyhow::anyhow;
 use wasmparser::{
-    FuncValidator, FuncValidatorAllocations, FunctionBody, Operator, OperatorsReader,
+    FuncValidator, FuncValidatorAllocations, FunctionBody, Operator, OperatorsReader, ValType,
     ValidatorResources,
 };
 
 use crate::{
-    HaltError,
+    HaltError, Value,
     blocks::{BlockManager, lookahead_find_blocks},
     compiler::{
         WackasmFunctionBody, WackasmOperator, WackasmTableTarget,
@@ -18,6 +18,7 @@ use crate::{
         filters::{block::BlockPass, locals::LocalsPass, stateless_base::StatelessBasePass},
     },
     functions::FunctionManager,
+    stack::{val_type_to_size, val_types_to_size},
 };
 
 pub(crate) struct Compiler {
@@ -29,7 +30,8 @@ pub(crate) struct Compiler {
     pub(crate) func_validator: FuncValidator<ValidatorResources>,
 
     // Internal state
-    pub(crate) compilation_lookup: Vec<usize>, // map of old pc to new pc, think of it as a hashmap
+    pub(crate) transform_pc_lookup: Vec<usize>, // map of old pc to new pc, think of it as a hashmap
+    pub(crate) locals_slot_to_index: Vec<usize>,
 }
 
 impl Compiler {
@@ -38,8 +40,38 @@ impl Compiler {
             func_body: WackasmFunctionBody::empty(),
             block_manager: BlockManager::new(),
             func_validator,
-            compilation_lookup: Vec::new(),
+            transform_pc_lookup: Vec::new(),
+            locals_slot_to_index: Vec::new(),
         }
+    }
+
+    pub fn create_locals(&mut self, params: &[ValType], local_types: Vec<ValType>) {
+        let mut slot_idx = 0;
+
+        // Process arguments/params first
+        self.func_body.params_slots = val_types_to_size(params);
+        for param_type in params {
+            self.locals_slot_to_index.push(slot_idx);
+            slot_idx += val_type_to_size(param_type);
+        }
+
+        let locals_len = val_types_to_size(&local_types);
+        let mut locals = vec![Value(0); locals_len].into_boxed_slice();
+
+        for local_type in local_types {
+            self.locals_slot_to_index.push(slot_idx);
+
+            // slot_idx - sself.func_body.params_slots gives us the index into declared locals (without params)
+            // rather than the locals as a whole
+            if matches!(local_type, ValType::Ref(_)) {
+                locals[slot_idx - self.func_body.params_slots] = Value::NULL_REF;
+            };
+
+            let size = val_type_to_size(&local_type);
+            slot_idx += size;
+        }
+
+        self.func_body.local_defaults = locals;
     }
 
     pub fn create_compiler_filters(&self) -> Vec<CompilerFilterConcrete> {
@@ -68,7 +100,7 @@ impl Compiler {
 
         let mut pc = 0;
         while !ops.eof() {
-            self.compilation_lookup.push(self.func_body.inner.len());
+            self.transform_pc_lookup.push(self.func_body.inner.len());
             let (operator, offset) = ops.read_with_offset()?;
             for filter in &mut compiler_passes {
                 if filter.compile(&mut *self, functions, pc, operator.clone())? {
@@ -82,7 +114,7 @@ impl Compiler {
                 .max(self.func_validator.operand_stack_height());
             pc += 1;
         }
-        self.compilation_lookup.push(self.func_body.inner.len());
+        self.transform_pc_lookup.push(self.func_body.inner.len());
 
         ops.get_binary_reader()
             .finish_expression(&self.func_validator.visitor(ops.original_position()))?;
@@ -99,7 +131,7 @@ impl Compiler {
                 | WackasmOperator::Br { target, .. }
                 | WackasmOperator::BrIf { target, .. } => {
                     *target = *self
-                        .compilation_lookup
+                        .transform_pc_lookup
                         .get(*target as usize)
                         .ok_or_else(|| anyhow!("no new pc for old pc"))?
                         as u32;
@@ -110,7 +142,7 @@ impl Compiler {
                             WackasmTableTarget::Return => {}
                             WackasmTableTarget::Break { target, .. } => {
                                 *target = *self
-                                    .compilation_lookup
+                                    .transform_pc_lookup
                                     .get(*target as usize)
                                     .ok_or_else(|| anyhow!("no new pc for old pc {}", target))?
                                     as u32;

@@ -7,12 +7,12 @@ use wasmparser::{
 };
 
 use crate::{
-    HaltError, Value, WackasmModule,
+    HaltError, Value,
     compiler::WackasmFunctionBody,
     macros::trap,
     module::{FunctionFrame, FunctionIndex, FunctionTypeIndex},
     pc::ProgramCounter,
-    stack::{FrameOperandStack, GlobalStack as _, LocalStore, val_types_to_size},
+    stack::{FrameOperandStack, GlobalStack as _},
 };
 
 const MAX_CALL_DEPTH: usize = 10_000;
@@ -22,7 +22,6 @@ pub(crate) struct FunctionManager {
     pub(crate) function_type_indexes: Vec<FuncType>,
     pub(crate) function_types: Vec<FunctionTypeIndex>,
     pub(crate) function_bodies: Vec<WackasmFunctionBody>,
-    pub(crate) init_function_frames: Vec<FunctionFrame>,
 }
 
 impl FunctionManager {
@@ -31,7 +30,6 @@ impl FunctionManager {
             function_type_indexes: Vec::new(),
             function_types: Vec::new(),
             function_bodies: Vec::new(),
-            init_function_frames: Vec::new(),
         }
     }
 
@@ -63,12 +61,17 @@ impl FunctionManager {
         Ok(function_type)
     }
 
-    pub(crate) fn get_function_code(&self, function_index: &FunctionIndex) -> Result<&WackasmFunctionBody, HaltError> {
-        self.function_bodies.get(function_index.0 as usize).ok_or_else(|| anyhow!("internally inconsistent function index").into())
+    pub(crate) fn get_function_code(
+        &self,
+        function_index: &FunctionIndex,
+    ) -> Result<&WackasmFunctionBody, HaltError> {
+        self.function_bodies
+            .get(function_index.0 as usize)
+            .ok_or_else(|| anyhow!("internally inconsistent function index").into())
     }
 
     fn get_next_function_index(&self) -> FunctionIndex {
-        FunctionIndex(self.init_function_frames.len() as u32)
+        FunctionIndex(self.function_bodies.len() as u32)
     }
 
     pub(crate) fn process_import_section(
@@ -112,19 +115,8 @@ impl FunctionManager {
         code_section: FunctionBody<'_>,
         func_validator: FuncValidator<ValidatorResources>,
     ) -> Result<FuncValidatorAllocations, HaltError> {
-        let mut function_state = FunctionFrame {
-            // Stuff that needs to be initialised
-            function_index: FunctionIndex(u32::MAX),
-            locals: LocalStore::new(),
-
-            // Runtime state
-            pc: ProgramCounter::default(),
-            stack_base: 0,
-        };
-
         // Check function signature and create parameter locals
         let function_index = &self.get_next_function_index();
-        function_state.function_index = *function_index;
         let function_type_index = self
             .function_types
             .get(function_index.0 as usize)
@@ -138,39 +130,29 @@ impl FunctionManager {
                     function_type_index
                 )
             })?;
+
         let params = function_type.params();
-        for param in params {
-            Self::declare_local(&mut function_state.locals, param);
-        }
 
         // Create locals
+        let mut local_types = Vec::new();
         let locals = code_section.get_locals_reader()?;
         for local in locals {
             let (count, val_type) = local?;
             for _ in 0..count {
-                Self::declare_local(&mut function_state.locals, &val_type);
+                local_types.push(val_type);
             }
         }
 
         // Save function body for later
         let (function_body, allocs) =
-            WackasmFunctionBody::compile(&code_section, func_validator, self)?;
+            WackasmFunctionBody::compile(&code_section, func_validator, self, local_types, params)?;
         self.function_bodies.push(function_body);
 
-        self.init_function_frames.push(function_state);
         Ok(allocs)
     }
 
-    fn declare_local(locals: &mut LocalStore, val_type: &ValType) {
-        let index = locals.len() as u32;
-        match val_type {
-            ValType::V128 => locals.insert_wide(index, 0),
-            _ => locals.insert(index, WackasmModule::val_type_to_value(val_type)),
-        }
-    }
-
     pub(crate) fn call_internal(
-        &mut self,
+        &self,
         callstack: &mut Vec<FunctionFrame>,
         stack: &mut FrameOperandStack,
         function_index: FunctionIndex,
@@ -180,73 +162,31 @@ impl FunctionManager {
             return Err(trap!("call stack exhausted"));
         }
 
-        let function = self
-            .init_function_frames
-            .get(function_index.0 as usize)
-            .ok_or_else(|| {
-                anyhow!("internal module corruption: cannot lookup initial function state")
-            })?;
+        let code_body = self.get_function_code(&function_index)?;
 
-        if stack.space() < self.get_function_code(&function.function_index)?.theoretical_max_stack_size() as usize {
+        if stack.space() < code_body.theoretical_max_stack_size() as usize {
             return Err(trap!("potential stack overflow"));
         }
 
-        let mut function = function.clone();
-
-        // Get function signature
-        let function_type_index = self
-            .function_types
-            .get(function_index.0 as usize)
-            .ok_or_else(|| {
-                anyhow!(
-                    "no function type index for function index {:?}",
-                    function_index
-                )
-            })?;
-        let function_type = self
-            .function_type_indexes
-            .get(function_type_index.0 as usize)
-            .ok_or_else(|| {
-                anyhow!(
-                    "no function type for function type index {:?}",
-                    function_type_index
-                )
-            })?;
-
-        let params = function_type.params();
-        let arguments = if let Some(arguments) = arguments {
-            let expected_slots = val_types_to_size(params);
-            if arguments.len() != expected_slots {
-                return Err(HaltError::Error(anyhow!(
-                    "invalid amount of argument slots, expected {}, got {}",
-                    expected_slots,
-                    arguments.len()
-                )));
-            }
-            arguments
-        } else {
-            let calling_operands_types = function_type.params();
-            let arguments = stack.pull_results(calling_operands_types)?;
-            arguments
-        };
-
-        // Insert arguments
-        let mut arguments = arguments.into_iter();
-        for (index, val_type) in params.into_iter().enumerate() {
-            match val_type {
-                wasmparser::ValType::V128 => {
-                    let high = arguments.next().unwrap().0 as u128;
-                    let low = arguments.next().unwrap().0 as u128;
-                    function.locals.set_wide(index as u32, (high << 64) | low)?;
-                }
-                _ => {
-                    let value = arguments.next().unwrap();
-                    function.locals.set(index as u32, value)?;
-                }
-            };
+        if let Some(arguments) = &arguments && arguments.len() != code_body.params_slots {
+            return Err(trap!("invalid arguments len"));
         }
 
-        function.stack_base = stack.len();
+        let mut function = FunctionFrame {
+            function_index,
+            pc: 0,
+            stack_base: 0,
+        };
+
+        if let Some(arguments) = arguments {
+            function.stack_base = stack.len();
+            stack.push_all(&arguments);
+            stack.push_all(&code_body.local_defaults);
+        } else {
+            function.stack_base = stack.len() - code_body.params_slots; // params are already on the stack, we just adopt them
+            stack.push_all(&code_body.local_defaults);
+        }
+
         callstack.push(function);
 
         Ok(())
