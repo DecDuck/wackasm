@@ -1,5 +1,6 @@
 use std::{
     collections::HashMap,
+    ops::Div,
     sync::atomic::{AtomicIsize, Ordering},
 };
 
@@ -10,7 +11,7 @@ use wasmparser::Operator;
 use crate::{
     Value, WackasmModule,
     blocks::Block,
-    macros::{i32_binop, i32_load, i32_store},
+    macros::{i32_binop, i32_load, i32_store, i64_binop, i64_cmp},
     module::{
         BlockIndex, ExportIndex, FunctionFrame, FunctionIndex, FunctionTypeIndex, GlobalIndex,
         TableIndex, TableValue,
@@ -189,6 +190,12 @@ impl WackasmExecutor {
                     let result = self.module.memories.grow(mem, amount)?;
                     function_frame.stack.push(Value::I32(result))?;
                 }
+                Operator::MemoryFill { mem } => {
+                    let amount = function_frame.stack.pop_i32()? as u32 as usize;
+                    let value = function_frame.stack.pop_i32()? as u8;
+                    let offset = function_frame.stack.pop_i32()? as u32 as usize;
+                    self.module.memories.fill(mem, offset, amount, value)?;
+                }
 
                 // Memory
                 Operator::I32Load { memarg } => {
@@ -358,7 +365,7 @@ impl WackasmExecutor {
                     return Ok(FunctionScopedResult::FunctionReturn);
                 }
 
-                // Maths
+                // i32 maths
                 Operator::I32Const { value } => {
                     function_frame.stack.push(Value::I32(value))?;
                 }
@@ -371,6 +378,13 @@ impl WackasmExecutor {
                 }
                 Operator::I32Mul => {
                     i32_binop!(function_frame.stack, i32, |lhs, rhs| lhs.wrapping_mul(rhs))
+                }
+                Operator::I32DivU => {
+                    i32_binop!(function_frame.stack, u32, |lhs, rhs| lhs
+                        .checked_div(rhs)
+                        .ok_or_else(
+                        || anyhow!("divide by 0")
+                    )?)
                 }
                 Operator::I32Sub => {
                     i32_binop!(function_frame.stack, i32, |lhs, rhs| lhs.wrapping_sub(rhs))
@@ -385,7 +399,7 @@ impl WackasmExecutor {
                     i32_binop!(function_frame.stack, i32, |lhs, rhs| lhs & rhs)
                 }
 
-                // Comparators
+                // i32 comparators
                 Operator::I32GtS => {
                     i32_binop!(function_frame.stack, i32, |lhs, rhs| lhs > rhs)
                 }
@@ -401,6 +415,9 @@ impl WackasmExecutor {
                 Operator::I32Ne => {
                     i32_binop!(function_frame.stack, i32, |a, b| a != b)
                 }
+                Operator::I32GeU => {
+                    i32_binop!(function_frame.stack, u32, |lhs, rhs| lhs >= rhs)
+                }
                 Operator::I32Eqz => {
                     let a = function_frame.stack.pop_i32()?;
                     let result = if a == 0 { 1 } else { 0 };
@@ -409,8 +426,60 @@ impl WackasmExecutor {
                 Operator::I32Eq => {
                     i32_binop!(function_frame.stack, i32, |a, b| a == b)
                 }
-                Operator::I32GeU => {
-                    i32_binop!(function_frame.stack, u32, |lhs, rhs| lhs >= rhs)
+                Operator::I32Or => {
+                    i32_binop!(function_frame.stack, i32, |a, b| a | b)
+                }
+
+                // i64 maths
+                Operator::I64Add => {
+                    i64_binop!(function_frame.stack, i64, |lhs, rhs| lhs.wrapping_add(rhs))
+                }
+                Operator::I64Mul => {
+                    i64_binop!(function_frame.stack, i64, |lhs, rhs| lhs.wrapping_mul(rhs))
+                }
+                Operator::I64Sub => {
+                    i64_binop!(function_frame.stack, i64, |lhs, rhs| lhs.wrapping_sub(rhs))
+                }
+                Operator::I64ShrU => {
+                    i64_binop!(function_frame.stack, u64, |lhs, rhs| lhs
+                        .wrapping_shr(rhs as u32))
+                }
+                Operator::I64Shl => {
+                    i64_binop!(function_frame.stack, u64, |lhs, rhs| lhs
+                        .wrapping_shl(rhs as u32))
+                }
+                Operator::I64And => {
+                    i64_binop!(function_frame.stack, i64, |lhs, rhs| lhs & rhs)
+                }
+                Operator::I64Or => {
+                    i64_binop!(function_frame.stack, i64, |lhs, rhs| lhs | rhs)
+                }
+
+                // i64 comparators
+                Operator::I64GtS => {
+                    i64_cmp!(function_frame.stack, i64, |lhs, rhs| lhs > rhs)
+                }
+                Operator::I64LtU => {
+                    i64_cmp!(function_frame.stack, u64, |lhs, rhs| lhs < rhs)
+                }
+                Operator::I64GtU => {
+                    i64_cmp!(function_frame.stack, u64, |lhs, rhs| lhs > rhs)
+                }
+                Operator::I64LeU => {
+                    i64_cmp!(function_frame.stack, u64, |lhs, rhs| lhs <= rhs)
+                }
+                Operator::I64GeU => {
+                    i64_cmp!(function_frame.stack, u64, |lhs, rhs| lhs >= rhs)
+                }
+                Operator::I64Eq => {
+                    i64_cmp!(function_frame.stack, i64, |lhs, rhs| lhs == rhs)
+                }
+                Operator::I64Ne => {
+                    i64_cmp!(function_frame.stack, i64, |lhs, rhs| lhs != rhs)
+                }
+                Operator::I64Eqz => {
+                    let a = function_frame.stack.pop_i64()?;
+                    function_frame.stack.push(Value::I32((a == 0) as i32))?;
                 }
                 Operator::Select => {
                     let cond = function_frame.stack.pop_i32()?;
@@ -422,6 +491,16 @@ impl WackasmExecutor {
                     } else {
                         function_frame.stack.push(val1)?;
                     }
+                }
+                Operator::I64ExtendI32U => {
+                    let value = function_frame.stack.pop_i32()?;
+                    let new_value = value as u32 as i64;
+                    function_frame.stack.push(Value::I64(new_value))?;
+                }
+                Operator::I32WrapI64 => {
+                    let value = function_frame.stack.pop_i64()?;
+                    let value = value as i32;
+                    function_frame.stack.push(Value::I32(value))?;
                 }
                 _ => return Err(anyhow!("unsupported operator: {:?}", operator)),
             }

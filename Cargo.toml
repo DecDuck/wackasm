@@ -9,6 +9,7 @@ bitcode = { version = "0.6.9", features = ["serde"] }
 serde = { version = "1.0.229", features = ["derive", "rc"] }
 self_cell = "1.2"
 wasmparser = "0.262.0"
+human_bytes = "0.4.3"
 
 [package.metadata.patch]
 crates = ["wasmparser"]

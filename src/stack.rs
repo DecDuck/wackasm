@@ -37,6 +37,7 @@ pub(crate) trait OperandStackFns {
     ) -> Result<Vec<Value>, anyhow::Error>;
     fn pop(&mut self) -> Result<Value, anyhow::Error>;
     fn pop_i32(&mut self) -> Result<i32, anyhow::Error>;
+    fn pop_i64(&mut self) -> Result<i64, anyhow::Error>;
     fn peek(&mut self) -> Result<&Value, anyhow::Error>;
 }
 
@@ -76,7 +77,7 @@ impl OperandStackFns for OperandStack {
         for rtn in returns.iter().rev() {
             results.push(match rtn {
                 ValType::I32 => Value::I32(self.pop_i32()?),
-                ValType::I64 => todo!(),
+                ValType::I64 => Value::I64(self.pop_i64()?),
                 ValType::F32 => todo!(),
                 ValType::F64 => todo!(),
                 ValType::V128 => todo!(),
@@ -102,6 +103,14 @@ impl OperandStackFns for OperandStack {
         match value {
             Value::I32(v) => Ok(v),
             _ => Err(anyhow!("invalid type, expected i32")),
+        }
+    }
+
+    fn pop_i64(&mut self) -> Result<i64, anyhow::Error> {
+        let value = self.pop()?;
+        match value {
+            Value::I64(v) => Ok(v),
+            _ => Err(anyhow!("invalid type, expected i64")),
         }
     }
 }
@@ -182,6 +191,10 @@ impl OperandStackFns for BlockAwareOperandStack {
 
     fn pop_i32(&mut self) -> Result<i32, anyhow::Error> {
         self.get_current_stack().pop_i32()
+    }
+
+    fn pop_i64(&mut self) -> Result<i64, anyhow::Error> {
+        self.get_current_stack().pop_i64()
     }
 }
 
