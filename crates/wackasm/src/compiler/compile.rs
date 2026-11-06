@@ -127,7 +127,10 @@ impl Compiler {
             WackasmOperator::Jump { offset: value }
             | WackasmOperator::JumpIfNez { offset: value, .. }
             | WackasmOperator::JumpIfEqz { offset: value, .. }
-            | WackasmOperator::JumpIfI32Cmp { offset: value, .. } => *value = offset,
+            | WackasmOperator::JumpIfI32Cmp { offset: value, .. }
+            | WackasmOperator::JumpIfI32CmpImm { offset: value, .. }
+            | WackasmOperator::JumpIfI64Cmp { offset: value, .. }
+            | WackasmOperator::JumpIfI64CmpImm { offset: value, .. } => *value = offset,
             _ => return Err(anyhow!("branch fixup points at non-branch").into()),
         }
         Ok(())

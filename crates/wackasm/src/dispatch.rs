@@ -1,6 +1,8 @@
 use crate::{
     HaltError, Value,
-    compiler::{I32Comparison, Reg, RuntimeWackasmOperator, WackasmMemArg, WackasmOperator},
+    compiler::{
+        I32Comparison, I64Comparison, Reg, RuntimeWackasmOperator, WackasmMemArg, WackasmOperator,
+    },
     functions::{FunctionManager, MAX_CALL_DEPTH},
     globals::GlobalManager,
     macros::{trap, unsupported},
@@ -206,6 +208,19 @@ fn compare_i32(kind: I32Comparison, lhs: i32, rhs: i32) -> bool {
         I32Comparison::GeS => lhs >= rhs,
         I32Comparison::GeU => (lhs as u32) >= rhs as u32,
         I32Comparison::LeU => (lhs as u32) <= rhs as u32,
+    }
+}
+
+#[inline(always)]
+fn compare_i64(kind: I64Comparison, lhs: i64, rhs: i64) -> bool {
+    match kind {
+        I64Comparison::Eq => lhs == rhs,
+        I64Comparison::Ne => lhs != rhs,
+        I64Comparison::GtS => lhs > rhs,
+        I64Comparison::LtU => (lhs as u64) < rhs as u64,
+        I64Comparison::GtU => (lhs as u64) > rhs as u64,
+        I64Comparison::LeU => (lhs as u64) <= rhs as u64,
+        I64Comparison::GeU => (lhs as u64) >= rhs as u64,
     }
 }
 
@@ -597,6 +612,21 @@ ops!(|ctx, pc, regs| const MEMORY0 match op {
             dispatch!(ctx, unsafe { pc.offset(*offset as isize) }, regs);
         }
     }
+    jump_if_i32_cmp_imm @ JumpIfI32CmpImm { lhs, imm, kind, invert, offset } => {
+        if compare_i32(*kind, get!(regs, lhs).as_i32(), *imm) != *invert {
+            dispatch!(ctx, unsafe { pc.offset(*offset as isize) }, regs);
+        }
+    }
+    jump_if_i64_cmp @ JumpIfI64Cmp { lhs, rhs, kind, invert, offset } => {
+        if compare_i64(*kind, get!(regs, lhs).as_i64(), get!(regs, rhs).as_i64()) != *invert {
+            dispatch!(ctx, unsafe { pc.offset(*offset as isize) }, regs);
+        }
+    }
+    jump_if_i64_cmp_imm @ JumpIfI64CmpImm { lhs, imm, kind, invert, offset } => {
+        if compare_i64(*kind, get!(regs, lhs).as_i64(), *imm as i64) != *invert {
+            dispatch!(ctx, unsafe { pc.offset(*offset as isize) }, regs);
+        }
+    }
     br_table @ BrTable { index, len } => {
         let entry = get!(regs, index).as_u32().min(*len - 1) as usize;
         dispatch!(ctx, unsafe { pc.add(1 + entry) }, regs);
@@ -725,6 +755,9 @@ ops!(|ctx, pc, regs| const MEMORY0 match op {
     }
     i64_eqz @ I64Eqz { dst, src } => {
         set!(regs, dst, Value((get!(regs, src).as_i64() == 0) as u64));
+    }
+    i64_cmp_imm @ I64CmpImm { dst, lhs, imm, kind } => {
+        set!(regs, dst, Value(compare_i64(*kind, get!(regs, lhs).as_i64(), *imm as i64) as u64));
     }
     i32_extend8_s @ I32Extend8S { dst, src } => {
         set!(regs, dst, Value(get!(regs, src).0 as i8 as u64));

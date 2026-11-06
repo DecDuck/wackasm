@@ -4,7 +4,7 @@ use crate::{
     functions::WackasmFunction,
 };
 
-fn body(wat: &str) -> WackasmFunctionBody {
+pub(super) fn body(wat: &str) -> WackasmFunctionBody {
     let module = WackasmModule::new(&wat::parse_str(wat).unwrap()).unwrap();
     match module.functions.function_bodies.last().unwrap() {
         WackasmFunction::Internal(body) => body.clone(),
@@ -12,7 +12,7 @@ fn body(wat: &str) -> WackasmFunctionBody {
     }
 }
 
-fn ops(body: &WackasmFunctionBody) -> Vec<&WackasmOperator> {
+pub(super) fn ops(body: &WackasmFunctionBody) -> Vec<&WackasmOperator> {
     body.runtime.iter().map(|operator| &operator.op).collect()
 }
 

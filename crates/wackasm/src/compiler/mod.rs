@@ -7,6 +7,8 @@ use crate::{HaltError, Value, compiler::compile::Compiler, functions::FunctionMa
 
 #[path = "filters/block.rs"]
 mod block;
+#[cfg(test)]
+mod comparison_tests;
 mod compile;
 mod dispatch;
 mod register;

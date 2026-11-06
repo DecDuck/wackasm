@@ -6,8 +6,9 @@ In more words, `wackasm` was built so that you could run a WASM module that uses
 
 ## performance
 
-The interpreter benchmarks against `wasmi`. Register IR with memory fast paths measured about
-**82%** of wasmi's performance on the existing prime benchmark, up from about **47%**
+The interpreter benchmarks against `wasmi`. Register IR with memory fast paths and
+compare/branch fusion measured about **86%** of wasmi's performance on the existing
+prime benchmark, up from about **47%**
 with the stack IR. There is still performance headroom, and results vary by machine.
 
 Measured on Windows on 2026-11-06 with
@@ -19,6 +20,10 @@ Measured on Windows on 2026-11-06 with
 | Stack IR baseline | 47.374% | 392,371 |
 | Register IR | 80.906% | 312,809 |
 | Register IR + memory fast paths | 82.373% | 312,809 |
+| Register IR + memory fast paths + compare/branch fusion | 86.459% | 312,809 |
+
+Each run recalibrates wasmi, so percentages vary. Criterion did not detect a
+statistically significant performance change for compare/branch fusion in this run.
 
 Also host/import functions are definitely lower than native WASM functions, so use them sparingly or do as much work as possible host side.
 
@@ -29,6 +34,12 @@ the first frame slots; validated operand-stack depths determine the remaining sl
 `v128` values use two slots. Local reads and constants are deferred until needed,
 results can be written directly into locals, and common immediate operations and
 compare/branch pairs are combined.
+
+Conditional jumps fuse supported i32 register/immediate comparisons and i64
+register/immediate comparisons, including full-width `i64.eqz`. i64 immediates
+are used only when sign extension from i32 preserves the constant exactly;
+larger constants retain their full value in a register. Fusion does not cross
+labels or discard comparison results written to locals.
 
 Internal calls and returns stay inside threaded dispatch. Fuel is charged at loop
 headers and calls, not plain blocks; a call with no fuel is suspended before entering
@@ -69,9 +80,10 @@ Of the couple tens of thousands of WASM tests I found, ~~these are the results:~
 Register-IR validation on 2026-11-06 against the core spec suite: **20,422 passed,
 481 failed, 43,956 unsupported**, versus **20,216 passed, 687 failed, 43,956
 unsupported** before the rewrite. Per-directive comparison found no regressions;
-206 previously failing checks now pass. Memory fast paths preserve every spec
-classification. All 69 unit/integration tests pass, including suspension/restore,
-unaligned accesses, memory growth, multi-memory, bounds traps and register-IR regressions.
+206 previously failing checks now pass. Memory fast paths and comparison fusion
+preserve every spec classification. All 78 unit/integration tests pass, including
+suspension/restore, unaligned accesses, memory growth, multi-memory, bounds traps,
+register-IR regressions and fused-comparison boundary checks against wasmi.
 
 ## what's this for?
 

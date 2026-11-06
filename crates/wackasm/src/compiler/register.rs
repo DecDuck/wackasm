@@ -3,7 +3,7 @@ use wasmparser::{Operator, ValType, WasmModuleResources as _};
 
 use crate::{
     HaltError,
-    compiler::{I32Comparison, Reg, WackasmOperator, compile::Compiler},
+    compiler::{I32Comparison, I64Comparison, Reg, WackasmOperator, compile::Compiler},
     functions::FunctionManager,
     module::FunctionIndex,
 };
@@ -228,6 +228,7 @@ impl Compiler {
             | I64GeU { dst, .. }
             | I64Eq { dst, .. }
             | I64Ne { dst, .. }
+            | I64CmpImm { dst, .. }
             | I32AddImm { dst, .. }
             | I32SubImm { dst, .. }
             | I32AndImm { dst, .. }
@@ -331,6 +332,137 @@ impl Compiler {
                     invert,
                     offset: 0,
                 }),
+                I32EqImm { dst, lhs, imm } if dst == cond => Some(JumpIfI32CmpImm {
+                    lhs,
+                    imm,
+                    kind: I32Comparison::Eq,
+                    invert,
+                    offset: 0,
+                }),
+                I32NeImm { dst, lhs, imm } if dst == cond => Some(JumpIfI32CmpImm {
+                    lhs,
+                    imm,
+                    kind: I32Comparison::Ne,
+                    invert,
+                    offset: 0,
+                }),
+                I32LtSImm { dst, lhs, imm } if dst == cond => Some(JumpIfI32CmpImm {
+                    lhs,
+                    imm,
+                    kind: I32Comparison::LtS,
+                    invert,
+                    offset: 0,
+                }),
+                I32LtUImm { dst, lhs, imm } if dst == cond => Some(JumpIfI32CmpImm {
+                    lhs,
+                    imm,
+                    kind: I32Comparison::LtU,
+                    invert,
+                    offset: 0,
+                }),
+                I32GtSImm { dst, lhs, imm } if dst == cond => Some(JumpIfI32CmpImm {
+                    lhs,
+                    imm,
+                    kind: I32Comparison::GtS,
+                    invert,
+                    offset: 0,
+                }),
+                I32GtUImm { dst, lhs, imm } if dst == cond => Some(JumpIfI32CmpImm {
+                    lhs,
+                    imm,
+                    kind: I32Comparison::GtU,
+                    invert,
+                    offset: 0,
+                }),
+                I32GeSImm { dst, lhs, imm } if dst == cond => Some(JumpIfI32CmpImm {
+                    lhs,
+                    imm,
+                    kind: I32Comparison::GeS,
+                    invert,
+                    offset: 0,
+                }),
+                I32GeUImm { dst, lhs, imm } if dst == cond => Some(JumpIfI32CmpImm {
+                    lhs,
+                    imm,
+                    kind: I32Comparison::GeU,
+                    invert,
+                    offset: 0,
+                }),
+                I32LeUImm { dst, lhs, imm } if dst == cond => Some(JumpIfI32CmpImm {
+                    lhs,
+                    imm,
+                    kind: I32Comparison::LeU,
+                    invert,
+                    offset: 0,
+                }),
+                I64Eq { dst, lhs, rhs } if dst == cond => Some(JumpIfI64Cmp {
+                    lhs,
+                    rhs,
+                    kind: I64Comparison::Eq,
+                    invert,
+                    offset: 0,
+                }),
+                I64Ne { dst, lhs, rhs } if dst == cond => Some(JumpIfI64Cmp {
+                    lhs,
+                    rhs,
+                    kind: I64Comparison::Ne,
+                    invert,
+                    offset: 0,
+                }),
+                I64GtS { dst, lhs, rhs } if dst == cond => Some(JumpIfI64Cmp {
+                    lhs,
+                    rhs,
+                    kind: I64Comparison::GtS,
+                    invert,
+                    offset: 0,
+                }),
+                I64LtU { dst, lhs, rhs } if dst == cond => Some(JumpIfI64Cmp {
+                    lhs,
+                    rhs,
+                    kind: I64Comparison::LtU,
+                    invert,
+                    offset: 0,
+                }),
+                I64GtU { dst, lhs, rhs } if dst == cond => Some(JumpIfI64Cmp {
+                    lhs,
+                    rhs,
+                    kind: I64Comparison::GtU,
+                    invert,
+                    offset: 0,
+                }),
+                I64LeU { dst, lhs, rhs } if dst == cond => Some(JumpIfI64Cmp {
+                    lhs,
+                    rhs,
+                    kind: I64Comparison::LeU,
+                    invert,
+                    offset: 0,
+                }),
+                I64GeU { dst, lhs, rhs } if dst == cond => Some(JumpIfI64Cmp {
+                    lhs,
+                    rhs,
+                    kind: I64Comparison::GeU,
+                    invert,
+                    offset: 0,
+                }),
+                I64CmpImm {
+                    dst,
+                    lhs,
+                    imm,
+                    kind,
+                } if dst == cond => Some(JumpIfI64CmpImm {
+                    lhs,
+                    imm,
+                    kind,
+                    invert,
+                    offset: 0,
+                }),
+                I64Eqz { dst, src } if dst == cond => Some(JumpIfI64CmpImm {
+                    lhs: src,
+                    imm: 0,
+                    kind: I64Comparison::Eq,
+                    invert,
+                    offset: 0,
+                }),
                 _ => None,
             };
             if let Some(replacement) = replacement {
@@ -394,6 +526,29 @@ impl Compiler {
                 } else {
                     let rhs = self.materialize_operand(right);
                     WackasmOperator::$name { dst, lhs, rhs }
+                };
+                self.produce(operator, 1)?;
+            }};
+        }
+        macro_rules! i64_comparison {
+            ($name:ident, $kind:ident) => {{
+                let right = self.registers.pop()?;
+                let left = self.registers.pop()?;
+                let lhs = self.materialize_operand(left);
+                let dst = self.registers.reg_at(self.registers.height_slots)?;
+                let operator = match right.provider {
+                    Provider::Const(bits) if i32::try_from(bits as i64).is_ok() => {
+                        WackasmOperator::I64CmpImm {
+                            dst,
+                            lhs,
+                            imm: bits as i64 as i32,
+                            kind: I64Comparison::$kind,
+                        }
+                    }
+                    _ => {
+                        let rhs = self.materialize_operand(right);
+                        WackasmOperator::$name { dst, lhs, rhs }
+                    }
                 };
                 self.produce(operator, 1)?;
             }};
@@ -706,13 +861,13 @@ impl Compiler {
             Operator::I64Shl => binary!(I64Shl),
             Operator::I64And => binary!(I64And),
             Operator::I64Or => binary!(I64Or),
-            Operator::I64GtS => binary!(I64GtS),
-            Operator::I64LtU => binary!(I64LtU),
-            Operator::I64GtU => binary!(I64GtU),
-            Operator::I64LeU => binary!(I64LeU),
-            Operator::I64GeU => binary!(I64GeU),
-            Operator::I64Eq => binary!(I64Eq),
-            Operator::I64Ne => binary!(I64Ne),
+            Operator::I64GtS => i64_comparison!(I64GtS, GtS),
+            Operator::I64LtU => i64_comparison!(I64LtU, LtU),
+            Operator::I64GtU => i64_comparison!(I64GtU, GtU),
+            Operator::I64LeU => i64_comparison!(I64LeU, LeU),
+            Operator::I64GeU => i64_comparison!(I64GeU, GeU),
+            Operator::I64Eq => i64_comparison!(I64Eq, Eq),
+            Operator::I64Ne => i64_comparison!(I64Ne, Ne),
             _ => {
                 self.materialize_all();
                 self.emit(WackasmOperator::Unsupported {

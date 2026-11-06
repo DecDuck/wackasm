@@ -23,7 +23,7 @@ impl TryFrom<MemArg> for WackasmMemArg {
     }
 }
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub(crate) enum I32Comparison {
     Eq,
     Ne,
@@ -34,6 +34,17 @@ pub(crate) enum I32Comparison {
     GeS,
     GeU,
     LeU,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub(crate) enum I64Comparison {
+    Eq,
+    Ne,
+    GtS,
+    LtU,
+    GtU,
+    LeU,
+    GeU,
 }
 
 const _: () = assert!(std::mem::size_of::<WackasmOperator>() <= 16);
@@ -538,5 +549,32 @@ pub enum WackasmOperator {
     },
     Unsupported {
         description: Box<String>,
+    },
+    JumpIfI32CmpImm {
+        lhs: Reg,
+        imm: i32,
+        kind: I32Comparison,
+        invert: bool,
+        offset: i32,
+    },
+    JumpIfI64Cmp {
+        lhs: Reg,
+        rhs: Reg,
+        kind: I64Comparison,
+        invert: bool,
+        offset: i32,
+    },
+    JumpIfI64CmpImm {
+        lhs: Reg,
+        imm: i32,
+        kind: I64Comparison,
+        invert: bool,
+        offset: i32,
+    },
+    I64CmpImm {
+        dst: Reg,
+        lhs: Reg,
+        imm: i32,
+        kind: I64Comparison,
     },
 }
