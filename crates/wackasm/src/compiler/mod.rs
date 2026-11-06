@@ -1,30 +1,29 @@
-use anyhow::anyhow;
 use serde::{Deserialize, Serialize};
 use wasmparser::{
-    BrTable, FuncValidator, FuncValidatorAllocations, FunctionBody, MemArg, Operator, ValType, ValidatorResources,
+    FuncValidator, FuncValidatorAllocations, FunctionBody, ValType, ValidatorResources,
 };
 
-use crate::{
-    HaltError, Value, blocks::{BlockManager, lookahead_find_blocks}, compiler::compile::Compiler, functions::FunctionManager, pc::ProgramCounter,
-};
+use crate::{HaltError, Value, compiler::compile::Compiler, functions::FunctionManager};
 
+#[path = "filters/block.rs"]
+mod block;
 mod compile;
-mod filter;
-mod filters;
-mod types;
 mod dispatch;
+mod register;
+#[cfg(test)]
+mod tests;
+mod types;
 
-pub(crate) use types::*;
 pub(crate) use dispatch::*;
+pub(crate) use types::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WackasmFunctionBody {
     pub(crate) inner: Option<Vec<WackasmOperator>>,
     pub(crate) runtime: Vec<RuntimeWackasmOperator>,
-    max_stack_operands: u32,
+    pub(crate) max_height_slots: u32,
     pub(crate) params_slots: usize,
     pub(crate) local_defaults: Box<[Value]>,
-
 }
 
 impl WackasmFunctionBody {
@@ -32,7 +31,7 @@ impl WackasmFunctionBody {
         Self {
             runtime: Vec::new(),
             inner: Some(Vec::new()),
-            max_stack_operands: 0,
+            max_height_slots: 0,
             params_slots: 0,
             local_defaults: Box::new([]),
         }
@@ -48,15 +47,15 @@ impl WackasmFunctionBody {
         let mut compiler = Compiler::new(func_validator);
 
         // pre-pass: create locals + map
-        compiler.create_locals(params, locals);
+        compiler.create_locals(params, locals)?;
 
-        // pass 1: function lookup
+        // Discover branch targets and optimisation barriers.
         compiler.block_lookahead(code)?;
 
-        // pass 2: transform
+        // Validate and lower the operand stack to register providers.
         compiler.transform(code, functions)?;
 
-        // pass 3: nop elimination & patch
+        // Resolve wasm targets to relative instruction offsets.
         compiler.target_rewrite()?;
 
         // finish up
@@ -64,9 +63,6 @@ impl WackasmFunctionBody {
     }
 
     pub fn theoretical_max_stack_size(&self) -> u32 {
-        let value = self.max_stack_operands as usize * 2; // v128 takes double size
-        let value = value + self.params_slots + self.local_defaults.len();
-
-        value as u32
+        self.max_height_slots + self.params_slots as u32 + self.local_defaults.len() as u32
     }
 }

@@ -6,16 +6,26 @@ use wasmparser::{
 };
 
 use crate::{
-    HaltError, HostYield, Value,
-    compiler::WackasmFunctionBody,
+    HaltError, Value,
+    compiler::{RuntimeWackasmOperator, WackasmFunctionBody},
     macros::trap,
-    module::{
-        FunctionFrame, FunctionIndex, FunctionTypeIndex, PendingImportCall,
-    },
-    stack::{FrameOperandStack, GlobalStack as _, val_types_to_size},
+    module::{FunctionIndex, FunctionTypeIndex},
+    stack::val_types_to_size,
 };
 
-const MAX_CALL_DEPTH: usize = 10_000;
+pub(crate) const MAX_CALL_DEPTH: usize = 10_000;
+
+// Derived pointers borrow immutable function allocations. Rebuild after loading or
+// deserializing bodies; never serialize these pointers or mutate their allocations.
+pub(crate) struct FuncInfo {
+    pub(crate) code: *const RuntimeWackasmOperator,
+    pub(crate) code_len: usize,
+    pub(crate) params_slots: usize,
+    pub(crate) results_slots: usize,
+    pub(crate) local_defaults: *const Value,
+    pub(crate) locals_len: usize,
+    pub(crate) frame_size: usize,
+}
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum WackasmFunction {
@@ -38,10 +48,35 @@ impl WackasmFunction {
 }
 
 #[derive(Serialize, Deserialize)]
+#[serde(try_from = "FunctionManagerData")]
 pub(crate) struct FunctionManager {
     pub(crate) function_type_indexes: Vec<FuncType>,
     pub(crate) function_types: Vec<FunctionTypeIndex>,
     pub(crate) function_bodies: Vec<WackasmFunction>,
+    #[serde(skip)]
+    pub(crate) info: Vec<FuncInfo>,
+}
+
+#[derive(Deserialize)]
+struct FunctionManagerData {
+    function_type_indexes: Vec<FuncType>,
+    function_types: Vec<FunctionTypeIndex>,
+    function_bodies: Vec<WackasmFunction>,
+}
+
+impl TryFrom<FunctionManagerData> for FunctionManager {
+    type Error = HaltError;
+
+    fn try_from(data: FunctionManagerData) -> Result<Self, Self::Error> {
+        let mut manager = Self {
+            function_type_indexes: data.function_type_indexes,
+            function_types: data.function_types,
+            function_bodies: data.function_bodies,
+            info: Vec::new(),
+        };
+        manager.rebuild_info()?;
+        Ok(manager)
+    }
 }
 
 impl FunctionManager {
@@ -50,7 +85,44 @@ impl FunctionManager {
             function_type_indexes: Vec::new(),
             function_types: Vec::new(),
             function_bodies: Vec::new(),
+            info: Vec::new(),
         }
+    }
+
+    pub(crate) fn rebuild_info(&mut self) -> Result<(), HaltError> {
+        let mut info = Vec::with_capacity(self.function_bodies.len());
+        for (index, function) in self.function_bodies.iter().enumerate() {
+            let ty = self.function_type_idx(&FunctionIndex(index as u32))?;
+            let params_slots = val_types_to_size(ty.params());
+            let results_slots = val_types_to_size(ty.results());
+            let (code, code_len, local_defaults, locals_len, frame_size) = match function {
+                WackasmFunction::Internal(body) => (
+                    body.runtime.as_ptr(),
+                    body.runtime.len(),
+                    body.local_defaults.as_ptr(),
+                    body.local_defaults.len(),
+                    body.theoretical_max_stack_size() as usize,
+                ),
+                WackasmFunction::Import { .. } => (
+                    std::ptr::null(),
+                    0,
+                    std::ptr::null(),
+                    0,
+                    params_slots.max(results_slots),
+                ),
+            };
+            info.push(FuncInfo {
+                code,
+                code_len,
+                params_slots,
+                results_slots,
+                local_defaults,
+                locals_len,
+                frame_size,
+            });
+        }
+        self.info = info;
+        Ok(())
     }
 
     pub(crate) fn function_type_idx(
@@ -242,107 +314,5 @@ impl FunctionManager {
             .push(WackasmFunction::Internal(function_body));
 
         Ok(allocs)
-    }
-
-    pub(crate) fn call_import_internal(
-        &self,
-        pending_import: &mut Option<PendingImportCall>,
-        stack: &mut FrameOperandStack,
-        arguments: Option<Vec<Value>>,
-        module: &str,
-        name: &str,
-        args: usize,
-        returns: usize,
-    ) -> Result<Option<HostYield>, HaltError> {
-        let arguments = match arguments {
-            Some(args) => args,
-            None => stack.pull_results_size(args)?,
-        };
-        if arguments.len() != args {
-            return Err(trap!(
-                "unexpected amount of arguments: expected {} vs got {}",
-                args,
-                arguments.len()
-            ));
-        }
-
-        *pending_import = Some(PendingImportCall {
-            module: module.to_owned(),
-            name: name.to_owned(),
-            args: arguments.clone(),
-            should_return: returns,
-        });
-
-        Ok(Some(HostYield::ImportCall {
-            module: module.to_owned(),
-            name: name.to_owned(),
-            args: arguments,
-            should_return: returns,
-        }))
-    }
-
-    #[must_use]
-    pub(crate) fn call_internal(
-        &self,
-        pending_import: &mut Option<PendingImportCall>,
-        callstack: &mut Vec<FunctionFrame>,
-        stack: &mut FrameOperandStack,
-        function_index: FunctionIndex,
-        arguments: Option<Vec<Value>>,
-    ) -> Result<Option<HostYield>, HaltError> {
-        if callstack.len() >= MAX_CALL_DEPTH {
-            return Err(trap!("call stack exhausted"));
-        }
-
-        let code_body = match self.get_function(&function_index)? {
-            WackasmFunction::Internal(wackasm_function_body) => wackasm_function_body,
-            WackasmFunction::Import {
-                module,
-                name,
-                args,
-                returns,
-            } => {
-                return self.call_import_internal(
-                    pending_import,
-                    stack,
-                    arguments,
-                    module,
-                    name,
-                    *args,
-                    *returns,
-                );
-            }
-        };
-
-        if stack.space() < code_body.theoretical_max_stack_size() as usize {
-            return Err(trap!("potential stack overflow"));
-        }
-
-        if let Some(arguments) = &arguments
-            && arguments.len() != code_body.params_slots
-        {
-            return Err(trap!("invalid arguments len"));
-        }
-
-        let mut stack_base = 0;
-
-        if let Some(arguments) = arguments {
-            stack_base = stack.len();
-            stack.push_all(&arguments);
-            stack.push_all(&code_body.local_defaults);
-        } else {
-            stack_base = stack.len() - code_body.params_slots; // params are already on the stack, we just adopt them
-            stack.push_all(&code_body.local_defaults);
-        }
-
-        let function = FunctionFrame {
-            function_index,
-            pc: 0,
-            stack_base,
-        };
-
-        callstack.push(function);
-
-        Ok(None)
     }
 }

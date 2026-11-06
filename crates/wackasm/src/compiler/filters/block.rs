@@ -1,234 +1,247 @@
 use anyhow::anyhow;
-use wasmparser::{Operator, ValType};
+use wasmparser::Operator;
 
 use crate::{
     HaltError,
     blocks::Block,
-    compiler::{
-        DropKeep, WackasmOperator, WackasmTableTarget, WackasmTableTargets,
-        compile::Compiler, filter::CompilerFilter,
-    },
+    compiler::{Reg, WackasmOperator, compile::Compiler},
     functions::FunctionManager,
-    macros::trap,
     module::BlockIndex,
     stack::val_types_to_size,
 };
 
-pub struct BlockPass {
-    block_stack: Vec<BlockIndex>,
+struct OpenBlock {
+    index: BlockIndex,
+    entry_height_slots: usize,
 }
 
-pub enum BranchResolveResult {
-    Unreachable,
-    Return,
-    Target { target: u32, dk: DropKeep },
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+enum Branch {
+    Return {
+        src: Reg,
+        len: Reg,
+    },
+    Target {
+        target: usize,
+        dst: Reg,
+        src: Reg,
+        len: Reg,
+    },
+}
+
+pub(crate) struct BlockPass {
+    blocks: Vec<OpenBlock>,
 }
 
 impl BlockPass {
-    fn resolve_branch(
+    pub(crate) fn new() -> Self {
+        Self { blocks: Vec::new() }
+    }
+
+    fn resolve(
         &self,
         compiler: &Compiler,
         functions: &FunctionManager,
         depth: u32,
-        stack_pops: u32,
-    ) -> Result<BranchResolveResult, HaltError> {
-        let validator = &compiler.func_validator;
-
-        // If it's unreachable
-        if validator
-            .get_control_frame(0)
-            .ok_or_else(|| anyhow!("no control frame while resolving branch"))?
-            .unreachable
-        {
-            return Ok(BranchResolveResult::Unreachable);
+    ) -> Result<Branch, HaltError> {
+        if depth as usize >= self.blocks.len() {
+            let frame = compiler
+                .func_validator
+                .get_control_frame(self.blocks.len())
+                .ok_or_else(|| anyhow!("missing function control frame"))?;
+            let result_slots = match frame.block_type {
+                wasmparser::BlockType::Empty => 0,
+                wasmparser::BlockType::Type(ty) => crate::stack::val_type_to_size(&ty),
+                wasmparser::BlockType::FuncType(index) => val_types_to_size(
+                    functions
+                        .function_type_idx_type(&crate::module::FunctionTypeIndex(index))?
+                        .results(),
+                ),
+            };
+            let len = Reg::try_from(result_slots)?;
+            let src = compiler.registers.reg_at(
+                compiler
+                    .registers
+                    .height_slots
+                    .checked_sub(len as usize)
+                    .ok_or_else(|| anyhow!("return stack underflow"))?,
+            )?;
+            return Ok(Branch::Return { src, len });
         }
-
-        // If it's a function return
-        if depth >= self.block_stack.len() as u32 {
-            return Ok(BranchResolveResult::Return);
-        }
-
-        // Branch to a block
-        let target_block = self.block_stack[self.block_stack.len() - 1 - depth as usize];
-        let block = compiler.block_manager.get(&target_block)?;
-        let (target, keep) = match block {
-            // Blocks & ifs break to the end, and take their return params
-            Block::If { end, .. } | Block::Block { end, .. } => {
-                (end + 1, block.return_params(functions)?)
-            }
-            // Loops break back to the start, and take their call params
-            // Branch back directly to the loop instruction, so we hit the consume fuel that
-            // we replace it with
+        let open = &self.blocks[self.blocks.len() - 1 - depth as usize];
+        let block = compiler.block_manager.get(&open.index)?;
+        let (target, types) = match block {
             Block::Loop { start, .. } => (*start, block.call_params(functions)?),
+            Block::Block { end, .. } | Block::If { end, .. } => {
+                (*end + 1, block.return_params(functions)?)
+            }
         };
-
-        let frame = validator
-            .get_control_frame(depth as usize)
-            .ok_or_else(|| anyhow!("target control frame doesn't exist"))?;
-
-        let keep = keep.map(|v| val_types_to_size(v)).unwrap_or(0) as u32;
-        let total = validator.operand_stack_height() as usize;
-        let above_frame = total - frame.height;
-        let slots: usize = (stack_pops as usize..above_frame)
-            .into_iter()
-            .map(|depth| {
-                let ty = validator.get_operand_type(depth).flatten();
-                if ty == Some(ValType::V128) { 2 } else { 1 }
-            })
-            .sum();
-
-        let drop = slots
-            .checked_sub(keep as usize)
-            .ok_or_else(|| anyhow!("negative drop depth"))?;
-
-        Ok(BranchResolveResult::Target {
-            target: u32::try_from(target)?,
-            dk: DropKeep {
-                drop: u16::try_from(drop)?,
-                keep: u16::try_from(keep)?,
-            },
+        let len = Reg::try_from(types.map(val_types_to_size).unwrap_or(0))?;
+        let src = compiler.registers.reg_at(
+            compiler
+                .registers
+                .height_slots
+                .checked_sub(len as usize)
+                .ok_or_else(|| anyhow!("branch stack underflow"))?,
+        )?;
+        let dst = compiler.registers.reg_at(open.entry_height_slots)?;
+        Ok(Branch::Target {
+            target,
+            dst,
+            src,
+            len,
         })
     }
-}
 
-impl CompilerFilter for BlockPass {
-    fn compile(
+    fn needs_copy(branch: Branch) -> bool {
+        matches!(branch, Branch::Target { dst, src, len, .. } if len != 0 && dst != src)
+    }
+
+    fn emit_branch(compiler: &mut Compiler, branch: Branch) {
+        match branch {
+            Branch::Return { src, len } => {
+                compiler.emit(WackasmOperator::Return { src, len });
+            }
+            Branch::Target {
+                target,
+                dst,
+                src,
+                len,
+            } => {
+                if len != 0 && dst != src {
+                    compiler.emit(WackasmOperator::CopySpan { dst, src, len });
+                }
+                compiler.jump(target);
+            }
+        }
+    }
+
+    pub(crate) fn compile(
         &mut self,
         compiler: &mut Compiler,
         functions: &FunctionManager,
         pc: usize,
-        operator: wasmparser::Operator,
-    ) -> Result<bool, crate::HaltError> {
-        let wackasm_operator = match operator {
-            // blocks & loops just open a new block
-            Operator::Block { .. } | Operator::Loop { .. } => {
-                self.block_stack.push(BlockIndex(pc as u32));
-
-                Some(WackasmOperator::ConsumeFuel)
-            }
-            Operator::If { .. } => {
-                let idx = BlockIndex(pc as u32);
-                self.block_stack.push(idx);
-                let block = compiler.block_manager.get(&idx)?.clone();
-                let (_, r#else, end) = block.if_block()?;
-
-                let false_target = r#else.unwrap_or(end) as u32 + 1;
-
-                Some(WackasmOperator::JumpIfEqz {
-                    target: false_target,
-                })
+        op: &Operator<'_>,
+        unreachable: bool,
+    ) -> Result<bool, HaltError> {
+        match op {
+            Operator::Block { .. } | Operator::Loop { .. } | Operator::If { .. } => {
+                let index = BlockIndex(u32::try_from(pc)?);
+                let block = *compiler.block_manager.get(&index)?;
+                let params = block
+                    .call_params(functions)?
+                    .map(val_types_to_size)
+                    .unwrap_or(0);
+                if !unreachable {
+                    let cond = if matches!(op, Operator::If { .. }) {
+                        let value = compiler.registers.pop()?;
+                        Some(compiler.materialize_operand(value))
+                    } else {
+                        None
+                    };
+                    compiler.materialize_all();
+                    if let Some(cond) = cond {
+                        let (_, r#else, end) = block.if_block()?;
+                        let branch_pc = compiler.conditional(cond, true);
+                        compiler.fixup(branch_pc, r#else.unwrap_or(end) + 1);
+                    }
+                    if matches!(op, Operator::Loop { .. }) {
+                        compiler.mark_loop_header(pc);
+                        compiler.emit(WackasmOperator::ConsumeFuel);
+                    }
+                }
+                let entry_height_slots = compiler.registers.height_slots.saturating_sub(params);
+                self.blocks.push(OpenBlock {
+                    index,
+                    entry_height_slots,
+                });
             }
             Operator::Else => {
-                let if_block = self
-                    .block_stack
-                    .last()
-                    .ok_or_else(|| trap!("no block when we get to else"))?;
-
-                let block = compiler.block_manager.get(if_block)?;
-
-                let (_, _, end) = block.if_block()?;
-
-                Some(WackasmOperator::Jump {
-                    target: end as u32 + 1,
-                })
-            }
-            Operator::End => match self.block_stack.pop() {
-                Some(_) => None,
-                None => Some(WackasmOperator::Return),
-            },
-            // Br
-            Operator::Br { relative_depth } => {
-                let branch = self.resolve_branch(compiler, functions, relative_depth, 0)?;
-                Some(match branch {
-                    BranchResolveResult::Unreachable => WackasmOperator::Unreachable,
-                    BranchResolveResult::Return => WackasmOperator::Return,
-                    BranchResolveResult::Target { target, dk } => match dk.drop == 0 {
-                        true => WackasmOperator::Jump { target },
-                        false => WackasmOperator::Br {
-                            target,
-                            drop_keep: dk,
-                        },
-                    },
-                })
-            }
-
-            Operator::BrIf { relative_depth } => {
-                let branch = self.resolve_branch(compiler, functions, relative_depth, 1)?;
-                Some(match branch {
-                    BranchResolveResult::Unreachable => WackasmOperator::Unreachable,
-                    BranchResolveResult::Return => WackasmOperator::ReturnIf,
-                    BranchResolveResult::Target { target, dk } => match dk.drop == 0 {
-                        true => WackasmOperator::JumpIf { target },
-                        false => WackasmOperator::BrIf {
-                            target,
-                            drop_keep: dk,
-                        },
-                    },
-                })
-            }
-            Operator::BrTable { ref targets } => {
-                let mut unreachable = matches!(
-                    self.resolve_branch(compiler, functions, 0, 1)?,
-                    BranchResolveResult::Unreachable
-                );
-
-                let mut results: WackasmTableTargets =
-                    Vec::with_capacity(targets.len() as usize + 1);
                 if !unreachable {
-                    for target in targets.targets() {
-                        let depth = target?;
-                        let branch = self.resolve_branch(compiler, functions, depth, 1)?;
-                        results.push(match branch {
-                            BranchResolveResult::Unreachable => {
-                                unreachable = true;
-                                break;
-                            }
-                            BranchResolveResult::Return => WackasmTableTarget::Return,
-                            BranchResolveResult::Target { target, dk } => {
-                                WackasmTableTarget::Break { target, dk }
-                            }
-                        });
-                    }
-
-                    // do the same for the default
-                    let branch = self.resolve_branch(compiler, functions, targets.default(), 1)?;
-                    results.push(match branch {
-                        BranchResolveResult::Unreachable => unreachable!(),
-                        BranchResolveResult::Return => WackasmTableTarget::Return,
-                        BranchResolveResult::Target { target, dk } => {
-                            WackasmTableTarget::Break { target, dk }
-                        }
-                    });
+                    compiler.materialize_all();
+                    let open = self
+                        .blocks
+                        .last()
+                        .ok_or_else(|| anyhow!("else without if"))?;
+                    let (_, _, end) = compiler.block_manager.get(&open.index)?.if_block()?;
+                    compiler.jump(end + 1);
                 }
-
-                Some(if !unreachable {
-                    WackasmOperator::BrTable {
-                        targets: Box::new(results),
+            }
+            Operator::End => {
+                if !unreachable {
+                    compiler.materialize_all();
+                    if self.blocks.is_empty() {
+                        let branch = self.resolve(compiler, functions, 0)?;
+                        Self::emit_branch(compiler, branch);
                     }
-                } else {
-                    WackasmOperator::Unreachable
-                })
+                }
+                self.blocks.pop();
+            }
+            Operator::Return => {
+                compiler.materialize_all();
+                let branch = self.resolve(compiler, functions, self.blocks.len() as u32)?;
+                Self::emit_branch(compiler, branch);
+            }
+            Operator::Br { relative_depth } => {
+                compiler.materialize_all();
+                let branch = self.resolve(compiler, functions, *relative_depth)?;
+                Self::emit_branch(compiler, branch);
+            }
+            Operator::BrIf { relative_depth } => {
+                let value = compiler.registers.pop()?;
+                let cond = compiler.materialize_operand(value);
+                compiler.materialize_all();
+                let branch = self.resolve(compiler, functions, *relative_depth)?;
+                match branch {
+                    Branch::Return { src, len } => {
+                        compiler.emit(WackasmOperator::ReturnIfNez { cond, src, len });
+                    }
+                    Branch::Target { target, .. } if !Self::needs_copy(branch) => {
+                        let branch_pc = compiler.conditional(cond, false);
+                        compiler.fixup(branch_pc, target);
+                    }
+                    _ => {
+                        let skip = compiler.conditional(cond, true);
+                        Self::emit_branch(compiler, branch);
+                        compiler.patch_relative(skip, compiler.code_len())?;
+                    }
+                }
+            }
+            Operator::BrTable { targets } => {
+                let value = compiler.registers.pop()?;
+                let index = compiler.materialize_operand(value);
+                compiler.materialize_all();
+                let mut branches = targets
+                    .targets()
+                    .map(|target| self.resolve(compiler, functions, target?))
+                    .collect::<Result<Vec<_>, HaltError>>()?;
+                branches.push(self.resolve(compiler, functions, targets.default())?);
+                let len = u32::try_from(branches.len())?;
+                compiler.emit(WackasmOperator::BrTable { index, len });
+                let table_start = compiler.code_len();
+                for branch in &branches {
+                    let entry_pc = compiler.emit(WackasmOperator::Jump { offset: 0 });
+                    if let Branch::Target { target, .. } = *branch
+                        && !Self::needs_copy(*branch)
+                    {
+                        compiler.fixup(entry_pc, target);
+                    }
+                }
+                let mut trampolines = std::collections::HashMap::new();
+                for (entry, branch) in branches.into_iter().enumerate() {
+                    if matches!(branch, Branch::Return { .. }) || Self::needs_copy(branch) {
+                        let trampoline = *trampolines.entry(branch).or_insert_with(|| {
+                            let trampoline = compiler.code_len();
+                            Self::emit_branch(compiler, branch);
+                            trampoline
+                        });
+                        compiler.patch_relative(table_start + entry, trampoline)?;
+                    }
+                }
             }
             _ => return Ok(false),
-        };
-
-        if let Some(wackasm_operator) = wackasm_operator {
-            compiler
-                .func_body
-                .inner
-                .as_mut()
-                .unwrap()
-                .push(wackasm_operator);
         }
-
-        return Ok(true);
-    }
-}
-
-impl BlockPass {
-    pub fn new() -> Self {
-        Self {
-            block_stack: Vec::new(),
-        }
+        compiler.last_producer = None;
+        Ok(true)
     }
 }

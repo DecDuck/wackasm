@@ -17,6 +17,7 @@ paste = "1.0.15"
 bitcode = { version = "0.6.9", features = ["serde"] }
 criterion = "0.5"
 wasmi = "2.0.0"
+wat = "1.263.0"
 
 [[bench]]
 name = "percent_of_wasmi"

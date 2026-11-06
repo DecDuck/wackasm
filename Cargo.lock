@@ -820,6 +820,7 @@ dependencies = [
  "thiserror",
  "wasmi",
  "wasmparser 0.262.0",
+ "wat",
 ]
 
 [[package]]
@@ -988,6 +989,7 @@ checksum = "4f5fa0a054ae153606df820eb0a84213e28cda41bbe04ba2628e71b6ba100fcb"
 dependencies = [
  "bitflags",
  "indexmap",
+ "semver",
 ]
 
 [[package]]

@@ -66,8 +66,8 @@ pub struct PendingImportCall {
     pub(crate) name: String,
     pub(crate) args: Vec<Value>,
     pub(crate) should_return: usize,
+    pub(crate) stack_base: usize,
 }
-
 
 #[derive(Serialize, Deserialize)]
 pub struct WackasmModule {
@@ -182,6 +182,8 @@ impl WackasmModule {
                 _ => return Err(unsupported!("unsupported section: {:?}", payload)),
             }
         }
+
+        functions.rebuild_info()?;
 
         Ok(Self {
             functions,
