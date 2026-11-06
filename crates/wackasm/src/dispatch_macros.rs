@@ -1,19 +1,27 @@
 #[macro_export]
 macro_rules! ops {
-    (|$ctx:ident, $pc:ident, $regs:ident| match $op:ident { $($arms:tt)* }) => {
-        ops!(@parse [($) $ctx, $pc, $regs] [] $($arms)*);
+    (|$ctx:ident, $pc:ident, $regs:ident| const $memory0:ident match $op:ident { $($arms:tt)* }) => {
+        ops!(@parse [($) $ctx, $pc, $regs, $memory0] [] $($arms)*);
     };
     (@parse $params:tt [$($acc:tt)*]
-        $name:ident @ $variant:ident $({ $($field:ident),* $(,)? })? => $body:block $(,)? $($rest:tt)*
+        $name:ident @ $variant:ident $({ $($field:ident),* $(,)? })? $([$memory:ident])? => $body:block $(,)? $($rest:tt)*
     ) => {
-        ops!(@parse $params [$($acc)* [$name $variant [$($($field)*)?] $body]] $($rest)*);
+        ops!(@parse $params [$($acc)* [$name $variant [$($($field)*)?] [$($memory)?] $body]] $($rest)*);
     };
-    (@parse [($d:tt) $ctx:ident, $pc:ident, $regs:ident] [$(
-        [$name:ident $variant:ident [$($field:ident)*] $body:tt]
+    (@handler $op:ident, $variant:ident, $name:ident, []) => { $name::<false> };
+    (@handler $op:ident, $variant:ident, $name:ident, [memory]) => {{
+        let WackasmOperator::$variant { memarg, .. } = $op else {
+            unreachable!()
+        };
+        if memarg.memory == 0 { $name::<true> } else { $name::<false> }
+    }};
+    (@parse [($d:tt) $ctx:ident, $pc:ident, $regs:ident, $memory0:ident] [$(
+        [$name:ident $variant:ident [$($field:ident)*] [$($memory:ident)?] $body:tt]
     )*]) => {
         pub(crate) fn handler_for(op: &WackasmOperator) -> WackasmOperatorHandler {
             match op {
-                $( WackasmOperator::$variant { .. } => $name, )*
+                $( WackasmOperator::$variant { .. } =>
+                    ops!(@handler op, $variant, $name, [$($memory)?]), )*
             }
         }
 
@@ -28,7 +36,7 @@ macro_rules! ops {
 
         $(
             #[allow(unused_variables, unreachable_code)]
-            fn $name<'a>(
+            fn $name<'a, const $memory0: bool>(
                 $ctx: &mut DispatchCtx<'a>,
                 $pc: *const RuntimeWackasmOperator,
                 $regs: *mut Value,

@@ -70,6 +70,7 @@ pub struct PendingImportCall {
 }
 
 #[derive(Serialize, Deserialize)]
+#[serde(try_from = "SerializedWackasmModule")]
 pub struct WackasmModule {
     pub(crate) exports: HashMap<String, ExportIndex>,
     pub(crate) tables: TableManager,
@@ -77,6 +78,34 @@ pub struct WackasmModule {
     pub(crate) globals: GlobalManager,
     pub(crate) start_func: Option<FunctionIndex>,
     pub(crate) functions: FunctionManager,
+}
+
+#[derive(Deserialize)]
+struct SerializedWackasmModule {
+    exports: HashMap<String, ExportIndex>,
+    tables: TableManager,
+    memories: MemoryManager,
+    globals: GlobalManager,
+    start_func: Option<FunctionIndex>,
+    functions: FunctionManager,
+}
+
+impl TryFrom<SerializedWackasmModule> for WackasmModule {
+    type Error = HaltError;
+
+    fn try_from(serialized: SerializedWackasmModule) -> Result<Self, Self::Error> {
+        serialized
+            .memories
+            .validate_compiled_indexes(&serialized.functions)?;
+        Ok(Self {
+            exports: serialized.exports,
+            tables: serialized.tables,
+            memories: serialized.memories,
+            globals: serialized.globals,
+            start_func: serialized.start_func,
+            functions: serialized.functions,
+        })
+    }
 }
 
 impl WackasmModule {

@@ -1,10 +1,10 @@
 use crate::{
     HaltError, Value,
-    compiler::{I32Comparison, Reg, RuntimeWackasmOperator, WackasmOperator},
+    compiler::{I32Comparison, Reg, RuntimeWackasmOperator, WackasmMemArg, WackasmOperator},
     functions::{FunctionManager, MAX_CALL_DEPTH},
     globals::GlobalManager,
     macros::{trap, unsupported},
-    memory::MemoryManager,
+    memory::{MemoryManager, MemoryNumber, MemoryView},
     module::{
         FunctionFrame, FunctionIndex, FunctionTypeIndex, GlobalIndex, TableIndex, TableValue,
     },
@@ -14,6 +14,7 @@ use crate::{
 
 pub(crate) struct DispatchCtx<'a> {
     pub(crate) memories: &'a mut MemoryManager,
+    pub(crate) memory0: MemoryView,
     pub(crate) globals: &'a mut GlobalManager,
     pub(crate) tables: &'a TableManager,
     pub(crate) functions: &'a FunctionManager,
@@ -22,6 +23,47 @@ pub(crate) struct DispatchCtx<'a> {
     pub(crate) capacity: usize,
     pub(crate) fuel: isize,
     pub(crate) exit: Option<Exit>,
+}
+
+impl DispatchCtx<'_> {
+    #[inline(always)]
+    fn memory_view(&mut self, index: u32) -> MemoryView {
+        if index == 0 {
+            self.memory0
+        } else {
+            // Only compiled, wasmparser-validated memory indexes reach dispatch.
+            unsafe { self.memories.view_validated(index) }
+        }
+    }
+
+    #[inline(always)]
+    fn load<T: MemoryNumber, const MEMORY0: bool>(
+        &mut self,
+        memarg: &WackasmMemArg,
+        address: u32,
+    ) -> Result<T, HaltError> {
+        let view = if MEMORY0 {
+            self.memory0
+        } else {
+            unsafe { self.memories.view_validated(memarg.memory) }
+        };
+        unsafe { view.load(address, memarg.offset) }
+    }
+
+    #[inline(always)]
+    fn store<T: MemoryNumber, const MEMORY0: bool>(
+        &mut self,
+        memarg: &WackasmMemArg,
+        address: u32,
+        value: T,
+    ) -> Result<(), HaltError> {
+        let view = if MEMORY0 {
+            self.memory0
+        } else {
+            unsafe { self.memories.view_validated(memarg.memory) }
+        };
+        unsafe { view.store(address, memarg.offset, value) }
+    }
 }
 
 pub(crate) type WackasmOperatorHandler =
@@ -204,20 +246,19 @@ macro_rules! imm {
     }};
 }
 macro_rules! load {
-    ($ctx:expr, $regs:expr, $dst:expr, $addr:expr, $memarg:expr, $ty:ty) => {{
+    ($ctx:expr, $regs:expr, $dst:expr, $addr:expr, $memarg:expr, $ty:ty, $memory0:ident) => {{
         let value = checked!(
             $ctx,
-            $ctx.memories
-                .load::<$ty>($memarg, get!($regs, $addr).as_u32())
+            $ctx.load::<$ty, $memory0>($memarg, get!($regs, $addr).as_u32())
         );
         set!($regs, $dst, Value(value as u64));
     }};
 }
 macro_rules! store {
-    ($ctx:expr, $regs:expr, $addr:expr, $value:expr, $memarg:expr, $ty:ty) => {{
+    ($ctx:expr, $regs:expr, $addr:expr, $value:expr, $memarg:expr, $ty:ty, $memory0:ident) => {{
         checked!(
             $ctx,
-            $ctx.memories.store(
+            $ctx.store::<$ty, $memory0>(
                 $memarg,
                 get!($regs, $addr).as_u32(),
                 get!($regs, $value).0 as $ty,
@@ -226,7 +267,7 @@ macro_rules! store {
     }};
 }
 
-ops!(|ctx, pc, regs| match op {
+ops!(|ctx, pc, regs| const MEMORY0 match op {
     nop @ Nop => {}
     fuel @ ConsumeFuel => {
         if !take_fuel(ctx, pc) {
@@ -289,6 +330,9 @@ ops!(|ctx, pc, regs| match op {
     }
     memory_grow @ MemoryGrow { dst, amount, mem } => {
         let result = checked!(ctx, ctx.memories.grow(*mem, get!(regs, amount).as_i32()));
+        if *mem == 0 {
+            ctx.memory0 = ctx.memories.memory0();
+        }
         set!(regs, dst, Value::from_i32(result));
     }
     memory_copy @ MemoryCopy {
@@ -298,16 +342,14 @@ ops!(|ctx, pc, regs| match op {
         src,
         len,
     } => {
-        checked!(
-            ctx,
-            ctx.memories.memcpy(
-                *src_mem as u32,
-                *dst_mem as u32,
-                get!(regs, dst).as_u32() as usize,
-                get!(regs, src).as_u32() as usize,
-                get!(regs, len).as_u32() as usize,
-            )
-        );
+        let source = ctx.memory_view(*src_mem as u32);
+        let destination = ctx.memory_view(*dst_mem as u32);
+        let dest = get!(regs, dst).as_u32() as usize;
+        let source_address = get!(regs, src).as_u32() as usize;
+        let length = get!(regs, len).as_u32() as usize;
+        checked!(ctx, unsafe {
+            destination.copy_from(source, dest, source_address, length)
+        });
     }
     memory_fill @ MemoryFill {
         mem,
@@ -315,70 +357,68 @@ ops!(|ctx, pc, regs| match op {
         value,
         len,
     } => {
-        checked!(
-            ctx,
-            ctx.memories.fill(
-                *mem,
-                get!(regs, addr).as_u32() as usize,
-                get!(regs, len).as_u32() as usize,
-                get!(regs, value).0 as u8,
-            )
-        );
+        let memory = ctx.memory_view(*mem);
+        let start = get!(regs, addr).as_u32() as usize;
+        let length = get!(regs, len).as_u32() as usize;
+        let byte = get!(regs, value).0 as u8;
+        checked!(ctx, unsafe {
+            memory.fill(start, length, byte)
+        });
     }
-    i32_load @ I32Load { dst, addr, memarg } => {
-        load!(ctx, regs, dst, addr, memarg, i32);
+    i32_load @ I32Load { dst, addr, memarg } [memory] => {
+        load!(ctx, regs, dst, addr, memarg, i32, MEMORY0);
     }
-    i32_load8_u @ I32Load8U { dst, addr, memarg } => {
-        load!(ctx, regs, dst, addr, memarg, u8);
+    i32_load8_u @ I32Load8U { dst, addr, memarg } [memory] => {
+        load!(ctx, regs, dst, addr, memarg, u8, MEMORY0);
     }
-    i32_load8_s @ I32Load8S { dst, addr, memarg } => {
-        load!(ctx, regs, dst, addr, memarg, i8);
+    i32_load8_s @ I32Load8S { dst, addr, memarg } [memory] => {
+        load!(ctx, regs, dst, addr, memarg, i8, MEMORY0);
     }
-    i32_load16_u @ I32Load16U { dst, addr, memarg } => {
-        load!(ctx, regs, dst, addr, memarg, u16);
+    i32_load16_u @ I32Load16U { dst, addr, memarg } [memory] => {
+        load!(ctx, regs, dst, addr, memarg, u16, MEMORY0);
     }
-    i32_load16_s @ I32Load16S { dst, addr, memarg } => {
-        load!(ctx, regs, dst, addr, memarg, i16);
+    i32_load16_s @ I32Load16S { dst, addr, memarg } [memory] => {
+        load!(ctx, regs, dst, addr, memarg, i16, MEMORY0);
     }
-    i64_load @ I64Load { dst, addr, memarg } => {
-        load!(ctx, regs, dst, addr, memarg, i64);
+    i64_load @ I64Load { dst, addr, memarg } [memory] => {
+        load!(ctx, regs, dst, addr, memarg, i64, MEMORY0);
     }
-    i64_load8_u @ I64Load8U { dst, addr, memarg } => {
-        load!(ctx, regs, dst, addr, memarg, u8);
+    i64_load8_u @ I64Load8U { dst, addr, memarg } [memory] => {
+        load!(ctx, regs, dst, addr, memarg, u8, MEMORY0);
     }
-    i64_load8_s @ I64Load8S { dst, addr, memarg } => {
-        load!(ctx, regs, dst, addr, memarg, i8);
+    i64_load8_s @ I64Load8S { dst, addr, memarg } [memory] => {
+        load!(ctx, regs, dst, addr, memarg, i8, MEMORY0);
     }
-    i64_load16_u @ I64Load16U { dst, addr, memarg } => {
-        load!(ctx, regs, dst, addr, memarg, u16);
+    i64_load16_u @ I64Load16U { dst, addr, memarg } [memory] => {
+        load!(ctx, regs, dst, addr, memarg, u16, MEMORY0);
     }
-    i64_load16_s @ I64Load16S { dst, addr, memarg } => {
-        load!(ctx, regs, dst, addr, memarg, i16);
+    i64_load16_s @ I64Load16S { dst, addr, memarg } [memory] => {
+        load!(ctx, regs, dst, addr, memarg, i16, MEMORY0);
     }
-    i64_load32_u @ I64Load32U { dst, addr, memarg } => {
-        load!(ctx, regs, dst, addr, memarg, u32);
+    i64_load32_u @ I64Load32U { dst, addr, memarg } [memory] => {
+        load!(ctx, regs, dst, addr, memarg, u32, MEMORY0);
     }
-    i64_load32_s @ I64Load32S { dst, addr, memarg } => {
-        load!(ctx, regs, dst, addr, memarg, i32);
+    i64_load32_s @ I64Load32S { dst, addr, memarg } [memory] => {
+        load!(ctx, regs, dst, addr, memarg, i32, MEMORY0);
     }
-    f32_load @ F32Load { dst, addr, memarg } => {
+    f32_load @ F32Load { dst, addr, memarg } [memory] => {
         let value = checked!(
             ctx,
-            ctx.memories.load::<f32>(memarg, get!(regs, addr).as_u32())
+            ctx.load::<f32, MEMORY0>(memarg, get!(regs, addr).as_u32())
         );
         set!(regs, dst, Value::from_f32(value));
     }
-    f64_load @ F64Load { dst, addr, memarg } => {
+    f64_load @ F64Load { dst, addr, memarg } [memory] => {
         let value = checked!(
             ctx,
-            ctx.memories.load::<f64>(memarg, get!(regs, addr).as_u32())
+            ctx.load::<f64, MEMORY0>(memarg, get!(regs, addr).as_u32())
         );
         set!(regs, dst, Value::from_f64(value));
     }
-    v128_load @ V128Load { dst, addr, memarg } => {
+    v128_load @ V128Load { dst, addr, memarg } [memory] => {
         let value = checked!(
             ctx,
-            ctx.memories.load::<u128>(memarg, get!(regs, addr).as_u32())
+            ctx.load::<u128, MEMORY0>(memarg, get!(regs, addr).as_u32())
         );
         unsafe {
             regs.add(*dst as usize).write(Value(value as u64));
@@ -390,59 +430,59 @@ ops!(|ctx, pc, regs| match op {
         addr,
         value,
         memarg,
-    } => {
-        store!(ctx, regs, addr, value, memarg, i32);
+    } [memory] => {
+        store!(ctx, regs, addr, value, memarg, i32, MEMORY0);
     }
     i32_store8 @ I32Store8 {
         addr,
         value,
         memarg,
-    } => {
-        store!(ctx, regs, addr, value, memarg, u8);
+    } [memory] => {
+        store!(ctx, regs, addr, value, memarg, u8, MEMORY0);
     }
     i32_store16 @ I32Store16 {
         addr,
         value,
         memarg,
-    } => {
-        store!(ctx, regs, addr, value, memarg, u16);
+    } [memory] => {
+        store!(ctx, regs, addr, value, memarg, u16, MEMORY0);
     }
     i64_store @ I64Store {
         addr,
         value,
         memarg,
-    } => {
-        store!(ctx, regs, addr, value, memarg, i64);
+    } [memory] => {
+        store!(ctx, regs, addr, value, memarg, i64, MEMORY0);
     }
     i64_store8 @ I64Store8 {
         addr,
         value,
         memarg,
-    } => {
-        store!(ctx, regs, addr, value, memarg, u8);
+    } [memory] => {
+        store!(ctx, regs, addr, value, memarg, u8, MEMORY0);
     }
     i64_store16 @ I64Store16 {
         addr,
         value,
         memarg,
-    } => {
-        store!(ctx, regs, addr, value, memarg, u16);
+    } [memory] => {
+        store!(ctx, regs, addr, value, memarg, u16, MEMORY0);
     }
     i64_store32 @ I64Store32 {
         addr,
         value,
         memarg,
-    } => {
-        store!(ctx, regs, addr, value, memarg, u32);
+    } [memory] => {
+        store!(ctx, regs, addr, value, memarg, u32, MEMORY0);
     }
     f32_store @ F32Store {
         addr,
         value,
         memarg,
-    } => {
+    } [memory] => {
         checked!(
             ctx,
-            ctx.memories.store(
+            ctx.store::<f32, MEMORY0>(
                 memarg,
                 get!(regs, addr).as_u32(),
                 get!(regs, value).as_f32()
@@ -453,10 +493,10 @@ ops!(|ctx, pc, regs| match op {
         addr,
         value,
         memarg,
-    } => {
+    } [memory] => {
         checked!(
             ctx,
-            ctx.memories.store(
+            ctx.store::<f64, MEMORY0>(
                 memarg,
                 get!(regs, addr).as_u32(),
                 get!(regs, value).as_f64()
@@ -467,15 +507,15 @@ ops!(|ctx, pc, regs| match op {
         addr,
         value,
         memarg,
-    } => {
+    } [memory] => {
         let number = unsafe {
             (*regs.add(*value as usize)).0 as u128
                 | (((*regs.add(*value as usize + 1)).0 as u128) << 64)
         };
         checked!(
             ctx,
-            ctx.memories
-                .store(memarg, get!(regs, addr).as_u32(), number)
+            ctx
+                .store::<u128, MEMORY0>(memarg, get!(regs, addr).as_u32(), number)
         );
     }
     call @ Call {

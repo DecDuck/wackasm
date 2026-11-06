@@ -6,8 +6,8 @@ In more words, `wackasm` was built so that you could run a WASM module that uses
 
 ## performance
 
-The interpreter benchmarks against `wasmi`. The register-IR rewrite measured about
-**81%** of wasmi's performance on the existing prime benchmark, up from about **47%**
+The interpreter benchmarks against `wasmi`. Register IR with memory fast paths measured about
+**82%** of wasmi's performance on the existing prime benchmark, up from about **47%**
 with the stack IR. There is still performance headroom, and results vary by machine.
 
 Measured on Windows on 2026-11-06 with
@@ -18,6 +18,7 @@ Measured on Windows on 2026-11-06 with
 | --- | --- | --- |
 | Stack IR baseline | 47.374% | 392,371 |
 | Register IR | 80.906% | 312,809 |
+| Register IR + memory fast paths | 82.373% | 312,809 |
 
 Also host/import functions are definitely lower than native WASM functions, so use them sparingly or do as much work as possible host side.
 
@@ -33,6 +34,14 @@ Internal calls and returns stay inside threaded dispatch. Fuel is charged at loo
 headers and calls, not plain blocks; a call with no fuel is suspended before entering
 the callee. Import calls yield to the host, and their results are written back into
 the caller's argument slots.
+
+Scalar and vector loads/stores use unaligned little-endian accesses after one
+widened effective-address bounds check. Memory 0 has specialized handlers using a
+cached pointer and length; other memories use validated indexes without repeating
+index checks. Bulk copy/fill validate complete ranges before writing, including
+overlapping copies. Cached views are refreshed after memory growth and each
+dispatch entry, never serialized. Restoring a snapshot revalidates compiled memory
+indexes before enabling unchecked lookup. Guest addresses always remain checked.
 
 If a start function calls an import, construction leaves initialization suspended.
 Finish it with `execute`/`import_return` or `execute_with_imports` before calling an
@@ -60,8 +69,9 @@ Of the couple tens of thousands of WASM tests I found, ~~these are the results:~
 Register-IR validation on 2026-11-06 against the core spec suite: **20,422 passed,
 481 failed, 43,956 unsupported**, versus **20,216 passed, 687 failed, 43,956
 unsupported** before the rewrite. Per-directive comparison found no regressions;
-206 previously failing checks now pass. All 57 unit/integration tests pass,
-including suspension/restore and register-IR regressions.
+206 previously failing checks now pass. Memory fast paths preserve every spec
+classification. All 69 unit/integration tests pass, including suspension/restore,
+unaligned accesses, memory growth, multi-memory, bounds traps and register-IR regressions.
 
 ## what's this for?
 
