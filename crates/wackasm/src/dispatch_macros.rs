@@ -8,20 +8,57 @@ macro_rules! ops {
     ) => {
         ops!(@parse $params [$($acc)* [$name $variant [$($($field)*)?] [$($memory)?] $body]] $($rest)*);
     };
-    (@handler $op:ident, $variant:ident, $name:ident, []) => { $name::<false> };
-    (@handler $op:ident, $variant:ident, $name:ident, [memory]) => {{
+    (@opcode $op:ident, $variant:ident, []) => { RuntimeOpcode::$variant };
+    (@opcode $op:ident, $variant:ident, [memory]) => {{
         let WackasmOperator::$variant { memarg, .. } = $op else {
             unreachable!()
         };
+        paste::paste! {
+            if memarg.memory == 0 {
+                RuntimeOpcode::[<$variant Memory0>]
+            } else {
+                RuntimeOpcode::$variant
+            }
+        }
+    }};
+    (@specialized $name:ident, []) => { $name::<false> };
+    (@specialized $name:ident, [memory]) => { $name::<true> };
+    (@handler $op:ident, $variant:ident, $name:ident, []) => { $name::<false> };
+    (@handler $op:ident, $variant:ident, $name:ident, [memory]) => {{
+        let WackasmOperator::$variant { memarg, .. } = $op else { unreachable!() };
         if memarg.memory == 0 { $name::<true> } else { $name::<false> }
     }};
     (@parse [($d:tt) $ctx:ident, $pc:ident, $regs:ident, $memory0:ident] [$(
         [$name:ident $variant:ident [$($field:ident)*] [$($memory:ident)?] $body:tt]
     )*]) => {
-        pub(crate) fn handler_for(op: &WackasmOperator) -> WackasmOperatorHandler {
+        paste::paste! {
+            #[cfg(feature = "compact-instructions")]
+            #[repr(u16)]
+            #[derive(Clone, Copy)]
+            // Paired IDs keep handler-table indexing direct, including memory-0 specializations.
+            #[allow(dead_code)]
+            pub(crate) enum RuntimeOpcode {
+                $($variant, [<$variant Memory0>],)*
+            }
+        }
+
+        #[cfg(feature = "compact-instructions")]
+        pub(crate) static HANDLERS: [WackasmOperatorHandler; [$(stringify!($variant)),*].len() * 2] =
+            [$($name::<false>, ops!(@specialized $name, [$($memory)?]),)*];
+
+        #[cfg(feature = "compact-instructions")]
+        pub(crate) fn opcode_for(op: &WackasmOperator) -> RuntimeOpcode {
             match op {
                 $( WackasmOperator::$variant { .. } =>
-                    ops!(@handler op, $variant, $name, [$($memory)?]), )*
+                    ops!(@opcode op, $variant, [$($memory)?]), )*
+            }
+        }
+
+        #[cfg(not(feature = "compact-instructions"))]
+        pub(crate) fn handler_for(op: &WackasmOperator) -> WackasmOperatorHandler {
+            match op {
+                $(WackasmOperator::$variant { .. } =>
+                    ops!(@handler op, $variant, $name, [$($memory)?]),)*
             }
         }
 
@@ -29,7 +66,7 @@ macro_rules! ops {
         macro_rules! dispatch {
             ($d c:expr, $d p:expr, $d r:expr) => {{
                 let pc: *const RuntimeWackasmOperator = $d p;
-                let handler = unsafe { (*pc).handler };
+                let handler = unsafe { (*pc).handler() };
                 become handler($d c, pc, $d r)
             }};
         }
@@ -41,6 +78,13 @@ macro_rules! ops {
                 $pc: *const RuntimeWackasmOperator,
                 $regs: *mut Value,
             ) {
+                #[cfg(feature = "compact-instructions")]
+                let operands = unsafe {
+                    (*$pc).operands::<crate::compiler::operands::$variant>()
+                };
+                #[cfg(feature = "compact-instructions")]
+                let crate::compiler::operands::$variant { $($field,)* } = operands;
+                #[cfg(not(feature = "compact-instructions"))]
                 let WackasmOperator::$variant { $($field,)* .. } = (unsafe { &(*$pc).op }) else {
                     unsafe { std::hint::unreachable_unchecked() }
                 };

@@ -3,6 +3,9 @@ name = "wackasm"
 version = "0.1.0"
 edition = "2024"
 
+[features]
+compact-instructions = []
+
 [dependencies]
 anyhow = "1.0.104"
 serde = { version = "1.0.229", features = ["derive", "rc"] }

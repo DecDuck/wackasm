@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use anyhow::anyhow;
 use serde::{Deserialize, Serialize};
 use wasmparser::{
@@ -25,6 +27,7 @@ pub(crate) struct FuncInfo {
     pub(crate) local_defaults: *const Value,
     pub(crate) locals_len: usize,
     pub(crate) frame_size: usize,
+    pub(crate) signature_id: u32,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -55,6 +58,8 @@ pub(crate) struct FunctionManager {
     pub(crate) function_bodies: Vec<WackasmFunction>,
     #[serde(skip)]
     pub(crate) info: Vec<FuncInfo>,
+    #[serde(skip)]
+    pub(crate) signature_ids: Vec<u32>,
 }
 
 #[derive(Deserialize)]
@@ -73,6 +78,7 @@ impl TryFrom<FunctionManagerData> for FunctionManager {
             function_types: data.function_types,
             function_bodies: data.function_bodies,
             info: Vec::new(),
+            signature_ids: Vec::new(),
         };
         manager.rebuild_info()?;
         Ok(manager)
@@ -86,10 +92,17 @@ impl FunctionManager {
             function_types: Vec::new(),
             function_bodies: Vec::new(),
             info: Vec::new(),
+            signature_ids: Vec::new(),
         }
     }
 
     pub(crate) fn rebuild_info(&mut self) -> Result<(), HaltError> {
+        let mut canonical_signatures = HashMap::new();
+        let mut signature_ids = Vec::with_capacity(self.function_type_indexes.len());
+        for (index, ty) in self.function_type_indexes.iter().enumerate() {
+            let id = u32::try_from(index).map_err(|_| anyhow!("too many function types"))?;
+            signature_ids.push(*canonical_signatures.entry(ty).or_insert(id));
+        }
         let mut info = Vec::with_capacity(self.function_bodies.len());
         for (index, function) in self.function_bodies.iter().enumerate() {
             let ty = self.function_type_idx(&FunctionIndex(index as u32))?;
@@ -119,10 +132,19 @@ impl FunctionManager {
                 local_defaults,
                 locals_len,
                 frame_size,
+                signature_id: signature_ids[self.function_types[index].0 as usize],
             });
         }
         self.info = info;
+        self.signature_ids = signature_ids;
         Ok(())
+    }
+
+    pub(crate) fn signature_id(&self, index: FunctionTypeIndex) -> Result<u32, HaltError> {
+        self.signature_ids
+            .get(index.0 as usize)
+            .copied()
+            .ok_or_else(|| trap!("no signature for function type index {:?}", index))
     }
 
     pub(crate) fn function_type_idx(

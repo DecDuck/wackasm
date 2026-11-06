@@ -43,7 +43,7 @@ fn all_i32_immediate_comparisons_fuse_to_one_conditional_dispatch() {
             let operators = ops(&body);
             assert_eq!(operators.len(), 2, "{name}, invert={invert}: {operators:?}");
             assert!(matches!(
-                operators[0],
+                &operators[0],
                 WackasmOperator::JumpIfI32CmpImm { lhs: 0, imm: -1, kind, invert: actual, offset: 1 }
                     if *kind == expected_kind && *actual == invert
             ));
@@ -65,7 +65,7 @@ fn all_supported_i64_comparisons_fuse_registers_and_immediates() {
                 let body = body(&format!("(module (func (param i64 i64) {control}))"));
                 let operators = ops(&body);
                 assert_eq!(operators.len(), 2, "{name}: {operators:?}");
-                match operators[0] {
+                match &operators[0] {
                     WackasmOperator::JumpIfI64CmpImm {
                         lhs: 0,
                         imm: -1,
@@ -112,12 +112,12 @@ fn i64_immediate_fusion_requires_exact_sign_extension() {
         if let Ok(imm) = i32::try_from(value) {
             assert_eq!(operators.len(), 2);
             assert!(matches!(
-                operators[0], WackasmOperator::JumpIfI64CmpImm { imm: actual, .. } if *actual == imm
+                &operators[0], WackasmOperator::JumpIfI64CmpImm { imm: actual, .. } if *actual == imm
             ));
         } else {
             assert_eq!(operators.len(), 3);
             assert!(matches!(operators[1], WackasmOperator::JumpIfI64Cmp { .. }));
-            let bits = match operators[0] {
+            let bits = match &operators[0] {
                 WackasmOperator::CopyImm32 { value, .. } => *value as u64,
                 WackasmOperator::CopyImm64 { value, .. } => {
                     value[0] as u64 | ((value[1] as u64) << 32)

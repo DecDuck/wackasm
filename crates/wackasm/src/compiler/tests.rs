@@ -12,8 +12,8 @@ pub(super) fn body(wat: &str) -> WackasmFunctionBody {
     }
 }
 
-pub(super) fn ops(body: &WackasmFunctionBody) -> Vec<&WackasmOperator> {
-    body.runtime.iter().map(|operator| &operator.op).collect()
+pub(super) fn ops(body: &WackasmFunctionBody) -> Vec<WackasmOperator> {
+    body.runtime.iter().map(|operator| operator.op()).collect()
 }
 
 #[test]
@@ -254,7 +254,7 @@ fn table_is_inline_and_copy_targets_have_relative_trampolines() {
         .position(|op| matches!(op, WackasmOperator::BrTable { len: 2, .. }))
         .unwrap();
     for entry in table + 1..=table + 2 {
-        let WackasmOperator::Jump { offset } = operators[entry] else {
+        let WackasmOperator::Jump { offset } = &operators[entry] else {
             panic!("table entry is not an inline jump");
         };
         let trampoline = usize::try_from(entry as i64 + *offset as i64).unwrap();
@@ -536,7 +536,7 @@ fn all_supported_i32_comparisons_have_immediate_and_fused_forms() {
              local.get 0 i32.const -3 i32.{name}))",
         ));
         assert_eq!(
-            std::mem::discriminant(&compiled.runtime[0].op),
+            std::mem::discriminant(&compiled.runtime[0].op()),
             std::mem::discriminant(&expected),
             "{name}",
         );
@@ -545,7 +545,7 @@ fn all_supported_i32_comparisons_have_immediate_and_fused_forms() {
              (block local.get 0 local.get 1 i32.{name} br_if 0)))",
         ));
         assert!(
-            matches!(compiled.runtime[0].op,
+            matches!(compiled.runtime[0].op(),
             JumpIfI32Cmp { kind: actual, .. }
             if std::mem::discriminant(&actual) == std::mem::discriminant(&kind)),
             "{name}"
@@ -567,7 +567,7 @@ fn duplicate_table_targets_share_a_single_trampoline() {
         .position(|op| matches!(op, WackasmOperator::BrTable { len: 3, .. }))
         .unwrap();
     let targets = (table + 1..=table + 3)
-        .map(|pc| match operators[pc] {
+        .map(|pc| match &operators[pc] {
             WackasmOperator::Jump { offset } => pc as i32 + offset,
             _ => panic!("expected inline jump"),
         })
@@ -637,11 +637,11 @@ fn factorial_ssa_loop_parameters_survive_backedges_and_multi_result_calls() {
     let module = WackasmModule::new(&wasm).unwrap();
     if let WackasmFunction::Internal(body) = module.functions.function_bodies.last().unwrap() {
         for (pc, operator) in body.runtime.iter().enumerate() {
-            if let WackasmOperator::Jump { offset } = operator.op
+            if let WackasmOperator::Jump { offset } = operator.op()
                 && offset < 0
             {
                 assert!(matches!(
-                    body.runtime[(pc as i32 + offset) as usize].op,
+                    body.runtime[(pc as i32 + offset) as usize].op(),
                     WackasmOperator::ConsumeFuel,
                 ));
             }

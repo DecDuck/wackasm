@@ -218,7 +218,7 @@ impl MemoryManager {
                 continue;
             };
             for operator in &body.runtime {
-                match &operator.op {
+                match &operator.op() {
                     I32Load { memarg, .. }
                     | I32Load8U { memarg, .. }
                     | I32Load8S { memarg, .. }
@@ -243,7 +243,32 @@ impl MemoryManager {
                     | I64Store32 { memarg, .. }
                     | F32Store { memarg, .. }
                     | F64Store { memarg, .. }
-                    | V128Store { memarg, .. } => validate(memarg.memory)?,
+                    | V128Store { memarg, .. }
+                    | I32LoadAt { memarg, .. }
+                    | I32Load8UAt { memarg, .. }
+                    | I32Load8SAt { memarg, .. }
+                    | I32Load16UAt { memarg, .. }
+                    | I32Load16SAt { memarg, .. }
+                    | I64LoadAt { memarg, .. }
+                    | I64Load8UAt { memarg, .. }
+                    | I64Load8SAt { memarg, .. }
+                    | I64Load16UAt { memarg, .. }
+                    | I64Load16SAt { memarg, .. }
+                    | I64Load32UAt { memarg, .. }
+                    | I64Load32SAt { memarg, .. }
+                    | F32LoadAt { memarg, .. }
+                    | F64LoadAt { memarg, .. }
+                    | V128LoadAt { memarg, .. }
+                    | I32StoreAt { memarg, .. }
+                    | I32Store8At { memarg, .. }
+                    | I32Store16At { memarg, .. }
+                    | I64StoreAt { memarg, .. }
+                    | I64Store8At { memarg, .. }
+                    | I64Store16At { memarg, .. }
+                    | I64Store32At { memarg, .. }
+                    | F32StoreAt { memarg, .. }
+                    | F64StoreAt { memarg, .. }
+                    | V128StoreAt { memarg, .. } => validate(memarg.memory)?,
                     MemoryGrow { mem, .. } | MemoryFill { mem, .. } => validate(*mem)?,
                     MemoryCopy {
                         src_mem, dst_mem, ..

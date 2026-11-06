@@ -10,6 +10,8 @@ mod block;
 #[cfg(test)]
 mod comparison_tests;
 mod compile;
+#[cfg(test)]
+mod constant_memory_tests;
 mod dispatch;
 mod register;
 #[cfg(test)]

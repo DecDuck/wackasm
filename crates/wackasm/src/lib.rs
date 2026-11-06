@@ -4,6 +4,7 @@
 #![feature(try_trait_v2)]
 #![feature(macro_metavar_expr)]
 #![deny(unused_must_use)]
+#![recursion_limit = "256"]
 
 mod blocks;
 mod compiler;

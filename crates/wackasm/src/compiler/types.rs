@@ -1,3 +1,4 @@
+use super::dispatch::operators;
 use serde::{Deserialize, Serialize};
 use wasmparser::MemArg;
 
@@ -49,8 +50,7 @@ pub(crate) enum I64Comparison {
 
 const _: () = assert!(std::mem::size_of::<WackasmOperator>() <= 16);
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum WackasmOperator {
+operators! {
     ConsumeFuel,
     Jump {
         offset: i32,
@@ -576,5 +576,106 @@ pub enum WackasmOperator {
         lhs: Reg,
         imm: i32,
         kind: I64Comparison,
+    },
+    // At operators use memarg.offset as the folded unsigned effective address.
+    I32LoadAt {
+        dst: Reg,
+        memarg: WackasmMemArg,
+    },
+    I32Load8UAt {
+        dst: Reg,
+        memarg: WackasmMemArg,
+    },
+    I32Load8SAt {
+        dst: Reg,
+        memarg: WackasmMemArg,
+    },
+    I32Load16UAt {
+        dst: Reg,
+        memarg: WackasmMemArg,
+    },
+    I32Load16SAt {
+        dst: Reg,
+        memarg: WackasmMemArg,
+    },
+    I64LoadAt {
+        dst: Reg,
+        memarg: WackasmMemArg,
+    },
+    I64Load8UAt {
+        dst: Reg,
+        memarg: WackasmMemArg,
+    },
+    I64Load8SAt {
+        dst: Reg,
+        memarg: WackasmMemArg,
+    },
+    I64Load16UAt {
+        dst: Reg,
+        memarg: WackasmMemArg,
+    },
+    I64Load16SAt {
+        dst: Reg,
+        memarg: WackasmMemArg,
+    },
+    I64Load32UAt {
+        dst: Reg,
+        memarg: WackasmMemArg,
+    },
+    I64Load32SAt {
+        dst: Reg,
+        memarg: WackasmMemArg,
+    },
+    F32LoadAt {
+        dst: Reg,
+        memarg: WackasmMemArg,
+    },
+    F64LoadAt {
+        dst: Reg,
+        memarg: WackasmMemArg,
+    },
+    V128LoadAt {
+        dst: Reg,
+        memarg: WackasmMemArg,
+    },
+    I32StoreAt {
+        value: Reg,
+        memarg: WackasmMemArg,
+    },
+    I32Store8At {
+        value: Reg,
+        memarg: WackasmMemArg,
+    },
+    I32Store16At {
+        value: Reg,
+        memarg: WackasmMemArg,
+    },
+    I64StoreAt {
+        value: Reg,
+        memarg: WackasmMemArg,
+    },
+    I64Store8At {
+        value: Reg,
+        memarg: WackasmMemArg,
+    },
+    I64Store16At {
+        value: Reg,
+        memarg: WackasmMemArg,
+    },
+    I64Store32At {
+        value: Reg,
+        memarg: WackasmMemArg,
+    },
+    F32StoreAt {
+        value: Reg,
+        memarg: WackasmMemArg,
+    },
+    F64StoreAt {
+        value: Reg,
+        memarg: WackasmMemArg,
+    },
+    V128StoreAt {
+        value: Reg,
+        memarg: WackasmMemArg,
     },
 }

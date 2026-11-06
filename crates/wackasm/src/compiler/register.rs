@@ -3,7 +3,9 @@ use wasmparser::{Operator, ValType, WasmModuleResources as _};
 
 use crate::{
     HaltError,
-    compiler::{I32Comparison, I64Comparison, Reg, WackasmOperator, compile::Compiler},
+    compiler::{
+        I32Comparison, I64Comparison, Reg, WackasmMemArg, WackasmOperator, compile::Compiler,
+    },
     functions::FunctionManager,
     module::FunctionIndex,
 };
@@ -20,6 +22,16 @@ pub(crate) struct Operand {
     pub(crate) provider: Provider,
     pub(crate) reg: Reg,
     pub(crate) width: usize,
+}
+
+fn constant_memarg(address: Operand, memarg: WackasmMemArg) -> Option<WackasmMemArg> {
+    let Provider::Const(bits) = address.provider else {
+        return None;
+    };
+    Some(WackasmMemArg {
+        offset: (bits as u32).checked_add(memarg.offset)?,
+        memory: memarg.memory,
+    })
 }
 
 pub(crate) struct RegStack {
@@ -190,6 +202,21 @@ impl Compiler {
             | F32Load { dst, .. }
             | F64Load { dst, .. }
             | V128Load { dst, .. }
+            | I32LoadAt { dst, .. }
+            | I32Load8UAt { dst, .. }
+            | I32Load8SAt { dst, .. }
+            | I32Load16UAt { dst, .. }
+            | I32Load16SAt { dst, .. }
+            | I64LoadAt { dst, .. }
+            | I64Load8UAt { dst, .. }
+            | I64Load8SAt { dst, .. }
+            | I64Load16UAt { dst, .. }
+            | I64Load16SAt { dst, .. }
+            | I64Load32UAt { dst, .. }
+            | I64Load32SAt { dst, .. }
+            | F32LoadAt { dst, .. }
+            | F64LoadAt { dst, .. }
+            | V128LoadAt { dst, .. }
             | I32Extend8S { dst, .. }
             | I64ExtendI32U { dst, .. }
             | I32WrapI64 { dst, .. }
@@ -554,31 +581,36 @@ impl Compiler {
             }};
         }
         macro_rules! load {
-            ($name:ident, $memarg:ident, $width:expr) => {{
+            ($name:ident, $at:ident, $memarg:ident, $width:expr) => {{
                 let value = self.registers.pop()?;
-                let addr = self.materialize_operand(value);
+                let memarg = WackasmMemArg::try_from(*$memarg)?;
                 let dst = self.registers.reg_at(self.registers.height_slots)?;
-                self.produce(
-                    WackasmOperator::$name {
-                        dst,
-                        addr,
-                        memarg: (*$memarg).try_into()?,
-                    },
-                    $width,
-                )?;
+                let operator = if let Some(memarg) = constant_memarg(value, memarg) {
+                    WackasmOperator::$at { dst, memarg }
+                } else {
+                    let addr = self.materialize_operand(value);
+                    WackasmOperator::$name { dst, addr, memarg }
+                };
+                self.produce(operator, $width)?;
             }};
         }
         macro_rules! store {
-            ($name:ident, $memarg:ident) => {{
+            ($name:ident, $at:ident, $memarg:ident) => {{
                 let operand = self.registers.pop()?;
                 let address = self.registers.pop()?;
                 let value = self.materialize_operand(operand);
-                let addr = self.materialize_operand(address);
-                self.emit(WackasmOperator::$name {
-                    addr,
-                    value,
-                    memarg: (*$memarg).try_into()?,
-                });
+                let memarg = WackasmMemArg::try_from(*$memarg)?;
+                let operator = if let Some(memarg) = constant_memarg(address, memarg) {
+                    WackasmOperator::$at { value, memarg }
+                } else {
+                    let addr = self.materialize_operand(address);
+                    WackasmOperator::$name {
+                        addr,
+                        value,
+                        memarg,
+                    }
+                };
+                self.emit(operator);
                 self.last_producer = None;
             }};
         }
@@ -781,31 +813,31 @@ impl Compiler {
                 });
                 self.last_producer = None;
             }
-            Operator::I32Load { memarg } => load!(I32Load, memarg, 1),
-            Operator::I32Load8U { memarg } => load!(I32Load8U, memarg, 1),
-            Operator::I32Load8S { memarg } => load!(I32Load8S, memarg, 1),
-            Operator::I32Load16U { memarg } => load!(I32Load16U, memarg, 1),
-            Operator::I32Load16S { memarg } => load!(I32Load16S, memarg, 1),
-            Operator::I64Load { memarg } => load!(I64Load, memarg, 1),
-            Operator::I64Load8U { memarg } => load!(I64Load8U, memarg, 1),
-            Operator::I64Load8S { memarg } => load!(I64Load8S, memarg, 1),
-            Operator::I64Load16U { memarg } => load!(I64Load16U, memarg, 1),
-            Operator::I64Load16S { memarg } => load!(I64Load16S, memarg, 1),
-            Operator::I64Load32U { memarg } => load!(I64Load32U, memarg, 1),
-            Operator::I64Load32S { memarg } => load!(I64Load32S, memarg, 1),
-            Operator::F32Load { memarg } => load!(F32Load, memarg, 1),
-            Operator::F64Load { memarg } => load!(F64Load, memarg, 1),
-            Operator::V128Load { memarg } => load!(V128Load, memarg, 2),
-            Operator::I32Store { memarg } => store!(I32Store, memarg),
-            Operator::I32Store8 { memarg } => store!(I32Store8, memarg),
-            Operator::I32Store16 { memarg } => store!(I32Store16, memarg),
-            Operator::I64Store { memarg } => store!(I64Store, memarg),
-            Operator::I64Store8 { memarg } => store!(I64Store8, memarg),
-            Operator::I64Store16 { memarg } => store!(I64Store16, memarg),
-            Operator::I64Store32 { memarg } => store!(I64Store32, memarg),
-            Operator::F32Store { memarg } => store!(F32Store, memarg),
-            Operator::F64Store { memarg } => store!(F64Store, memarg),
-            Operator::V128Store { memarg } => store!(V128Store, memarg),
+            Operator::I32Load { memarg } => load!(I32Load, I32LoadAt, memarg, 1),
+            Operator::I32Load8U { memarg } => load!(I32Load8U, I32Load8UAt, memarg, 1),
+            Operator::I32Load8S { memarg } => load!(I32Load8S, I32Load8SAt, memarg, 1),
+            Operator::I32Load16U { memarg } => load!(I32Load16U, I32Load16UAt, memarg, 1),
+            Operator::I32Load16S { memarg } => load!(I32Load16S, I32Load16SAt, memarg, 1),
+            Operator::I64Load { memarg } => load!(I64Load, I64LoadAt, memarg, 1),
+            Operator::I64Load8U { memarg } => load!(I64Load8U, I64Load8UAt, memarg, 1),
+            Operator::I64Load8S { memarg } => load!(I64Load8S, I64Load8SAt, memarg, 1),
+            Operator::I64Load16U { memarg } => load!(I64Load16U, I64Load16UAt, memarg, 1),
+            Operator::I64Load16S { memarg } => load!(I64Load16S, I64Load16SAt, memarg, 1),
+            Operator::I64Load32U { memarg } => load!(I64Load32U, I64Load32UAt, memarg, 1),
+            Operator::I64Load32S { memarg } => load!(I64Load32S, I64Load32SAt, memarg, 1),
+            Operator::F32Load { memarg } => load!(F32Load, F32LoadAt, memarg, 1),
+            Operator::F64Load { memarg } => load!(F64Load, F64LoadAt, memarg, 1),
+            Operator::V128Load { memarg } => load!(V128Load, V128LoadAt, memarg, 2),
+            Operator::I32Store { memarg } => store!(I32Store, I32StoreAt, memarg),
+            Operator::I32Store8 { memarg } => store!(I32Store8, I32Store8At, memarg),
+            Operator::I32Store16 { memarg } => store!(I32Store16, I32Store16At, memarg),
+            Operator::I64Store { memarg } => store!(I64Store, I64StoreAt, memarg),
+            Operator::I64Store8 { memarg } => store!(I64Store8, I64Store8At, memarg),
+            Operator::I64Store16 { memarg } => store!(I64Store16, I64Store16At, memarg),
+            Operator::I64Store32 { memarg } => store!(I64Store32, I64Store32At, memarg),
+            Operator::F32Store { memarg } => store!(F32Store, F32StoreAt, memarg),
+            Operator::F64Store { memarg } => store!(F64Store, F64StoreAt, memarg),
+            Operator::V128Store { memarg } => store!(V128Store, V128StoreAt, memarg),
             Operator::I32Extend8S => unary!(I32Extend8S),
             Operator::I64ExtendI32U => unary!(I64ExtendI32U),
             Operator::I32WrapI64 => unary!(I32WrapI64),

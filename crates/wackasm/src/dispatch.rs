@@ -3,7 +3,7 @@ use crate::{
     compiler::{
         I32Comparison, I64Comparison, Reg, RuntimeWackasmOperator, WackasmMemArg, WackasmOperator,
     },
-    functions::{FunctionManager, MAX_CALL_DEPTH},
+    functions::{FuncInfo, FunctionManager, MAX_CALL_DEPTH},
     globals::GlobalManager,
     macros::{trap, unsupported},
     memory::{MemoryManager, MemoryNumber, MemoryView},
@@ -123,15 +123,12 @@ fn call_target(
     pc: *const RuntimeWackasmOperator,
     function_index: u32,
     base: Reg,
+    info: &FuncInfo,
 ) -> Option<DispatchTarget> {
     if ctx.frames.len() >= MAX_CALL_DEPTH {
         trap_exit(ctx, "call stack exhausted");
         return None;
     }
-    let Some(info) = ctx.functions.info.get(function_index as usize) else {
-        trap_exit(ctx, "invalid function index");
-        return None;
-    };
     let caller_base = ctx
         .frames
         .last()
@@ -156,7 +153,16 @@ fn call_target(
     }
     let regs = unsafe { ctx.buffer.add(stack_base) };
     unsafe {
-        std::ptr::copy_nonoverlapping(local_defaults, regs.add(params_slots), locals_len);
+        match locals_len {
+            0 => {}
+            1 => regs.add(params_slots).write(local_defaults.read()),
+            2 => {
+                regs.add(params_slots).write(local_defaults.read());
+                regs.add(params_slots + 1)
+                    .write(local_defaults.add(1).read());
+            }
+            _ => std::ptr::copy_nonoverlapping(local_defaults, regs.add(params_slots), locals_len),
+        }
     }
     ctx.frames.push(FunctionFrame {
         function_index: FunctionIndex(function_index),
@@ -182,7 +188,21 @@ fn return_target(
         len as usize,
         ctx.functions.info[function_index.0 as usize].results_slots
     );
-    unsafe { std::ptr::copy(regs.add(src as usize), regs, len as usize) };
+    unsafe {
+        let source = regs.add(src as usize);
+        match len {
+            0 => {}
+            1 => regs.write(source.read()),
+            2 => {
+                // Read both slots before writing: result and argument slots may overlap.
+                let low = source.read();
+                let high = source.add(1).read();
+                regs.write(low);
+                regs.add(1).write(high);
+            }
+            _ => std::ptr::copy(source, regs, len as usize),
+        }
+    };
     let frame = ctx.frames.pop().expect("dispatch requires a frame");
     if let Some(caller) = ctx.frames.last() {
         let info = &ctx.functions.info[caller.function_index.0 as usize];
@@ -262,20 +282,23 @@ macro_rules! imm {
 }
 macro_rules! load {
     ($ctx:expr, $regs:expr, $dst:expr, $addr:expr, $memarg:expr, $ty:ty, $memory0:ident) => {{
-        let value = checked!(
-            $ctx,
-            $ctx.load::<$ty, $memory0>($memarg, get!($regs, $addr).as_u32())
-        );
+        load!(@address $ctx, $regs, $dst, get!($regs, $addr).as_u32(), $memarg, $ty, $memory0);
+    }};
+    (@address $ctx:expr, $regs:expr, $dst:expr, $addr:expr, $memarg:expr, $ty:ty, $memory0:ident) => {{
+        let value = checked!($ctx, $ctx.load::<$ty, $memory0>($memarg, $addr));
         set!($regs, $dst, Value(value as u64));
     }};
 }
 macro_rules! store {
     ($ctx:expr, $regs:expr, $addr:expr, $value:expr, $memarg:expr, $ty:ty, $memory0:ident) => {{
+        store!(@address $ctx, $regs, get!($regs, $addr).as_u32(), $value, $memarg, $ty, $memory0);
+    }};
+    (@address $ctx:expr, $regs:expr, $addr:expr, $value:expr, $memarg:expr, $ty:ty, $memory0:ident) => {{
         checked!(
             $ctx,
             $ctx.store::<$ty, $memory0>(
                 $memarg,
-                get!($regs, $addr).as_u32(),
+                $addr,
                 get!($regs, $value).0 as $ty,
             )
         );
@@ -533,6 +556,91 @@ ops!(|ctx, pc, regs| const MEMORY0 match op {
                 .store::<u128, MEMORY0>(memarg, get!(regs, addr).as_u32(), number)
         );
     }
+    i32_load_at @ I32LoadAt { dst, memarg } [memory] => {
+        load!(@address ctx, regs, dst, 0, memarg, i32, MEMORY0);
+    }
+    i32_load8_u_at @ I32Load8UAt { dst, memarg } [memory] => {
+        load!(@address ctx, regs, dst, 0, memarg, u8, MEMORY0);
+    }
+    i32_load8_s_at @ I32Load8SAt { dst, memarg } [memory] => {
+        load!(@address ctx, regs, dst, 0, memarg, i8, MEMORY0);
+    }
+    i32_load16_u_at @ I32Load16UAt { dst, memarg } [memory] => {
+        load!(@address ctx, regs, dst, 0, memarg, u16, MEMORY0);
+    }
+    i32_load16_s_at @ I32Load16SAt { dst, memarg } [memory] => {
+        load!(@address ctx, regs, dst, 0, memarg, i16, MEMORY0);
+    }
+    i64_load_at @ I64LoadAt { dst, memarg } [memory] => {
+        load!(@address ctx, regs, dst, 0, memarg, i64, MEMORY0);
+    }
+    i64_load8_u_at @ I64Load8UAt { dst, memarg } [memory] => {
+        load!(@address ctx, regs, dst, 0, memarg, u8, MEMORY0);
+    }
+    i64_load8_s_at @ I64Load8SAt { dst, memarg } [memory] => {
+        load!(@address ctx, regs, dst, 0, memarg, i8, MEMORY0);
+    }
+    i64_load16_u_at @ I64Load16UAt { dst, memarg } [memory] => {
+        load!(@address ctx, regs, dst, 0, memarg, u16, MEMORY0);
+    }
+    i64_load16_s_at @ I64Load16SAt { dst, memarg } [memory] => {
+        load!(@address ctx, regs, dst, 0, memarg, i16, MEMORY0);
+    }
+    i64_load32_u_at @ I64Load32UAt { dst, memarg } [memory] => {
+        load!(@address ctx, regs, dst, 0, memarg, u32, MEMORY0);
+    }
+    i64_load32_s_at @ I64Load32SAt { dst, memarg } [memory] => {
+        load!(@address ctx, regs, dst, 0, memarg, i32, MEMORY0);
+    }
+    f32_load_at @ F32LoadAt { dst, memarg } [memory] => {
+        let value = checked!(ctx, ctx.load::<f32, MEMORY0>(memarg, 0));
+        set!(regs, dst, Value::from_f32(value));
+    }
+    f64_load_at @ F64LoadAt { dst, memarg } [memory] => {
+        let value = checked!(ctx, ctx.load::<f64, MEMORY0>(memarg, 0));
+        set!(regs, dst, Value::from_f64(value));
+    }
+    v128_load_at @ V128LoadAt { dst, memarg } [memory] => {
+        let value = checked!(ctx, ctx.load::<u128, MEMORY0>(memarg, 0));
+        unsafe {
+            regs.add(*dst as usize).write(Value(value as u64));
+            regs.add(*dst as usize + 1).write(Value((value >> 64) as u64));
+        }
+    }
+    i32_store_at @ I32StoreAt { value, memarg } [memory] => {
+        store!(@address ctx, regs, 0, value, memarg, i32, MEMORY0);
+    }
+    i32_store8_at @ I32Store8At { value, memarg } [memory] => {
+        store!(@address ctx, regs, 0, value, memarg, u8, MEMORY0);
+    }
+    i32_store16_at @ I32Store16At { value, memarg } [memory] => {
+        store!(@address ctx, regs, 0, value, memarg, u16, MEMORY0);
+    }
+    i64_store_at @ I64StoreAt { value, memarg } [memory] => {
+        store!(@address ctx, regs, 0, value, memarg, i64, MEMORY0);
+    }
+    i64_store8_at @ I64Store8At { value, memarg } [memory] => {
+        store!(@address ctx, regs, 0, value, memarg, u8, MEMORY0);
+    }
+    i64_store16_at @ I64Store16At { value, memarg } [memory] => {
+        store!(@address ctx, regs, 0, value, memarg, u16, MEMORY0);
+    }
+    i64_store32_at @ I64Store32At { value, memarg } [memory] => {
+        store!(@address ctx, regs, 0, value, memarg, u32, MEMORY0);
+    }
+    f32_store_at @ F32StoreAt { value, memarg } [memory] => {
+        checked!(ctx, ctx.store::<f32, MEMORY0>(memarg, 0, get!(regs, value).as_f32()));
+    }
+    f64_store_at @ F64StoreAt { value, memarg } [memory] => {
+        checked!(ctx, ctx.store::<f64, MEMORY0>(memarg, 0, get!(regs, value).as_f64()));
+    }
+    v128_store_at @ V128StoreAt { value, memarg } [memory] => {
+        let number = unsafe {
+            (*regs.add(*value as usize)).0 as u128
+                | (((*regs.add(*value as usize + 1)).0 as u128) << 64)
+        };
+        checked!(ctx, ctx.store::<u128, MEMORY0>(memarg, 0, number));
+    }
     call @ Call {
         function_index,
         base,
@@ -540,7 +648,11 @@ ops!(|ctx, pc, regs| const MEMORY0 match op {
         if !take_fuel(ctx, pc) {
             return;
         }
-        if let Some((next, callee_regs)) = call_target(ctx, pc, *function_index, *base) {
+        let Some(info) = ctx.functions.info.get(*function_index as usize) else {
+            trap_exit(ctx, "invalid function index");
+            return;
+        };
+        if let Some((next, callee_regs)) = call_target(ctx, pc, *function_index, *base, info) {
             dispatch!(ctx, next, callee_regs);
         }
         return;
@@ -575,15 +687,17 @@ ops!(|ctx, pc, regs| const MEMORY0 match op {
         };
         let expected = checked!(
             ctx,
-            ctx.functions
-                .function_type_idx_type(&FunctionTypeIndex(*type_index))
+            ctx.functions.signature_id(FunctionTypeIndex(*type_index))
         );
-        let actual = checked!(ctx, ctx.functions.function_type_idx(&target));
-        if expected != actual {
+        let Some(info) = ctx.functions.info.get(target.0 as usize) else {
+            trap_exit(ctx, "invalid function index");
+            return;
+        };
+        if expected != info.signature_id {
             trap_exit(ctx, "indirect call type mismatch");
             return;
         }
-        if let Some((next, callee_regs)) = call_target(ctx, pc, target.0, *base) {
+        if let Some((next, callee_regs)) = call_target(ctx, pc, target.0, *base, info) {
             dispatch!(ctx, next, callee_regs);
         }
         return;

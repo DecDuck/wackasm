@@ -203,9 +203,12 @@ fn restoration_revalidates_indexes_before_unchecked_dispatch() {
                 continue;
             };
             for operator in &mut body.runtime {
-                match &mut operator.op {
+                let mut op = operator.op();
+                match &mut op {
                     WackasmOperator::I32Load { memarg, .. }
-                    | WackasmOperator::I32Store { memarg, .. } => memarg.memory = 1,
+                    | WackasmOperator::I32Store { memarg, .. }
+                    | WackasmOperator::I32LoadAt { memarg, .. }
+                    | WackasmOperator::I32StoreAt { memarg, .. } => memarg.memory = 1,
                     WackasmOperator::MemoryGrow { mem, .. }
                     | WackasmOperator::MemoryFill { mem, .. } => *mem = 1,
                     WackasmOperator::MemoryCopy {
@@ -219,6 +222,7 @@ fn restoration_revalidates_indexes_before_unchecked_dispatch() {
                     }
                     _ => {}
                 }
+                *operator = op.into();
             }
         }
         let serialized = bitcode::serialize(&module).unwrap();
@@ -265,9 +269,9 @@ fn memory0_selects_specialized_handlers_without_changing_the_serialized_ir() {
             _ => unreachable!(),
         }
         let indexed = RuntimeWackasmOperator::from(indexed);
-        assert!(!std::ptr::fn_addr_eq(zero.handler, indexed.handler));
+        assert!(!std::ptr::fn_addr_eq(zero.handler(), indexed.handler()));
         let bytes = bitcode::serialize(&zero).unwrap();
         let restored: RuntimeWackasmOperator = bitcode::deserialize(&bytes).unwrap();
-        assert!(std::ptr::fn_addr_eq(zero.handler, restored.handler));
+        assert!(std::ptr::fn_addr_eq(zero.handler(), restored.handler()));
     }
 }
