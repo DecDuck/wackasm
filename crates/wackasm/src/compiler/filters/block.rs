@@ -185,7 +185,13 @@ impl BlockPass {
             Operator::Br { relative_depth } => {
                 compiler.materialize_all();
                 let branch = self.resolve(compiler, functions, *relative_depth)?;
-                Self::emit_branch(compiler, branch);
+                match branch {
+                    Branch::Target { target, .. }
+                        if target < pc
+                            && !Self::needs_copy(branch)
+                            && compiler.invert_into_backedge(pc, target) => {}
+                    _ => Self::emit_branch(compiler, branch),
+                }
             }
             Operator::BrIf { relative_depth } => {
                 let value = compiler.registers.pop()?;

@@ -135,13 +135,13 @@ macro_rules! operators {
             impl super::RuntimeWackasmOperator {
                 pub(crate) fn op(&self) -> WackasmOperator {
                     unsafe {
-                        match self.opcode {
-                            $(crate::dispatch::RuntimeOpcode::$variant
-                            | crate::dispatch::RuntimeOpcode::[<$variant Memory0>] => {
+                        match self.opcode.portable() {
+                            $(crate::dispatch::RuntimeOpcode::[<$variant Spec0>] => {
                                 let value = self.operands::<operands::$variant>();
                                 let operands::$variant { $($($field,)*)? } = (*value).clone();
                                 WackasmOperator::$variant { $($($field,)*)? }
                             },)*
+                            _ => unreachable!(),
                         }
                     }
                 }
@@ -152,13 +152,13 @@ macro_rules! operators {
                 fn from(op: super::RuntimeWackasmOperator) -> Self {
                     let op = std::mem::ManuallyDrop::new(op);
                     unsafe {
-                        match op.opcode {
-                            $(crate::dispatch::RuntimeOpcode::$variant
-                            | crate::dispatch::RuntimeOpcode::[<$variant Memory0>] => {
+                        match op.opcode.portable() {
+                            $(crate::dispatch::RuntimeOpcode::[<$variant Spec0>] => {
                                 let operands::$variant { $($($field,)*)? } =
                                     std::ptr::read(op.operands::<operands::$variant>());
                                 WackasmOperator::$variant { $($($field,)*)? }
                             },)*
+                            _ => unreachable!(),
                         }
                     }
                 }
@@ -167,15 +167,15 @@ macro_rules! operators {
             #[cfg(feature = "compact-instructions")]
             impl Drop for super::RuntimeWackasmOperator {
                 fn drop(&mut self) {
-                    match self.opcode {
-                        $(crate::dispatch::RuntimeOpcode::$variant
-                        | crate::dispatch::RuntimeOpcode::[<$variant Memory0>] => {
+                    match self.opcode.portable() {
+                        $(crate::dispatch::RuntimeOpcode::[<$variant Spec0>] => {
                             if std::mem::needs_drop::<operands::$variant>() {
                                 unsafe {
                                     drop(std::ptr::read(self.operands::<operands::$variant>()));
                                 }
                             }
                         },)*
+                        _ => unreachable!(),
                     }
                 }
             }

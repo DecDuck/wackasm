@@ -140,13 +140,6 @@ impl FunctionManager {
         Ok(())
     }
 
-    pub(crate) fn signature_id(&self, index: FunctionTypeIndex) -> Result<u32, HaltError> {
-        self.signature_ids
-            .get(index.0 as usize)
-            .copied()
-            .ok_or_else(|| trap!("no signature for function type index {:?}", index))
-    }
-
     pub(crate) fn function_type_idx(
         &self,
         function_index: &FunctionIndex,

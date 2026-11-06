@@ -22,6 +22,8 @@ pub(crate) struct Compiler {
     pub(crate) registers: RegStack,
     pub(crate) locals_slot_to_index: Vec<usize>,
     pub(crate) last_producer: Option<usize>,
+    /// Code position of the most recent branch landing site.
+    pub(crate) last_label: usize,
     transform_pc_lookup: Vec<usize>,
     branch_fixups: Vec<(usize, usize)>,
     labels: Vec<bool>,
@@ -36,6 +38,7 @@ impl Compiler {
             registers: RegStack::new(0),
             locals_slot_to_index: Vec::new(),
             last_producer: None,
+            last_label: 0,
             transform_pc_lookup: Vec::new(),
             branch_fixups: Vec::new(),
             labels: Vec::new(),
@@ -111,6 +114,38 @@ impl Compiler {
         self.branch_fixups.push((pc, target));
     }
 
+    /// Rewrites `br_if exit; br loop` as `br_unless loop; br exit`, so each iteration takes
+    /// one branch. `pc` is the wasm pc of the `br`; nothing may branch to it.
+    pub(crate) fn invert_into_backedge(&mut self, pc: usize, target: usize) -> bool {
+        let jump_pc = self.code_len();
+        if self.labels[pc] {
+            return false;
+        }
+        let Some(last) = self
+            .branch_fixups
+            .last_mut()
+            .filter(|(branch_pc, _)| *branch_pc + 1 == jump_pc)
+        else {
+            return false;
+        };
+        use WackasmOperator::*;
+        let conditional = &mut self.func_body.inner.as_mut().unwrap()[last.0];
+        *conditional = match conditional.clone() {
+            JumpIfNez { cond, offset } => JumpIfEqz { cond, offset },
+            JumpIfEqz { cond, offset } => JumpIfNez { cond, offset },
+            JumpIfI32Cmp { lhs, rhs, kind, invert, offset } => JumpIfI32Cmp { lhs, rhs, kind, invert: !invert, offset },
+            JumpIfI32CmpImm { lhs, imm, kind, invert, offset } => JumpIfI32CmpImm { lhs, imm, kind, invert: !invert, offset },
+            JumpIfI64Cmp { lhs, rhs, kind, invert, offset } => JumpIfI64Cmp { lhs, rhs, kind, invert: !invert, offset },
+            JumpIfI64CmpImm { lhs, imm, kind, invert, offset } => JumpIfI64CmpImm { lhs, imm, kind, invert: !invert, offset },
+            I32AddImmJumpIfNez { dst, lhs, imm, offset } => I32AddImmJumpIfEqz { dst, lhs, imm, offset },
+            I32AddImmJumpIfEqz { dst, lhs, imm, offset } => I32AddImmJumpIfNez { dst, lhs, imm, offset },
+            _ => return false,
+        };
+        let exit = std::mem::replace(&mut last.1, target);
+        self.jump(exit);
+        true
+    }
+
     pub(crate) fn code_len(&self) -> usize {
         self.func_body.inner.as_ref().unwrap().len()
     }
@@ -118,6 +153,8 @@ impl Compiler {
     pub(crate) fn mark_loop_header(&mut self, old_pc: usize) {
         // Entry providers are initialised once; backedges already carry canonical parameters.
         self.transform_pc_lookup[old_pc] = self.code_len();
+        // Backedges land just after the header's ConsumeFuel.
+        self.last_label = self.code_len() + 1;
     }
 
     pub(crate) fn patch_relative(&mut self, pc: usize, target: usize) -> Result<(), HaltError> {
@@ -130,7 +167,9 @@ impl Compiler {
             | WackasmOperator::JumpIfI32Cmp { offset: value, .. }
             | WackasmOperator::JumpIfI32CmpImm { offset: value, .. }
             | WackasmOperator::JumpIfI64Cmp { offset: value, .. }
-            | WackasmOperator::JumpIfI64CmpImm { offset: value, .. } => *value = offset,
+            | WackasmOperator::JumpIfI64CmpImm { offset: value, .. }
+            | WackasmOperator::I32AddImmJumpIfNez { offset: value, .. }
+            | WackasmOperator::I32AddImmJumpIfEqz { offset: value, .. } => *value = offset,
             _ => return Err(anyhow!("branch fixup points at non-branch").into()),
         }
         Ok(())
@@ -178,6 +217,7 @@ impl Compiler {
         while !ops.eof() {
             if self.labels[pc] {
                 self.last_producer = None;
+                self.last_label = self.code_len();
             }
             self.transform_pc_lookup.push(self.code_len());
             let (operator, offset) = ops.read_with_offset()?;
@@ -230,10 +270,20 @@ impl Compiler {
 
     pub fn target_rewrite(&mut self) -> Result<(), HaltError> {
         for (pc, old_target) in std::mem::take(&mut self.branch_fixups) {
-            let target = *self
+            let mut target = *self
                 .transform_pc_lookup
                 .get(old_target)
                 .ok_or_else(|| anyhow!("no new pc for old pc {old_target}"))?;
+            if target <= pc {
+                // Backward branches meter fuel themselves, so they skip the loop header's charge.
+                if !matches!(
+                    self.func_body.inner.as_ref().unwrap().get(target),
+                    Some(WackasmOperator::ConsumeFuel)
+                ) {
+                    return Err(anyhow!("backward branch does not target a loop header").into());
+                }
+                target += 1;
+            }
             self.patch_relative(pc, target)?;
         }
         Ok(())

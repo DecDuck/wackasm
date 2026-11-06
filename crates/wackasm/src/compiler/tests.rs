@@ -1,6 +1,6 @@
 use crate::{
     WackasmModule,
-    compiler::{I32Comparison, WackasmFunctionBody, WackasmOperator},
+    compiler::{I32Comparison, WackasmFunctionBody, WackasmMemArg, WackasmOperator},
     functions::WackasmFunction,
 };
 
@@ -322,7 +322,8 @@ fn loops_have_backward_relative_jumps_and_are_the_only_fuel_sites() {
             _ => None,
         })
         .unwrap();
-    assert_eq!(pc as i32 + offset, fuel as i32);
+    // Backedges charge fuel themselves and skip the header's ConsumeFuel.
+    assert_eq!(pc as i32 + offset, fuel as i32 + 1);
 }
 
 #[test]
@@ -641,7 +642,7 @@ fn factorial_ssa_loop_parameters_survive_backedges_and_multi_result_calls() {
                 && offset < 0
             {
                 assert!(matches!(
-                    body.runtime[(pc as i32 + offset) as usize].op(),
+                    body.runtime[(pc as i32 + offset - 1) as usize].op(),
                     WackasmOperator::ConsumeFuel,
                 ));
             }
@@ -660,4 +661,322 @@ fn factorial_ssa_loop_parameters_survive_backedges_and_multi_result_calls() {
         executor.get_result().unwrap(),
         &vec![crate::Value::from_i64(7034535277573963776)],
     );
+}
+
+#[test]
+fn exit_branch_then_backedge_inverts_into_one_metered_backedge() {
+    let wat = r#"(module (memory 1)
+      (func (export "run") (param i32 i32) (result i32)
+        (block $exit
+          (loop $loop
+            local.get 0 i32.const -1 i32.store8
+            local.get 0 i32.const 1 i32.add local.tee 0
+            local.get 1 i32.eq br_if $exit
+            br $loop))
+        local.get 0))"#;
+    let operators = ops(&body(wat));
+    let fuel = operators
+        .iter()
+        .position(|op| matches!(op, WackasmOperator::ConsumeFuel))
+        .unwrap();
+    let backedge = operators
+        .iter()
+        .position(|op| matches!(op, WackasmOperator::JumpIfI32Cmp { .. }))
+        .unwrap();
+    assert!(matches!(
+        operators[backedge],
+        WackasmOperator::JumpIfI32Cmp { kind: I32Comparison::Eq, invert: true, offset, .. }
+            if backedge as i32 + offset == fuel as i32 + 1
+    ));
+    assert!(matches!(operators[backedge + 1], WackasmOperator::Jump { offset } if offset > 0));
+
+    let mut executor =
+        crate::WackasmExecutor::new(WackasmModule::new(&wat::parse_str(wat).unwrap()).unwrap())
+            .unwrap();
+    executor
+        .call_export("run", vec![crate::Value(0), crate::Value(4)])
+        .unwrap();
+    executor.set_fuel(isize::MAX);
+    assert!(matches!(executor.execute().unwrap(), crate::HostYield::Return));
+    assert_eq!(executor.get_result().unwrap(), &vec![crate::Value(4)]);
+    // One header entry plus three backedges, as when every iteration passed the header.
+    assert_eq!(isize::MAX - executor.get_fuel(), 4);
+    assert_eq!(
+        executor.memory().read_bytes(0, 0, 5).unwrap(),
+        &[255, 255, 255, 255, 0]
+    );
+}
+
+#[test]
+fn constant_memory0_stores_use_exact_immediates() {
+    let wat = r#"(module (memory 1) (memory 1)
+      (func (export "run") (param i32)
+        local.get 0 i64.const -2 i64.store
+        local.get 0 i64.const 0x123456789 i64.store offset=8
+        local.get 0 i64.const 0x1ff i64.store8 offset=16
+        local.get 0 f32.const -1.5 f32.store offset=20
+        local.get 0 i32.const 7 i32.store 1))"#;
+    let operators = ops(&body(wat));
+    assert!(operators.iter().any(|op| matches!(
+        op,
+        WackasmOperator::I64StoreImm { value: -2, offset: 0, .. }
+    )));
+    assert!(operators.iter().any(|op| matches!(
+        op,
+        WackasmOperator::I64Store { memarg: WackasmMemArg { offset: 8, .. }, .. }
+    )));
+    assert!(operators.iter().any(|op| matches!(
+        op,
+        WackasmOperator::I32Store8Imm { value: 0x1ff, offset: 16, .. }
+    )));
+    assert!(operators.iter().any(|op| matches!(
+        op,
+        WackasmOperator::I32Store { memarg: WackasmMemArg { memory: 1, .. }, .. }
+    )));
+
+    let mut executor =
+        crate::WackasmExecutor::new(WackasmModule::new(&wat::parse_str(wat).unwrap()).unwrap())
+            .unwrap();
+    executor.call_export("run", vec![crate::Value(8)]).unwrap();
+    assert!(matches!(executor.execute().unwrap(), crate::HostYield::Return));
+    let memory = executor.memory();
+    assert_eq!(memory.read_bytes(0, 8, 8).unwrap(), &(-2i64).to_le_bytes());
+    assert_eq!(memory.read_bytes(0, 16, 8).unwrap(), &0x123456789u64.to_le_bytes());
+    assert_eq!(memory.read_bytes(0, 24, 1).unwrap(), &[0xff]);
+    assert_eq!(memory.read_bytes(0, 28, 4).unwrap(), &(-1.5f32).to_le_bytes());
+    assert_eq!(memory.read_bytes(1, 8, 4).unwrap(), &7u32.to_le_bytes());
+
+    executor.call_export("run", vec![crate::Value(65530)]).unwrap();
+    let before = executor.memory().bytes(0).unwrap().to_vec();
+    assert!(matches!(executor.execute(), Err(crate::HaltError::Trap(_))));
+    assert_eq!(executor.memory().bytes(0).unwrap(), before);
+}
+
+fn run_i32(executor: &mut crate::WackasmExecutor, name: &str, args: &[i32]) -> Vec<crate::Value> {
+    let args = args.iter().map(|&arg| crate::Value::from_i32(arg)).collect();
+    executor.call_export(name, args).unwrap();
+    assert!(matches!(executor.execute().unwrap(), crate::HostYield::Return));
+    executor.get_result().unwrap().clone()
+}
+
+#[test]
+fn add_immediates_fuse_into_zero_test_backedges_and_retry_after_suspension() {
+    let wat = r#"(module
+      (func (export "tee") (param i32) (result i32) (local i32)
+        (loop $l
+          local.get 1 i32.const 1 i32.add local.set 1
+          local.get 0 i32.const -1 i32.add local.tee 0
+          br_if $l)
+        local.get 1)
+      (func (export "eqz") (param i32) (result i32) (local i32)
+        (block $exit
+          (loop $l
+            local.get 1 i32.const 1 i32.add local.set 1
+            local.get 0 i32.const 1 i32.sub local.tee 0
+            i32.eqz br_if $exit
+            br $l))
+        local.get 1))"#;
+    let module = WackasmModule::new(&wat::parse_str(wat).unwrap()).unwrap();
+    for index in [0, 1] {
+        let WackasmFunction::Internal(body) = &module.functions.function_bodies[index] else {
+            panic!("expected internal function")
+        };
+        assert!(
+            ops(body).iter().any(|op| matches!(
+                op,
+                WackasmOperator::I32AddImmJumpIfNez { dst: 0, lhs: 0, imm: -1, offset }
+                    if *offset < 0
+            )),
+            "{:?}",
+            ops(body)
+        );
+    }
+    let mut executor = crate::WackasmExecutor::new(module).unwrap();
+    for name in ["tee", "eqz"] {
+        executor.set_fuel(isize::MAX);
+        assert_eq!(run_i32(&mut executor, name, &[5]), vec![crate::Value(5)]);
+        // Exhaust fuel on every backedge; a retried backedge must not repeat its add.
+        executor
+            .call_export(name, vec![crate::Value(5)])
+            .unwrap();
+        let mut suspensions = 0;
+        loop {
+            executor.set_fuel(1);
+            match executor.execute().unwrap() {
+                crate::HostYield::Return => break,
+                crate::HostYield::OutOfFuel => {
+                    let bytes = bitcode::serialize(&executor).unwrap();
+                    drop(executor);
+                    executor = bitcode::deserialize(&bytes).unwrap();
+                    suspensions += 1;
+                }
+                _ => panic!("unexpected import"),
+            }
+        }
+        assert_eq!(suspensions, 4);
+        assert_eq!(executor.get_result().unwrap(), &vec![crate::Value(5)]);
+    }
+}
+
+#[test]
+fn register_metered_fuel_is_written_back_when_traps_end_dispatch() {
+    let wat = r#"(module (memory 1)
+      (func (export "oob") (param i32)
+        (loop $l
+          local.get 0 i32.const -1 i32.add local.tee 0
+          br_if $l)
+        i32.const 70000 i32.load drop)
+      (func (export "unreachable") (param i32)
+        (loop $l
+          local.get 0 i32.const -1 i32.add local.tee 0
+          br_if $l)
+        unreachable))"#;
+    let mut executor =
+        crate::WackasmExecutor::new(WackasmModule::new(&wat::parse_str(wat).unwrap()).unwrap())
+            .unwrap();
+    for name in ["oob", "unreachable"] {
+        executor.set_fuel(100);
+        executor.call_export(name, vec![crate::Value(4)]).unwrap();
+        assert!(matches!(executor.execute(), Err(crate::HaltError::Trap(_))));
+        // One loop entry plus three backedges.
+        assert_eq!(executor.get_fuel(), 96, "{name}");
+    }
+}
+
+#[test]
+fn branch_targets_between_add_and_zero_test_block_fusion() {
+    let wat = r#"(module
+      (func (export "run") (param i32 i32) (result i32)
+        (block $b
+          (block $inner
+            local.get 1 br_if $inner
+            local.get 0 i32.const 1 i32.add local.set 0)
+          local.get 0 br_if $b
+          i32.const 0 return)
+        i32.const 1))"#;
+    assert!(!ops(&body(wat)).iter().any(|op| matches!(
+        op,
+        WackasmOperator::I32AddImmJumpIfNez { .. } | WackasmOperator::I32AddImmJumpIfEqz { .. }
+    )));
+    let mut executor =
+        crate::WackasmExecutor::new(WackasmModule::new(&wat::parse_str(wat).unwrap()).unwrap())
+            .unwrap();
+    for (args, expected) in [([5, 1], 1), ([0, 1], 0), ([-1, 0], 0), ([0, 0], 1)] {
+        assert_eq!(run_i32(&mut executor, "run", &args), vec![crate::Value(expected)]);
+    }
+}
+
+#[test]
+fn add_immediate_addresses_fold_into_memory0_loads_with_32_bit_wrapping() {
+    let wat = r#"(module (memory 1)
+      (data (i32.const 0) "\01\02\03\04\05\06\07\08\09")
+      (func (export "run") (param i32) (result i32 i64 i32)
+        local.get 0 i32.const 1 i32.add i32.load8_u
+        local.get 0 i32.const -1 i32.sub i64.load offset=1
+        local.get 0 i32.const 1 i32.add i32.load16_s offset=4))"#;
+    let operators = ops(&body(wat));
+    assert!(matches!(
+        operators.as_slice(),
+        [
+            WackasmOperator::I32Load8URel { base: 0, delta: 1, offset: 0, .. },
+            WackasmOperator::I64LoadRel { base: 0, delta: 1, offset: 1, .. },
+            WackasmOperator::I32Load16SRel { base: 0, delta: 1, offset: 4, .. },
+            WackasmOperator::Return { .. },
+        ]
+    ));
+    let mut executor =
+        crate::WackasmExecutor::new(WackasmModule::new(&wat::parse_str(wat).unwrap()).unwrap())
+            .unwrap();
+    assert_eq!(
+        run_i32(&mut executor, "run", &[0]),
+        vec![
+            crate::Value(2),
+            crate::Value(u64::from_le_bytes([3, 4, 5, 6, 7, 8, 9, 0])),
+            crate::Value(0x0706),
+        ]
+    );
+    // The add wraps to address 0 before the offset is applied, so this does not trap.
+    assert_eq!(
+        run_i32(&mut executor, "run", &[-1]),
+        vec![
+            crate::Value(1),
+            crate::Value(u64::from_le_bytes([2, 3, 4, 5, 6, 7, 8, 9])),
+            crate::Value(0x0605),
+        ]
+    );
+    executor
+        .call_export("run", vec![crate::Value(65535)])
+        .unwrap();
+    assert!(matches!(executor.execute(), Err(crate::HaltError::Trap(_))));
+}
+
+#[test]
+fn register_sum_addresses_fold_into_memory0_base_index_accesses() {
+    let wat = r#"(module (memory 1) (memory 1)
+      (data (i32.const 0) "\01\02\80\04")
+      (func (export "run") (param i32 i32 i64) (result i32 i64 i32)
+        local.get 0 local.get 1 i32.add i32.const 0x1ab i32.store8 offset=16
+        local.get 0 local.get 1 i32.add local.get 2 i64.store offset=24
+        local.get 0 local.get 1 i32.add i32.load8_s offset=2
+        local.get 0 local.get 1 i32.add i64.load offset=24
+        local.get 0 local.get 1 i32.add i32.load16_u offset=16)
+      (func (export "other") (param i32 i32)
+        local.get 0 local.get 1 i32.add i32.const 7 i32.store8 1))"#;
+    let module = WackasmModule::new(&wat::parse_str(wat).unwrap()).unwrap();
+    let operators = |index: usize| {
+        let WackasmFunction::Internal(body) = &module.functions.function_bodies[index] else {
+            panic!("expected internal function")
+        };
+        ops(body)
+    };
+    assert!(matches!(
+        operators(0).as_slice(),
+        [
+            WackasmOperator::Store8ImmIdx { base: 0, index: 1, value: 0x1ab, offset: 16 },
+            WackasmOperator::Store64Idx { base: 0, index: 1, value: 2, offset: 24 },
+            WackasmOperator::LoadI8Idx { base: 0, index: 1, offset: 2, .. },
+            WackasmOperator::LoadI64Idx { base: 0, index: 1, offset: 24, .. },
+            WackasmOperator::LoadU16Idx { base: 0, index: 1, offset: 16, .. },
+            WackasmOperator::Return { .. },
+        ]
+    ));
+    // Only memory 0 has base+index forms.
+    assert!(operators(1).iter().any(|op| matches!(op, WackasmOperator::I32Add { .. })));
+
+    let mut executor = crate::WackasmExecutor::new(module).unwrap();
+    // The second case wraps `base + index` to 0 before the offset, so it must not trap.
+    for (base, index) in [(0, 0), (u32::MAX, 1)] {
+        executor
+            .call_export(
+                "run",
+                vec![crate::Value::from_u32(base), crate::Value::from_u32(index), crate::Value::from_i64(-5)],
+            )
+            .unwrap();
+        assert!(matches!(executor.execute().unwrap(), crate::HostYield::Return));
+        assert_eq!(
+            executor.get_result().unwrap(),
+            &vec![crate::Value::from_i32(-128), crate::Value::from_i64(-5), crate::Value(0xab)]
+        );
+    }
+    executor
+        .call_export("run", vec![crate::Value(65535), crate::Value(0), crate::Value(0)])
+        .unwrap();
+    let before = executor.memory().bytes(0).unwrap().to_vec();
+    assert!(matches!(executor.execute(), Err(crate::HaltError::Trap(_))));
+    assert_eq!(executor.memory().bytes(0).unwrap(), before);
+}
+
+#[test]
+fn base_index_stores_do_not_fold_when_the_value_would_clobber_the_index() {
+    // The index is a temporary in the slot that the wide constant materializes into.
+    let wat = r#"(module (memory 1)
+      (func (export "run") (param i32) (result i64)
+        local.get 0 local.get 0 i32.const 1 i32.and i32.add
+        i64.const 0x123456789 i64.store
+        local.get 0 i64.load))"#;
+    assert!(ops(&body(wat)).iter().any(|op| matches!(op, WackasmOperator::I64Store { .. })));
+    let mut executor =
+        crate::WackasmExecutor::new(WackasmModule::new(&wat::parse_str(wat).unwrap()).unwrap())
+            .unwrap();
+    assert_eq!(run_i32(&mut executor, "run", &[8]), vec![crate::Value(0x123456789)]);
 }

@@ -13,7 +13,7 @@ use wackasm::{Value, WackasmExecutor, WackasmModule, imports::NoResources};
 static WASM: &[u8] = include_bytes!("../../../compute/target/wasm32-unknown-unknown/release/compute.wasm");
 
 const EXPORT: &str = "run_prime_benchmark";
-const LIMIT: u32 = 1_000;
+const LIMIT: u32 = 5_000;
 const ROUNDS: u32 = 10_000;
 const SAMPLES: usize = 500;
 

@@ -678,4 +678,71 @@ operators! {
         value: Reg,
         memarg: WackasmMemArg,
     },
+    // Memory-0 stores of constant values; I64StoreImm sign-extends its immediate.
+    I32StoreImm {
+        addr: Reg,
+        value: i32,
+        offset: u32,
+    },
+    I32Store8Imm {
+        addr: Reg,
+        value: i32,
+        offset: u32,
+    },
+    I32Store16Imm {
+        addr: Reg,
+        value: i32,
+        offset: u32,
+    },
+    I64StoreImm {
+        addr: Reg,
+        value: i32,
+        offset: u32,
+    },
+    // Writes `dst = lhs + imm` (i32, wrapping), then branches on the result.
+    I32AddImmJumpIfNez {
+        dst: Reg,
+        lhs: Reg,
+        imm: i32,
+        offset: i32,
+    },
+    I32AddImmJumpIfEqz {
+        dst: Reg,
+        lhs: Reg,
+        imm: i32,
+        offset: i32,
+    },
+    // Memory-0 loads from `(base + delta) mod 2^32`, then `offset` as usual.
+    I32LoadRel { dst: Reg, base: Reg, delta: i32, offset: u32 },
+    I32Load8URel { dst: Reg, base: Reg, delta: i32, offset: u32 },
+    I32Load8SRel { dst: Reg, base: Reg, delta: i32, offset: u32 },
+    I32Load16URel { dst: Reg, base: Reg, delta: i32, offset: u32 },
+    I32Load16SRel { dst: Reg, base: Reg, delta: i32, offset: u32 },
+    I64LoadRel { dst: Reg, base: Reg, delta: i32, offset: u32 },
+    I64Load8URel { dst: Reg, base: Reg, delta: i32, offset: u32 },
+    I64Load8SRel { dst: Reg, base: Reg, delta: i32, offset: u32 },
+    I64Load16URel { dst: Reg, base: Reg, delta: i32, offset: u32 },
+    I64Load16SRel { dst: Reg, base: Reg, delta: i32, offset: u32 },
+    I64Load32URel { dst: Reg, base: Reg, delta: i32, offset: u32 },
+    I64Load32SRel { dst: Reg, base: Reg, delta: i32, offset: u32 },
+    F32LoadRel { dst: Reg, base: Reg, delta: i32, offset: u32 },
+    F64LoadRel { dst: Reg, base: Reg, delta: i32, offset: u32 },
+    // Memory-0 accesses at `(base + index) mod 2^32`, then `offset`. Keyed by memory width;
+    // loads sign- or zero-extend to 64 bits like the equivalent wasm loads.
+    LoadI8Idx { dst: Reg, base: Reg, index: Reg, offset: u32 },
+    LoadU8Idx { dst: Reg, base: Reg, index: Reg, offset: u32 },
+    LoadI16Idx { dst: Reg, base: Reg, index: Reg, offset: u32 },
+    LoadU16Idx { dst: Reg, base: Reg, index: Reg, offset: u32 },
+    LoadI32Idx { dst: Reg, base: Reg, index: Reg, offset: u32 },
+    LoadU32Idx { dst: Reg, base: Reg, index: Reg, offset: u32 },
+    LoadI64Idx { dst: Reg, base: Reg, index: Reg, offset: u32 },
+    Store8Idx { base: Reg, index: Reg, value: Reg, offset: u32 },
+    Store16Idx { base: Reg, index: Reg, value: Reg, offset: u32 },
+    Store32Idx { base: Reg, index: Reg, value: Reg, offset: u32 },
+    Store64Idx { base: Reg, index: Reg, value: Reg, offset: u32 },
+    // Store64ImmIdx sign-extends its immediate.
+    Store8ImmIdx { base: Reg, index: Reg, value: i32, offset: u32 },
+    Store16ImmIdx { base: Reg, index: Reg, value: i32, offset: u32 },
+    Store32ImmIdx { base: Reg, index: Reg, value: i32, offset: u32 },
+    Store64ImmIdx { base: Reg, index: Reg, value: i32, offset: u32 },
 }

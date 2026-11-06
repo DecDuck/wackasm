@@ -162,7 +162,6 @@ impl WackasmExecutor {
             let memory0 = self.module.memories.memory0();
             let mut ctx = DispatchCtx {
                 memories: &mut self.module.memories,
-                memory0,
                 globals: &mut self.module.globals,
                 tables: &self.module.tables,
                 functions: &self.module.functions,
@@ -172,9 +171,12 @@ impl WackasmExecutor {
                 fuel: target_fuel,
                 exit: None,
             };
-            dispatch(&mut ctx, unsafe { info.code.add(frame.pc) }, unsafe {
-                buffer.add(frame.stack_base)
-            });
+            dispatch(
+                &mut ctx,
+                unsafe { info.code.add(frame.pc) },
+                unsafe { buffer.add(frame.stack_base) },
+                memory0,
+            );
             let remaining = ctx.fuel;
             let exit = ctx
                 .exit

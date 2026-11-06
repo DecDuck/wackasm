@@ -7,9 +7,11 @@ In more words, `wackasm` was built so that you could run a WASM module that uses
 ## performance
 
 The interpreter benchmarks against `wasmi`. Register IR with memory fast paths,
-compare/branch fusion and constant-address accesses measured about **90%** of wasmi's performance on the existing
-prime benchmark, up from about **47%**
-with the stack IR. There is still performance headroom, and results vary by machine.
+compare/branch fusion, constant-address accesses, specialized branch handlers,
+backedge inversion, store immediates, add/branch and add/load fusion, a
+register-passing handler ABI and base+index addressing measured about **116%** of
+wasmi's performance on the existing prime benchmark, up from about **47%**
+with the stack IR. Results vary by machine.
 
 Measured on Windows on 2026-11-06 with
 `cargo bench -p wackasm --bench percent_of_wasmi` (limit 1,000, rounds 10,000,
@@ -22,11 +24,30 @@ Measured on Windows on 2026-11-06 with
 | Register IR + memory fast paths | 82.373% | 312,809 |
 | Register IR + memory fast paths + compare/branch fusion | 86.459% | 312,809 |
 | Above + constant-address loads/stores | 89.661% | 312,809 |
+| Frameless handlers, specialized branches, backedge inversion, store immediates | 100.19%–101.87% | 312,809 |
+| Above + add/branch and add/load fusion, SysV handler ABI | 105.22% | 312,809 |
 
 Each run recalibrates wasmi, so percentages vary. Criterion did not detect a
 statistically significant performance change for the compare/branch fusion run.
 For constant-address accesses, it reported a statistically significant **3.7%**
 throughput improvement over the preceding run.
+
+The latest row was measured against a same-machine rerun of the previous commit
+(**88.371%**); Criterion reported a statistically significant **13.4%–15.3%**
+throughput improvement. Frameless handlers and specialized branches alone were
+within noise (+1.5%); most of the gain came from dispatching 12.4% fewer
+instructions in the hot loops.
+
+The final row is **+19.1%** over that same 88.371% rerun. Because the wasmi
+calibration moved between 1.96 ms and 2.42 ms across runs, the steps were also
+compared by interleaving one wasmi and one wackasm run 400 times and taking the
+median ratio: about **108%** after add/branch and add/load fusion (14% fewer
+dispatches), about **109%** after the SysV ABI change and about **116%** after
+base+index addressing (wackasm median 1.76–1.84 ms, down from 1.89–1.97 ms).
+
+With `LIMIT` raised to 5,000 (35,231,177 fuel per run), Criterion measured
+**102.65%** of wasmi, **+16.2%** over the pre-session baseline saved at limit 1,000;
+that baseline used the smaller workload, so the change is indicative only.
 
 Call-path fast paths measured **85.659%** of wasmi, versus **82.415%** in the
 saved pre-change direct-dispatch rerun. Criterion reported a statistically
@@ -66,12 +87,47 @@ Conditional jumps fuse supported i32 register/immediate comparisons and i64
 register/immediate comparisons, including full-width `i64.eqz`. i64 immediates
 are used only when sign extension from i32 preserves the constant exactly;
 larger constants retain their full value in a register. Fusion does not cross
-labels or discard comparison results written to locals.
+labels or discard comparison results written to locals. At load time each fused
+branch selects a handler specialized for its comparison (with `invert` folded in)
+and direction, so there is no runtime comparison switch.
+
+An i32 add/sub immediate followed by a zero test of its result (`local.tee; br_if`
+or `i32.eqz; br_if`) becomes one add-and-branch instruction, unless something
+branches to the test. On a backedge it meters fuel before writing its result, so
+an exhausted branch can be retried. An i32 add/sub immediate that only produces a
+memory-0 load address is folded into a relative load, which wraps the add at
+32 bits before applying the static offset exactly as the separate instructions would.
+Likewise, a register-register `i32.add` that only produces a memory-0 address becomes
+a base+index load or store (with a register or immediate value). Base+index forms
+are keyed by access width, so e.g. `i32.load8_u` and `i64.load8_u` share one
+handler. A store is not folded when its constant value would have to be
+materialized into a register that the add read.
+
+On x86-64, handlers use the SysV calling convention (also on Windows), which passes
+six integer arguments in registers and has fewer callee-saved registers than
+Win64. Memory 0's base and length are passed in two of those registers, so
+memory-0 accesses do not reload them from the dispatch context; `memory.grow`
+refreshes them. Other targets use the Rust ABI with the same signature.
+
+Fuel stays in the dispatch context. Holding it in the sixth argument register made
+every metering handler shorter, but measured about 3% slower on a Core Ultra 9 285H
+in same-session A/B runs (also with 64-byte function alignment), so it was reverted.
+
+A `br_if` immediately followed by a loop backedge `br` is inverted, so each
+iteration takes one branch; this is skipped when the `br` is itself a branch target.
+Constants assigned to locals are written directly, and constant values stored
+to memory 0 use immediate store instructions (64-bit stores only when the value is
+an exact sign-extended i32).
+
+Hot handlers have no stack frame: traps, fuel exhaustion and other cold paths are
+tail-called with the handler signature instead of being called.
 
 Internal calls and returns stay inside threaded dispatch. Fuel is charged at loop
 headers and calls, not plain blocks; a call with no fuel is suspended before entering
-the callee. Import calls yield to the host, and their results are written back into
-the caller's argument slots.
+the callee. Entering a loop by fallthrough runs its header's `ConsumeFuel`; backward
+branches charge the same fuel themselves and land just after the header, so totals
+are unchanged while each iteration dispatches one fewer instruction. Import calls
+yield to the host, and their results are written back into the caller's argument slots.
 
 Indirect calls compare cached canonical signature IDs rather than walking
 parameter/result types; structurally identical duplicate type declarations share
@@ -126,11 +182,15 @@ Register-IR validation on 2026-11-06 against the core spec suite: **20,422 passe
 unsupported** before the rewrite. Per-directive comparison found no regressions;
 206 previously failing checks now pass. Memory fast paths, comparison fusion,
 constant-address accesses, compact dispatch and call fast paths preserve every
-spec classification. All 93 unit/integration tests pass in each dispatch mode, including
+spec classification, as do frameless handlers, specialized branches, backedge
+inversion, store immediates, add/branch and add/load fusion and the SysV handler
+ABI (per-directive results identical to the previous commit). All unit/integration tests pass in each dispatch mode, including
 suspension/restore, unaligned accesses, memory growth, multi-memory, bounds traps,
 register-IR regressions, canonical signatures, small call/return copies, bounded
 recursive execution, every opcode's compact encoding and ownership,
-constant-address lowering/overflow checks and
+constant-address lowering/overflow checks, backedge fuel parity, store-immediate
+lowering, add/branch retry after suspension, add/load 32-bit wrapping, base+index
+wrapping and clobber guards, exact fuel after traps and
 fused-comparison boundary checks against wasmi.
 
 ## what's this for?

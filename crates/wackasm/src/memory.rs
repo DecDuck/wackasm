@@ -75,6 +75,8 @@ fn checked_range(start: usize, length: usize, limit: usize) -> Result<usize, Hal
 }
 
 // Dispatch-local views are never serialized and must be refreshed after memory.grow.
+// `repr(C)` keeps the two words register-passable through the handler ABI.
+#[repr(C)]
 #[derive(Clone, Copy)]
 pub(crate) struct MemoryView {
     pointer: *mut u8,
@@ -82,26 +84,28 @@ pub(crate) struct MemoryView {
 }
 
 impl MemoryView {
+    pub(crate) const EMPTY: Self = Self {
+        pointer: std::ptr::NonNull::<u8>::dangling().as_ptr(),
+        len: 0,
+    };
+
     #[inline(always)]
-    fn address<T: MemoryNumber>(&self, address: u32, offset: u32) -> Result<usize, HaltError> {
+    fn address<T: MemoryNumber>(&self, address: u32, offset: u32) -> Option<usize> {
         // WASM32 addresses plus offsets and a fixed width fit in u64, even on 32-bit hosts.
         let start = address as u64 + offset as u64;
         let end = start + std::mem::size_of::<T>() as u64;
         if end > self.len as u64 {
-            return Err(out_of_bounds());
+            return None;
         }
-        Ok(start as usize)
+        Some(start as usize)
     }
 
+    /// Returns `None` when out of bounds, leaving the trap to the caller's cold path.
     /// The view must still refer to a live memory allocation with its current length.
     #[inline(always)]
-    pub(crate) unsafe fn load<T: MemoryNumber>(
-        &self,
-        address: u32,
-        offset: u32,
-    ) -> Result<T, HaltError> {
+    pub(crate) unsafe fn load<T: MemoryNumber>(&self, address: u32, offset: u32) -> Option<T> {
         let start = self.address::<T>(address, offset)?;
-        Ok(unsafe { T::read_le(self.pointer.add(start)) })
+        Some(unsafe { T::read_le(self.pointer.add(start)) })
     }
 
     /// The view must still refer to a live, exclusively accessible memory allocation.
@@ -111,10 +115,10 @@ impl MemoryView {
         address: u32,
         offset: u32,
         value: T,
-    ) -> Result<(), HaltError> {
+    ) -> Option<()> {
         let start = self.address::<T>(address, offset)?;
         unsafe { value.write_le(self.pointer.add(start)) };
-        Ok(())
+        Some(())
     }
 
     /// The view must still refer to a live, exclusively accessible memory allocation.
@@ -183,10 +187,7 @@ impl MemoryManager {
                 pointer: memory.buffer.as_mut_ptr(),
                 len: memory.buffer.len(),
             },
-            None => MemoryView {
-                pointer: std::ptr::NonNull::<u8>::dangling().as_ptr(),
-                len: 0,
-            },
+            None => MemoryView::EMPTY,
         }
     }
 
@@ -416,17 +417,11 @@ mod tests {
         unsafe { view.store(1, 0, value).unwrap() };
         assert_eq!(&bytes[1..1 + expected.len()], expected);
         assert_eq!(unsafe { view.load::<T>(0, 1).unwrap() }, value);
-        assert!(matches!(
-            unsafe { view.load::<T>(3, 0) },
-            Err(HaltError::Trap(_))
-        ));
-        assert!(matches!(
-            unsafe { view.store(3, 0, value) },
-            Err(HaltError::Trap(_))
-        ));
+        assert!(unsafe { view.load::<T>(3, 0) }.is_none());
+        assert!(unsafe { view.store(3, 0, value) }.is_none());
         assert_eq!(&bytes[1..1 + expected.len()], expected);
-        assert!(unsafe { view.load::<T>(u32::MAX, u32::MAX) }.is_err());
-        assert!(unsafe { view.store(u32::MAX, u32::MAX, value) }.is_err());
+        assert!(unsafe { view.load::<T>(u32::MAX, u32::MAX) }.is_none());
+        assert!(unsafe { view.store(u32::MAX, u32::MAX, value) }.is_none());
     }
 
     #[test]

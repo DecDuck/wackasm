@@ -34,6 +34,21 @@ fn constant_memarg(address: Operand, memarg: WackasmMemArg) -> Option<WackasmMem
     })
 }
 
+/// Constant memory-0 store values become immediates; 64-bit stores need an exact i32.
+fn store_immediate(value: Operand, memarg: WackasmMemArg, wide: bool) -> Option<i32> {
+    let Provider::Const(bits) = value.provider else {
+        return None;
+    };
+    if memarg.memory != 0 {
+        return None;
+    }
+    if wide {
+        i32::try_from(bits as i64).ok()
+    } else {
+        Some(bits as u32 as i32)
+    }
+}
+
 pub(crate) struct RegStack {
     pub(crate) providers: Vec<Operand>,
     pub(crate) locals_len: usize,
@@ -270,7 +285,28 @@ impl Compiler {
             | I32GtUImm { dst, .. }
             | I32GeSImm { dst, .. }
             | I32GeUImm { dst, .. }
-            | I32LeUImm { dst, .. } => dst,
+            | I32LeUImm { dst, .. }
+            | I32LoadRel { dst, .. }
+            | I32Load8URel { dst, .. }
+            | I32Load8SRel { dst, .. }
+            | I32Load16URel { dst, .. }
+            | I32Load16SRel { dst, .. }
+            | I64LoadRel { dst, .. }
+            | I64Load8URel { dst, .. }
+            | I64Load8SRel { dst, .. }
+            | I64Load16URel { dst, .. }
+            | I64Load16SRel { dst, .. }
+            | I64Load32URel { dst, .. }
+            | I64Load32SRel { dst, .. }
+            | F32LoadRel { dst, .. }
+            | F64LoadRel { dst, .. }
+            | LoadI8Idx { dst, .. }
+            | LoadU8Idx { dst, .. }
+            | LoadI16Idx { dst, .. }
+            | LoadU16Idx { dst, .. }
+            | LoadI32Idx { dst, .. }
+            | LoadU32Idx { dst, .. }
+            | LoadI64Idx { dst, .. } => dst,
             _ => return false,
         };
         if *dst != from {
@@ -495,14 +531,79 @@ impl Compiler {
             if let Some(replacement) = replacement {
                 self.func_body.inner.as_mut().unwrap()[pc] = replacement;
                 self.last_producer = None;
-                return pc;
+                return self.fuse_add_branch(pc);
             }
         }
         self.last_producer = None;
-        self.emit(if invert {
+        let pc = self.emit(if invert {
             JumpIfEqz { cond, offset: 0 }
         } else {
             JumpIfNez { cond, offset: 0 }
+        });
+        self.fuse_add_branch(pc)
+    }
+
+    /// Folds an i32 add/sub immediate into the zero-test branch at `pc` (the last instruction).
+    fn fuse_add_branch(&mut self, pc: usize) -> usize {
+        // Something may branch straight to the zero test, skipping the add.
+        if pc == 0 || self.last_label >= pc {
+            return pc;
+        }
+        use WackasmOperator::*;
+        let code = self.func_body.inner.as_mut().unwrap();
+        let (cond, nonzero) = match code[pc] {
+            JumpIfNez { cond, .. } => (cond, true),
+            JumpIfEqz { cond, .. } => (cond, false),
+            _ => return pc,
+        };
+        let (dst, lhs, imm) = match code[pc - 1] {
+            I32AddImm { dst, lhs, imm } if dst == cond => (dst, lhs, imm),
+            I32SubImm { dst, lhs, imm } if dst == cond => (dst, lhs, imm.wrapping_neg()),
+            _ => return pc,
+        };
+        code[pc - 1] = if nonzero {
+            I32AddImmJumpIfNez { dst, lhs, imm, offset: 0 }
+        } else {
+            I32AddImmJumpIfEqz { dst, lhs, imm, offset: 0 }
+        };
+        code.pop();
+        pc - 1
+    }
+
+    /// Removes the instruction that only produced this memory-0 address, if `fold` accepts it.
+    fn take_address<T>(
+        &mut self,
+        address: Operand,
+        memarg: WackasmMemArg,
+        fold: impl FnOnce(&WackasmOperator, Reg) -> Option<T>,
+    ) -> Option<T> {
+        let Provider::Temp(reg) = address.provider else {
+            return None;
+        };
+        if memarg.memory != 0 {
+            return None;
+        }
+        let pc = self.last_producer.filter(|pc| *pc + 1 == self.code_len())?;
+        let code = self.func_body.inner.as_mut().unwrap();
+        let folded = fold(&code[pc], reg)?;
+        code.pop();
+        self.last_producer = None;
+        Some(folded)
+    }
+
+    fn take_address_add(&mut self, address: Operand, memarg: WackasmMemArg) -> Option<(Reg, i32)> {
+        use WackasmOperator::*;
+        self.take_address(address, memarg, |op, reg| match *op {
+            I32AddImm { dst, lhs, imm } if dst == reg => Some((lhs, imm)),
+            I32SubImm { dst, lhs, imm } if dst == reg => Some((lhs, imm.wrapping_neg())),
+            _ => None,
+        })
+    }
+
+    fn take_address_index(&mut self, address: Operand, memarg: WackasmMemArg) -> Option<(Reg, Reg)> {
+        self.take_address(address, memarg, |op, reg| match *op {
+            WackasmOperator::I32Add { dst, lhs, rhs } if dst == reg => Some((lhs, rhs)),
+            _ => None,
         })
     }
 
@@ -581,13 +682,27 @@ impl Compiler {
             }};
         }
         macro_rules! load {
-            ($name:ident, $at:ident, $memarg:ident, $width:expr) => {{
+            ($name:ident, $at:ident, $memarg:ident, $width:expr $(, $rel:ident, $idx:ident)?) => {{
                 let value = self.registers.pop()?;
                 let memarg = WackasmMemArg::try_from(*$memarg)?;
                 let dst = self.registers.reg_at(self.registers.height_slots)?;
                 let operator = if let Some(memarg) = constant_memarg(value, memarg) {
                     WackasmOperator::$at { dst, memarg }
-                } else {
+                } $(else if let Some((base, delta)) = self.take_address_add(value, memarg) {
+                    WackasmOperator::$rel {
+                        dst,
+                        base,
+                        delta,
+                        offset: memarg.offset,
+                    }
+                } else if let Some((base, index)) = self.take_address_index(value, memarg) {
+                    WackasmOperator::$idx {
+                        dst,
+                        base,
+                        index,
+                        offset: memarg.offset,
+                    }
+                })? else {
                     let addr = self.materialize_operand(value);
                     WackasmOperator::$name { dst, addr, memarg }
                 };
@@ -595,19 +710,46 @@ impl Compiler {
             }};
         }
         macro_rules! store {
-            ($name:ident, $at:ident, $memarg:ident) => {{
+            ($name:ident, $at:ident, $memarg:ident $(, $imm:ident, $wide:expr, $idx:ident, $imm_idx:ident)?) => {{
                 let operand = self.registers.pop()?;
                 let address = self.registers.pop()?;
-                let value = self.materialize_operand(operand);
                 let memarg = WackasmMemArg::try_from(*$memarg)?;
                 let operator = if let Some(memarg) = constant_memarg(address, memarg) {
+                    let value = self.materialize_operand(operand);
                     WackasmOperator::$at { value, memarg }
                 } else {
-                    let addr = self.materialize_operand(address);
-                    WackasmOperator::$name {
-                        addr,
-                        value,
-                        memarg,
+                    $(
+                    let immediate = store_immediate(operand, memarg, $wide);
+                    // Materializing a constant value after removing the add could clobber its index.
+                    let foldable = immediate.is_some() || !matches!(operand.provider, Provider::Const(_));
+                    if let Some((base, index)) = foldable
+                        .then(|| self.take_address_index(address, memarg))
+                        .flatten()
+                    {
+                        let offset = memarg.offset;
+                        match immediate {
+                            Some(value) => WackasmOperator::$imm_idx { base, index, value, offset },
+                            None => {
+                                let value = self.materialize_operand(operand);
+                                WackasmOperator::$idx { base, index, value, offset }
+                            }
+                        }
+                    } else)? {
+                        let addr = self.materialize_operand(address);
+                        $(if let Some(value) = store_immediate(operand, memarg, $wide) {
+                            WackasmOperator::$imm {
+                                addr,
+                                value,
+                                offset: memarg.offset,
+                            }
+                        } else)? {
+                            let value = self.materialize_operand(operand);
+                            WackasmOperator::$name {
+                                addr,
+                                value,
+                                memarg,
+                            }
+                        }
                     }
                 };
                 self.emit(operator);
@@ -660,7 +802,8 @@ impl Compiler {
                 self.preserve_local(local);
                 let value = self.registers.pop()?;
                 if !matches!(value.provider, Provider::Temp(reg) if self.retarget(reg, local)) {
-                    let src = self.materialize_operand(value);
+                    // Constants materialize straight into the local.
+                    let src = self.materialize_operand(Operand { reg: local, ..value });
                     self.copy(local, src, value.width);
                 }
                 self.last_producer = None;
@@ -813,30 +956,31 @@ impl Compiler {
                 });
                 self.last_producer = None;
             }
-            Operator::I32Load { memarg } => load!(I32Load, I32LoadAt, memarg, 1),
-            Operator::I32Load8U { memarg } => load!(I32Load8U, I32Load8UAt, memarg, 1),
-            Operator::I32Load8S { memarg } => load!(I32Load8S, I32Load8SAt, memarg, 1),
-            Operator::I32Load16U { memarg } => load!(I32Load16U, I32Load16UAt, memarg, 1),
-            Operator::I32Load16S { memarg } => load!(I32Load16S, I32Load16SAt, memarg, 1),
-            Operator::I64Load { memarg } => load!(I64Load, I64LoadAt, memarg, 1),
-            Operator::I64Load8U { memarg } => load!(I64Load8U, I64Load8UAt, memarg, 1),
-            Operator::I64Load8S { memarg } => load!(I64Load8S, I64Load8SAt, memarg, 1),
-            Operator::I64Load16U { memarg } => load!(I64Load16U, I64Load16UAt, memarg, 1),
-            Operator::I64Load16S { memarg } => load!(I64Load16S, I64Load16SAt, memarg, 1),
-            Operator::I64Load32U { memarg } => load!(I64Load32U, I64Load32UAt, memarg, 1),
-            Operator::I64Load32S { memarg } => load!(I64Load32S, I64Load32SAt, memarg, 1),
-            Operator::F32Load { memarg } => load!(F32Load, F32LoadAt, memarg, 1),
-            Operator::F64Load { memarg } => load!(F64Load, F64LoadAt, memarg, 1),
+            Operator::I32Load { memarg } => load!(I32Load, I32LoadAt, memarg, 1, I32LoadRel, LoadI32Idx),
+            Operator::I32Load8U { memarg } => load!(I32Load8U, I32Load8UAt, memarg, 1, I32Load8URel, LoadU8Idx),
+            Operator::I32Load8S { memarg } => load!(I32Load8S, I32Load8SAt, memarg, 1, I32Load8SRel, LoadI8Idx),
+            Operator::I32Load16U { memarg } => load!(I32Load16U, I32Load16UAt, memarg, 1, I32Load16URel, LoadU16Idx),
+            Operator::I32Load16S { memarg } => load!(I32Load16S, I32Load16SAt, memarg, 1, I32Load16SRel, LoadI16Idx),
+            Operator::I64Load { memarg } => load!(I64Load, I64LoadAt, memarg, 1, I64LoadRel, LoadI64Idx),
+            Operator::I64Load8U { memarg } => load!(I64Load8U, I64Load8UAt, memarg, 1, I64Load8URel, LoadU8Idx),
+            Operator::I64Load8S { memarg } => load!(I64Load8S, I64Load8SAt, memarg, 1, I64Load8SRel, LoadI8Idx),
+            Operator::I64Load16U { memarg } => load!(I64Load16U, I64Load16UAt, memarg, 1, I64Load16URel, LoadU16Idx),
+            Operator::I64Load16S { memarg } => load!(I64Load16S, I64Load16SAt, memarg, 1, I64Load16SRel, LoadI16Idx),
+            Operator::I64Load32U { memarg } => load!(I64Load32U, I64Load32UAt, memarg, 1, I64Load32URel, LoadU32Idx),
+            Operator::I64Load32S { memarg } => load!(I64Load32S, I64Load32SAt, memarg, 1, I64Load32SRel, LoadI32Idx),
+            // Float values hold their bit patterns, so they load like same-width integers.
+            Operator::F32Load { memarg } => load!(F32Load, F32LoadAt, memarg, 1, F32LoadRel, LoadU32Idx),
+            Operator::F64Load { memarg } => load!(F64Load, F64LoadAt, memarg, 1, F64LoadRel, LoadI64Idx),
             Operator::V128Load { memarg } => load!(V128Load, V128LoadAt, memarg, 2),
-            Operator::I32Store { memarg } => store!(I32Store, I32StoreAt, memarg),
-            Operator::I32Store8 { memarg } => store!(I32Store8, I32Store8At, memarg),
-            Operator::I32Store16 { memarg } => store!(I32Store16, I32Store16At, memarg),
-            Operator::I64Store { memarg } => store!(I64Store, I64StoreAt, memarg),
-            Operator::I64Store8 { memarg } => store!(I64Store8, I64Store8At, memarg),
-            Operator::I64Store16 { memarg } => store!(I64Store16, I64Store16At, memarg),
-            Operator::I64Store32 { memarg } => store!(I64Store32, I64Store32At, memarg),
-            Operator::F32Store { memarg } => store!(F32Store, F32StoreAt, memarg),
-            Operator::F64Store { memarg } => store!(F64Store, F64StoreAt, memarg),
+            Operator::I32Store { memarg } => store!(I32Store, I32StoreAt, memarg, I32StoreImm, false, Store32Idx, Store32ImmIdx),
+            Operator::I32Store8 { memarg } => store!(I32Store8, I32Store8At, memarg, I32Store8Imm, false, Store8Idx, Store8ImmIdx),
+            Operator::I32Store16 { memarg } => store!(I32Store16, I32Store16At, memarg, I32Store16Imm, false, Store16Idx, Store16ImmIdx),
+            Operator::I64Store { memarg } => store!(I64Store, I64StoreAt, memarg, I64StoreImm, true, Store64Idx, Store64ImmIdx),
+            Operator::I64Store8 { memarg } => store!(I64Store8, I64Store8At, memarg, I32Store8Imm, false, Store8Idx, Store8ImmIdx),
+            Operator::I64Store16 { memarg } => store!(I64Store16, I64Store16At, memarg, I32Store16Imm, false, Store16Idx, Store16ImmIdx),
+            Operator::I64Store32 { memarg } => store!(I64Store32, I64Store32At, memarg, I32StoreImm, false, Store32Idx, Store32ImmIdx),
+            Operator::F32Store { memarg } => store!(F32Store, F32StoreAt, memarg, I32StoreImm, false, Store32Idx, Store32ImmIdx),
+            Operator::F64Store { memarg } => store!(F64Store, F64StoreAt, memarg, I64StoreImm, true, Store64Idx, Store64ImmIdx),
             Operator::V128Store { memarg } => store!(V128Store, V128StoreAt, memarg),
             Operator::I32Extend8S => unary!(I32Extend8S),
             Operator::I64ExtendI32U => unary!(I64ExtendI32U),
