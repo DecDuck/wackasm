@@ -1,86 +1,45 @@
-use std::{fs::File, path::PathBuf, time::Instant};
-
 use anyhow::anyhow;
-use serde::{Deserialize, Serialize};
 use wackasm::{
-    HostYield, Value, WackasmExecutor, WackasmModule,
-    imports::{NoResources, WackasmHostBridge, WackasmResource},
+    HaltError, HostYield, WackasmExecutor, WackasmModule,
+    imports::{NoResources, WackasmHostBridge},
 };
+use wackasm_wasi::StdWasi;
 
-use crate::wasi::WasiHandler;
+use crate::wasi::CliImports;
 
 pub mod wasi;
 
-#[derive(Serialize, Deserialize)]
-pub struct SuspendableFileHandle {
-    pub id: Value,
-    file_path: PathBuf,
-    #[serde(skip)]
-    file_handle: Option<File>,
-}
-
-#[derive(Serialize, Deserialize)]
-pub enum CliResources {
-    FileHandle(SuspendableFileHandle),
-}
-
-impl WackasmResource for CliResources {
-    fn opaque_handle(&self) -> Value {
-        match self {
-            CliResources::FileHandle(suspendable_file_handle) => suspendable_file_handle.id,
-        }
-    }
-
-    fn reactivate(self) -> Result<Self, anyhow::Error> {
-        Ok(match self {
-            CliResources::FileHandle(mut suspendable_file_handle) => {
-                suspendable_file_handle.file_handle =
-                    Some(File::open(suspendable_file_handle.file_path.clone())?);
-                CliResources::FileHandle(suspendable_file_handle)
-            }
-        })
-    }
-}
-
 pub fn main() -> Result<(), anyhow::Error> {
-    let contents = std::fs::read("./compute/target/wasm32-unknown-unknown/release/compute.wasm")?;
+    let contents = std::fs::read("./target/wasm32-wasip1/release/wasi.wasm")?;
     let module = WackasmModule::new(&contents)?;
-    let mut host_bridge = WackasmHostBridge::new(WasiHandler {}, WasiHandler {});
+    let sandbox = std::env::temp_dir().join(format!(
+        "wackasm-wasi-{}-{}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)?
+            .as_nanos()
+    ));
+    std::fs::create_dir_all(&sandbox)?;
+    let wasi = StdWasi::new(&sandbox)?
+        .with_args(["wasi-test".to_owned(), "guest-arg".to_owned()])
+        .with_environ(["WACKASM_WASI_TEST=enabled".to_owned()]);
+    let mut host_bridge: WackasmHostBridge<_, _, NoResources> =
+        WackasmHostBridge::new(wasi, CliImports {});
     let mut executor = WackasmExecutor::new(module)?;
 
-    executor.call_export(
-        "print_prime_benchmark",
-        vec![Value::from_i32(1000000), Value::from_i32(80)],
-    )?;
-
-    executor.set_fuel(10);
-    let _ = executor.execute_with_imports(&mut host_bridge)?;
-
-    println!("before serialize: {:?}", executor.get_result());
-
-    let raw_executor = bitcode::serialize(&executor)?;
-    drop(executor);
-    println!(
-        "full suspended executor size: {}",
-        human_bytes::human_bytes(raw_executor.len() as f64)
-    );
-    let mut executor: WackasmExecutor = bitcode::deserialize(&raw_executor)?;
-
-    println!("after serialize: {:?}", executor.get_result());
-
+    executor.call_export("_start", Vec::new())?;
     executor.set_fuel(isize::MAX);
-    let start = Instant::now();
-    let _ = executor.execute_with_imports(&mut host_bridge)?;
-    let time = start.elapsed();
-
-    let consumed_fuel = isize::MAX - executor.get_fuel();
-
-    let time = time.as_millis() as f64;
-    let fpms = consumed_fuel as f64 / time;
-    let fps = fpms * 1000f64;
-
-    println!("finish: {:?}", executor.get_result());
-    println!("fps: {:.0}, total: {}s", fps, time / 1000.0f64);
+    match executor.execute_with_imports(&mut host_bridge) {
+        Ok(HostYield::Return) => println!("WASI test guest returned"),
+        Err(HaltError::Trap(error)) if error.to_string() == "WASI process exited with status 0" => {
+            println!("WASI test guest exited successfully")
+        }
+        Err(error) => return Err(error.into()),
+        _ => return Err(anyhow!("WASI test guest yielded unexpectedly")),
+    }
+    drop(executor);
+    drop(host_bridge);
+    std::fs::remove_dir_all(sandbox)?;
 
     Ok(())
 }

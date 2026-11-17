@@ -81,7 +81,14 @@ pub struct WackasmModule {
 
 impl WackasmModule {
     pub fn new(data: &[u8]) -> Result<Self, HaltError> {
-        Self::with_linker(data, None)
+        Self::build(data, None, None)
+    }
+
+    /// Like [`Self::new`], but all linear memories together may use at most
+    /// `limit` bytes. A module whose initial memory is already over the limit
+    /// is rejected, and a `memory.grow` past it returns -1 to the guest.
+    pub fn with_memory_limit(data: &[u8], limit: u64) -> Result<Self, HaltError> {
+        Self::build(data, None, Some(limit))
     }
 }
 
@@ -94,6 +101,14 @@ impl WackasmModule {
     }
 
     pub fn with_linker(data: &[u8], linker: Option<()>) -> Result<Self, HaltError> {
+        Self::build(data, linker, None)
+    }
+
+    fn build(
+        data: &[u8],
+        _linker: Option<()>,
+        memory_limit: Option<u64>,
+    ) -> Result<Self, HaltError> {
         let mut validator = wasmparser::Validator::new();
         let mut allocs = FuncValidatorAllocations::default();
 
@@ -104,7 +119,7 @@ impl WackasmModule {
         let mut exports = HashMap::new();
 
         let mut tables = TableManager::new();
-        let mut memories = MemoryManager::new();
+        let mut memories = MemoryManager::new(memory_limit);
         let mut globals = GlobalManager::new();
         let mut functions = FunctionManager::new();
 

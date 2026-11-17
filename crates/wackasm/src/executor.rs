@@ -66,8 +66,8 @@ impl WackasmExecutor {
                 start_func,
                 Some(Vec::new()),
             )?;
-            if !matches!(me.execute()?, HostYield::Return) {
-                return Err(trap!("got a non-return host yield while running _start"));
+            if matches!(me.execute()?, HostYield::OutOfFuel) {
+                return Err(trap!("ran out of fuel while running _start"));
             }
         }
 
@@ -187,6 +187,15 @@ impl WackasmExecutor {
 
     pub fn memory(&self) -> &MemoryManager {
         &self.module.memories
+    }
+
+    /// Changes the host memory budget; see [`MemoryManager::set_limit`].
+    pub fn set_memory_limit(&mut self, limit: Option<u64>) {
+        self.module.memories.set_limit(limit);
+    }
+
+    pub fn write_memory(&mut self, mem: u32, addr: u32, bytes: &[u8]) -> Result<(), HaltError> {
+        self.module.memories.write_bytes(mem, addr, bytes)
     }
 
     pub fn execute(&mut self) -> Result<HostYield, HaltError> {

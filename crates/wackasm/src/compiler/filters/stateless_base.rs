@@ -146,12 +146,15 @@ impl CompilerFilter for StatelessBasePass {
             // i32 maths
             Operator::I32Add => WackasmOperator::I32Add,
             Operator::I32Mul => WackasmOperator::I32Mul,
+            Operator::I32Ctz => WackasmOperator::I32Ctz,
             Operator::I32DivU => WackasmOperator::I32DivU,
+            Operator::I32ShrS => WackasmOperator::I32ShrS,
             Operator::I32Sub => WackasmOperator::I32Sub,
             Operator::I32ShrU => WackasmOperator::I32ShrU,
             Operator::I32Shl => WackasmOperator::I32Shl,
             Operator::I32And => WackasmOperator::I32And,
             Operator::I32Xor => WackasmOperator::I32Xor,
+            Operator::I32Rotl => WackasmOperator::I32Rotl,
             Operator::I32Rotr => WackasmOperator::I32Rotr,
 
             // i32 comparators
@@ -160,6 +163,7 @@ impl CompilerFilter for StatelessBasePass {
             Operator::I32LtU => WackasmOperator::I32LtU,
             Operator::I32GtU => WackasmOperator::I32GtU,
             Operator::I32GeS => WackasmOperator::I32GeS,
+            Operator::I32LeS => WackasmOperator::I32LeS,
             Operator::I32LeU => WackasmOperator::I32LeU,
             Operator::I32Ne => WackasmOperator::I32Ne,
             Operator::I32GeU => WackasmOperator::I32GeU,
@@ -174,13 +178,17 @@ impl CompilerFilter for StatelessBasePass {
             Operator::I64ShrU => WackasmOperator::I64ShrU,
             Operator::I64Shl => WackasmOperator::I64Shl,
             Operator::I64And => WackasmOperator::I64And,
+            Operator::I64Xor => WackasmOperator::I64Xor,
             Operator::I64Or => WackasmOperator::I64Or,
 
             // i64 comparators
             Operator::I64GtS => WackasmOperator::I64GtS,
+            Operator::I64LtS => WackasmOperator::I64LtS,
             Operator::I64LtU => WackasmOperator::I64LtU,
             Operator::I64GtU => WackasmOperator::I64GtU,
+            Operator::I64LeS => WackasmOperator::I64LeS,
             Operator::I64LeU => WackasmOperator::I64LeU,
+            Operator::I64GeS => WackasmOperator::I64GeS,
             Operator::I64GeU => WackasmOperator::I64GeU,
             Operator::I64Eq => WackasmOperator::I64Eq,
             Operator::I64Ne => WackasmOperator::I64Ne,

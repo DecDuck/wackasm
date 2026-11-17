@@ -65,13 +65,29 @@ impl LinearMemory {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct MemoryManager {
     memories: Vec<LinearMemory>,
+    /// Host-imposed budget, in bytes, for all linear memories together.
+    /// `None` means only the wasm limits (memory maximums, 4 GiB) apply.
+    limit: Option<u64>,
 }
 
 impl MemoryManager {
-    pub(crate) fn new() -> Self {
+    pub(crate) fn new(limit: Option<u64>) -> Self {
         Self {
             memories: Vec::new(),
+            limit,
         }
+    }
+
+    pub fn limit(&self) -> Option<u64> {
+        self.limit
+    }
+
+    pub fn set_limit(&mut self, limit: Option<u64>) {
+        self.limit = limit;
+    }
+
+    pub fn used_bytes(&self) -> u64 {
+        self.memories.iter().map(|m| m.buffer.len() as u64).sum()
     }
 
     pub(crate) fn process_memory_section(
@@ -80,8 +96,21 @@ impl MemoryManager {
     ) -> Result<(), HaltError> {
         for memory in raw_memories {
             let memory = memory?;
+            let page_size = memory.page_size() as u64;
+            let initial_bytes = memory
+                .initial
+                .checked_mul(page_size)
+                .ok_or_else(|| anyhow!("initial memory size overflows"))?;
+            if let Some(limit) = self.limit
+                && self.used_bytes().saturating_add(initial_bytes) > limit
+            {
+                return Err(HaltError::Error(anyhow!(
+                    "initial memory of {} bytes exceeds the limit of {limit} bytes",
+                    self.used_bytes() + initial_bytes
+                )));
+            }
             self.memories.push(LinearMemory::new(
-                memory.page_size() as usize,
+                page_size as usize,
                 memory.initial,
                 memory.maximum,
             ));
@@ -133,6 +162,8 @@ impl MemoryManager {
     }
 
     pub(crate) fn grow(&mut self, mem: u32, amount: i32) -> Result<i32, HaltError> {
+        let used = self.used_bytes();
+        let host_limit = self.limit;
         let memory = self
             .memories
             .get_mut(mem as usize)
@@ -154,6 +185,11 @@ impl MemoryManager {
         };
 
         let new_len = new as usize * memory.page_size;
+        if let Some(limit) = host_limit
+            && used - memory.buffer.len() as u64 + new_len as u64 > limit
+        {
+            return Ok(-1);
+        }
         if memory
             .buffer
             .try_reserve_exact(new_len - memory.buffer.len())
@@ -304,6 +340,23 @@ impl MemoryManager {
             .ok_or_else(|| anyhow!("no linear memory for index {}", mem))?
             .get(start..end)
             .ok_or_else(|| trap!("out of bounds memory access"))
+    }
+
+    pub fn write_bytes(&mut self, mem: u32, addr: u32, bytes: &[u8]) -> Result<(), HaltError> {
+        let start = addr as usize;
+        let end = start
+            .checked_add(bytes.len())
+            .ok_or_else(|| trap!("out of bounds memory access"))?;
+        let memory = self
+            .memories
+            .get_mut(mem as usize)
+            .ok_or_else(|| anyhow!("no linear memory for index {}", mem))?;
+        let destination = memory
+            .buffer
+            .get_mut(start..end)
+            .ok_or_else(|| trap!("out of bounds memory access"))?;
+        destination.copy_from_slice(bytes);
+        Ok(())
     }
 
     /// Reads a NUL-terminated string starting at `addr`.

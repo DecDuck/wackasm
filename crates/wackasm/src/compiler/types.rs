@@ -231,12 +231,15 @@ pub enum WackasmOperator {
     // i32 maths
     I32Add,
     I32Mul,
+    I32Ctz,
     I32DivU,
+    I32ShrS,
     I32Sub,
     I32ShrU,
     I32Shl,
     I32And,
     I32Xor,
+    I32Rotl,
     I32Rotr,
 
     // i32 comparators
@@ -245,6 +248,7 @@ pub enum WackasmOperator {
     I32GtU,
     I32LtS,
     I32GeS,
+    I32LeS,
     I32LeU,
     I32Ne,
     I32GeU,
@@ -259,13 +263,17 @@ pub enum WackasmOperator {
     I64ShrU,
     I64Shl,
     I64And,
+    I64Xor,
     I64Or,
 
     // i64 comparators
     I64GtS,
+    I64LtS,
     I64LtU,
     I64GtU,
+    I64LeS,
     I64LeU,
+    I64GeS,
     I64GeU,
     I64Eq,
     I64Ne,

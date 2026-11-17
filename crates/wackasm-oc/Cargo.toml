@@ -1,0 +1,20 @@
+[package]
+name = "wackasm-oc"
+version = "0.1.0"
+edition = "2024"
+description = "OpenComputers architecture backed by wackasm, exposed to the JVM over JNI"
+
+[lib]
+# cdylib is loaded by the JVM (System.loadLibrary("wackasm_oc")); rlib keeps
+# the pure-Rust machine usable from tests and other crates.
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+anyhow = "1.0.104"
+bitcode = { version = "0.6.9", features = ["serde"] }
+jni = "0.21.1"
+serde = { version = "1.0.229", features = ["derive"] }
+wackasm = { path = "../wackasm" }
+
+[dev-dependencies]
+wat = "1"

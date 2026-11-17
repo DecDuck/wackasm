@@ -352,6 +352,9 @@ ops!(|ctx, pc, stack, locals| match op {
             .checked_div(rhs)
             .ok_or_else(|| trap!("integer divide by zero"))?)
     }
+    i32_shr_s @ I32ShrS => {
+        i32_binop!(stack, i32, |lhs, rhs| lhs.wrapping_shr(rhs as u32))
+    }
     i32_sub @ I32Sub => {
         i32_binop!(stack, i32, |lhs, rhs| lhs.wrapping_sub(rhs))
     }
@@ -373,6 +376,9 @@ ops!(|ctx, pc, stack, locals| match op {
     i32_rotr @ I32Rotr => {
         i32_binop!(stack, i32, |lhs, rhs| lhs.rotate_right(rhs as u32))
     }
+    i32_rotl @ I32Rotl => {
+        i32_binop!(stack, i32, |lhs, rhs| lhs.rotate_left(rhs as u32))
+    }
 
     // i32 comparators
     i32_gt_s @ I32GtS => {
@@ -380,6 +386,9 @@ ops!(|ctx, pc, stack, locals| match op {
     }
     i32_ge_s @ I32GeS => {
         i32_binop!(stack, i32, |lhs, rhs| lhs >= rhs)
+    }
+    i32_le_s @ I32LeS => {
+        i32_binop!(stack, i32, |lhs, rhs| lhs <= rhs)
     }
     i32_lt_s @ I32LtS => {
         i32_binop!(stack, i32, |lhs, rhs| lhs < rhs)
@@ -406,6 +415,10 @@ ops!(|ctx, pc, stack, locals| match op {
         let a = stack.pop_i32();
         stack.push(Value((a == 0) as u64));
     }
+    i32_ctz @ I32Ctz => {
+        let value = stack.pop_i32();
+        stack.push(Value(value.trailing_zeros() as u64));
+    }
 
     // i64 maths
     i64_add @ I64Add => {
@@ -426,6 +439,9 @@ ops!(|ctx, pc, stack, locals| match op {
     i64_and @ I64And => {
         i64_binop!(stack, i64, |lhs, rhs| lhs & rhs)
     }
+    i64_xor @ I64Xor => {
+        i64_binop!(stack, i64, |lhs, rhs| lhs ^ rhs)
+    }
     i64_or @ I64Or => {
         i64_binop!(stack, i64, |lhs, rhs| lhs | rhs)
     }
@@ -434,14 +450,23 @@ ops!(|ctx, pc, stack, locals| match op {
     i64_gt_s @ I64GtS => {
         i64_cmp!(stack, i64, |lhs, rhs| lhs > rhs)
     }
+    i64_lt_s @ I64LtS => {
+        i64_cmp!(stack, i64, |lhs, rhs| lhs < rhs)
+    }
     i64_lt_u @ I64LtU => {
         i64_cmp!(stack, u64, |lhs, rhs| lhs < rhs)
     }
     i64_gt_u @ I64GtU => {
         i64_cmp!(stack, u64, |lhs, rhs| lhs > rhs)
     }
+    i64_le_s @ I64LeS => {
+        i64_cmp!(stack, i64, |lhs, rhs| lhs <= rhs)
+    }
     i64_le_u @ I64LeU => {
         i64_cmp!(stack, u64, |lhs, rhs| lhs <= rhs)
+    }
+    i64_ge_s @ I64GeS => {
+        i64_cmp!(stack, i64, |lhs, rhs| lhs >= rhs)
     }
     i64_ge_u @ I64GeU => {
         i64_cmp!(stack, u64, |lhs, rhs| lhs >= rhs)
