@@ -1,6 +1,7 @@
 // @ts-check
 import { defineConfig } from 'astro/config';
 import starlight from '@astrojs/starlight';
+import starlightThemeNova from 'starlight-theme-nova';
 
 // Published to GitHub Pages at https://decduck.github.io/wackasm/.
 // SITE and BASE can be overridden, for example for a fork or a custom domain.
@@ -13,6 +14,9 @@ export default defineConfig({
   integrations: [
     starlight({
       title: 'wackasm',
+      // Shown next to the title (the same icon as the favicon).
+      logo: { src: './src/assets/logo.svg', alt: '' },
+      plugins: [starlightThemeNova()],
       description: 'WebAssembly computers for OpenComputers, running on the wackasm interpreter.',
       social: [{ icon: 'github', label: 'GitHub', href: 'https://github.com/DecDuck/wackasm' }],
       editLink: { baseUrl: 'https://github.com/DecDuck/wackasm/edit/master/docs/' },

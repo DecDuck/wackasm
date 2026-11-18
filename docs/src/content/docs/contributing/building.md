@@ -10,8 +10,8 @@ sidebar:
 - Rust **nightly** (wackasm uses nightly features), with the
   `wasm32-unknown-unknown` and `wasm32-wasip1` targets:
   `rustup target add wasm32-unknown-unknown wasm32-wasip1`;
-- [`cargo-patch-crate`](https://crates.io/crates/cargo-patch-crate)
-  (`cargo install cargo-patch-crate`). The interpreter builds against a
+- [`patch-crate`](https://crates.io/crates/patch-crate), which provides
+  `cargo patch-crate` (`cargo install patch-crate`). The interpreter builds against a
   patched `wasmparser` (`patches/`), applied with `cargo patch-crate`;
 - any JDK 17 or newer, to run Gradle. Gradle downloads the Java 8 toolchain
   Minecraft needs;

@@ -48,9 +48,10 @@ jobs:
       - uses: dtolnay/rust-toolchain@nightly
         with:
           targets: ${{ matrix.target }}
-      - uses: taiki-e/install-action@v2
-        with:
-          tool: cargo-patch-crate
+      # The crate is `patch-crate`; its binary is `cargo-patch-crate`. It has
+      # no prebuilt binaries, so it is built from source.
+      - name: Install cargo patch-crate
+        run: cargo install patch-crate --version 0.1.13 --locked
       - uses: Swatinem/rust-cache@v2
         with:
           key: ${{ matrix.target }}
@@ -73,9 +74,10 @@ jobs:
       - uses: dtolnay/rust-toolchain@nightly
         with:
           targets: wasm32-unknown-unknown, wasm32-wasip1
-      - uses: taiki-e/install-action@v2
-        with:
-          tool: cargo-patch-crate
+      # The crate is `patch-crate`; its binary is `cargo-patch-crate`. It has
+      # no prebuilt binaries, so it is built from source.
+      - name: Install cargo patch-crate
+        run: cargo install patch-crate --version 0.1.13 --locked
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: |
@@ -200,9 +202,10 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
-      - uses: taiki-e/install-action@v2
-        with:
-          tool: cargo-patch-crate
+      # The crate is `patch-crate`; its binary is `cargo-patch-crate`. It has
+      # no prebuilt binaries, so it is built from source.
+      - name: Install cargo patch-crate
+        run: cargo install patch-crate --version 0.1.13 --locked
       # Cargo loads the whole workspace, and its [patch] points into target/.
       - name: Apply the wasmparser patch
         run: cargo patch-crate
