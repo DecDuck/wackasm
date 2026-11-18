@@ -1,6 +1,6 @@
 # Wackasm for OpenComputers
 
-A Minecraft 1.21.1 Fabric mod that adds a **WebAssembly** architecture to
+A Minecraft 1.21.1 NeoForge mod that adds a **WebAssembly** architecture to
 [OpenComputers: Modernized](https://github.com/habzg/OpenComputers-Modernized),
 running guests on the wackasm interpreter. Machines are fully suspendable: a
 computer can be saved and reloaded mid-instruction, even in the middle of a
@@ -10,7 +10,7 @@ Player and programmer documentation: <https://decduck.github.io/wackasm/>
 (source in [`docs/`](../docs)). This file covers building the mod.
 
 ```
-mc-mod/                     this Fabric mod (Java)
+mc-mod/                     this NeoForge mod (Java)
 crates/wackasm-oc/          JNI library: suspension, snapshots, guest ABI
 crates/wackasm-oc-bios/     the 4 KiB WebAssembly BIOS (EEPROM code)
 crates/wackasm-oc-guest/    the "wackasm shell" floppy's /init.wasm
@@ -25,9 +25,8 @@ Requirements:
   (`rustup target add wasm32-unknown-unknown wasm32-wasip1`)
 * [`patch-crate`](https://crates.io/crates/patch-crate) (`cargo install
   patch-crate`), then `cargo patch-crate` once at the repository root
-* JDK 25 or newer to run Gradle (Fabric Loom needs it); the mod is compiled
-  with a Java 21 toolchain for Minecraft 1.21.1, which Gradle downloads if
-  it isn't installed
+* JDK 21 or newer to run Gradle (ModDevGradle); Minecraft 1.21.1 builds with
+  Java 21
 
 ```powershell
 cd mc-mod
@@ -48,11 +47,9 @@ bytes, so `generateRecipes` writes both recipes (EEPROM + paper, floppy +
 paper) from the built BIOS. They must make the same items as the
 `Items.registerEEPROM` and `Items.registerFloppy` calls in `WackasmMod`.
 
-OpenComputers: Modernized sets up its API in its own main entrypoint, and
-Fabric doesn't order main entrypoints by dependency, so `WackasmMod`
-registers as soon as the API exists: in its main entrypoint if
-OpenComputers' ran first, otherwise in the client or dedicated-server
-entrypoint, which Fabric runs after every main entrypoint.
+OpenComputers: Modernized sets up its API in its `FMLCommonSetupEvent`
+handler, and those run in parallel across mods, so `WackasmMod` registers in
+work queued with `enqueueWork`, which runs once every mod's handler is done.
 
 The jar only contains a library for the platform it was built on. For a
 multi-platform jar, put cross-built libraries in

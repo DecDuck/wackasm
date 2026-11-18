@@ -1,5 +1,6 @@
 plugins {
-    id 'fabric-loom' version '1.19.3'
+    id 'java'
+    id 'net.neoforged.moddev' version '2.0.148'
 }
 
 group = 'dev.wackasm'
@@ -10,17 +11,31 @@ java.toolchain.languageVersion = JavaLanguageVersion.of(21)
 
 tasks.withType(JavaCompile).configureEach { options.encoding = 'UTF-8' }
 
-loom {
+neoForge {
+    version = neo_version
+    parchment {
+        minecraftVersion = minecraft_version
+        mappingsVersion = parchment_mappings_version
+    }
     runs {
         // runs/, not run/: keep dev worlds apart from anything else there.
-        client { client(); runDir 'runs/client' }
+        client {
+            client()
+            gameDirectory = project.file('runs/client')
+        }
         server {
             server()
-            runDir 'runs/server'
-            programArgs '--nogui'
+            gameDirectory = project.file('runs/server')
+            programArgument '--nogui'
         }
     }
+    mods {
+        wackasm { sourceSet sourceSets.main }
+    }
 }
+// The unit tests use Minecraft and OpenComputers classes (NBT, values), but
+// not a running game.
+neoForge.addModdingDependenciesTo(sourceSets.test)
 
 repositories {
     maven {
@@ -28,24 +43,13 @@ repositories {
         url = 'https://habzg.github.io/OpenComputers-Modernized/'
         content { includeGroup 'li.cil.oc' }
     }
-    maven {
-        name = 'ParchmentMC'
-        url = 'https://maven.parchmentmc.org'
-        content { includeGroup 'org.parchmentmc.data' }
-    }
 }
 
 dependencies {
-    minecraft "com.mojang:minecraft:${minecraft_version}"
-    mappings loom.layered {
-        officialMojangMappings()
-        parchment("org.parchmentmc.data:parchment-${minecraft_version}:${parchment_mappings_version}@zip")
-    }
-    modImplementation "net.fabricmc:fabric-loader:${loader_version}"
-    modImplementation "net.fabricmc.fabric-api:fabric-api:${fabric_api_version}"
     // The full mod (it includes the API), so the dev client and server have
-    // OpenComputers loaded.
-    modImplementation "li.cil.oc:opencomputers-fabric:${ocm_version}"
+    // OpenComputers loaded. NeoForge runs on Mojang's names, so the jar is
+    // used as is.
+    implementation "li.cil.oc:opencomputers-neoforge:${ocm_version}"
 
     testImplementation platform('org.junit:junit-bom:5.10.2')
     testImplementation 'org.junit.jupiter:junit-jupiter'
@@ -101,10 +105,10 @@ def generateRecipes = tasks.register('generateRecipes') {
 sourceSets.main.resources.srcDir(generateRecipes)
 
 processResources {
-    def props = [version: project.version, minecraft_version: minecraft_version, loader_version: loader_version,
-                 fabric_api_version: fabric_api_version, ocm_version: ocm_version]
+    def props = [version: project.version, minecraft_version: minecraft_version, neo_version: neo_version,
+                 ocm_version: ocm_version]
     inputs.properties props
-    filesMatching('fabric.mod.json') { expand(props) }
+    filesMatching('META-INF/neoforge.mods.toml') { expand(props) }
 }
 
 jar {

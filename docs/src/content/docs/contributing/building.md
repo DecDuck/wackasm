@@ -13,9 +13,8 @@ sidebar:
 - [`patch-crate`](https://crates.io/crates/patch-crate), which provides
   `cargo patch-crate` (`cargo install patch-crate`). The interpreter builds against a
   patched `wasmparser` (`patches/`), applied with `cargo patch-crate`;
-- JDK 25 or newer, to run Gradle (Fabric Loom needs it). The mod is compiled
-  with Java 21 for Minecraft 1.21.1; Gradle downloads that toolchain if it
-  isn't installed;
+- JDK 21 or newer, to run Gradle (ModDevGradle) and build for Minecraft
+  1.21.1;
 - Node.js 22 or newer, for these docs.
 
 ## Layout
@@ -28,7 +27,7 @@ crates/wackasm-opencomputers/   the guest library (published on crates.io)
 crates/wackasm-oc-bios/         the 4 KiB EEPROM BIOS (wasm32-unknown-unknown)
 crates/wackasm-oc-guest/        the shell, the floppy's /init.wasm
 crates/wackasm-oc-programs/     the floppy's /bin programs (wasm32-wasip1)
-mc-mod/                         the Fabric mod for Minecraft 1.21.1 (OpenComputers: Modernized)
+mc-mod/                         the NeoForge mod for Minecraft 1.21.1 (OpenComputers: Modernized)
 docs/                           this site (Starlight)
 ```
 

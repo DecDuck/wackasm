@@ -25,7 +25,7 @@ import net.minecraft.nbt.Tag;
  * resources ({@code assets/wackasm/loot/shell/}).
  *
  * <p>OpenComputers' {@code FileSystem.fromClass} looks for the files next to
- * the mod's classes. In a dev run, Loom keeps classes and resources in
+ * the mod's classes. In a dev run, classes and resources are in
  * separate directories, so it finds an empty disk. This reads each file
  * through the class loader instead, which works the same from the jar and in
  * dev, using the table of contents the build writes ({@code shell.index}: one

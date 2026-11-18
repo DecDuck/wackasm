@@ -28,7 +28,7 @@
  },
  "beacon": {
   "classes": [
-   "li.cil.oc.fabric.integration.vanilla.DriverBeacon$Environment"
+   "li.cil.oc.neoforge.integration.vanilla.DriverBeacon$Environment"
   ],
   "methods": {
    "getLevels": {
@@ -56,7 +56,7 @@
  },
  "brewing_stand": {
   "classes": [
-   "li.cil.oc.fabric.integration.vanilla.DriverBrewingStand$Environment"
+   "li.cil.oc.neoforge.integration.vanilla.DriverBrewingStand$Environment"
   ],
   "methods": {
    "getBrewTime": {
@@ -71,7 +71,7 @@
  "chunkloader": {
   "classes": [
    "li.cil.oc.core.impl.server.component.UpgradeChunkloaderBase",
-   "li.cil.oc.fabric.server.component.UpgradeChunkloader"
+   "li.cil.oc.neoforge.server.component.UpgradeChunkloader"
   ],
   "methods": {
    "isActive": {
@@ -184,7 +184,7 @@
  "crafting": {
   "classes": [
    "li.cil.oc.core.impl.server.component.UpgradeCraftingBase",
-   "li.cil.oc.fabric.server.component.UpgradeCrafting"
+   "li.cil.oc.neoforge.server.component.UpgradeCrafting"
   ],
   "methods": {
    "craft": {
@@ -377,7 +377,7 @@
  "debug": {
   "classes": [
    "li.cil.oc.core.impl.server.component.DebugCardBase",
-   "li.cil.oc.fabric.server.component.DebugCard"
+   "li.cil.oc.neoforge.server.component.DebugCard"
   ],
   "methods": {
    "changeBuffer": {
@@ -491,7 +491,7 @@
   "classes": [
    "li.cil.oc.core.impl.common.blockentity.DiskDrive",
    "li.cil.oc.core.impl.server.component.DiskDriveMountableBase",
-   "li.cil.oc.fabric.server.component.DiskDriveMountable"
+   "li.cil.oc.neoforge.server.component.DiskDriveMountable"
   ],
   "methods": {
    "eject": {
@@ -590,7 +590,7 @@
  "drone": {
   "classes": [
    "li.cil.oc.core.impl.server.component.DroneBase",
-   "li.cil.oc.fabric.server.component.Drone"
+   "li.cil.oc.neoforge.server.component.Drone"
   ],
   "methods": {
    "compare": {
@@ -905,7 +905,7 @@
  },
  "energy_device": {
   "classes": [
-   "li.cil.oc.fabric.integration.vanilla.DriverEnergy$Environment"
+   "li.cil.oc.neoforge.integration.neoforge.DriverEnergyStorage$Environment"
   ],
   "methods": {
    "canExtract": {
@@ -1094,7 +1094,7 @@
  },
  "fluid_handler": {
   "classes": [
-   "li.cil.oc.fabric.integration.vanilla.DriverFluidHandler$Environment"
+   "li.cil.oc.neoforge.integration.vanilla.DriverFluidHandler$Environment"
   ],
   "methods": {
    "getTankInfo": {
@@ -1108,7 +1108,7 @@
  },
  "fluid_tank": {
   "classes": [
-   "li.cil.oc.fabric.integration.vanilla.DriverFluidTank$Environment"
+   "li.cil.oc.neoforge.integration.vanilla.DriverFluidTank$Environment"
   ],
   "methods": {
    "getInfo": {
@@ -1122,7 +1122,7 @@
  },
  "furnace": {
   "classes": [
-   "li.cil.oc.fabric.integration.vanilla.DriverFurnace$Environment"
+   "li.cil.oc.neoforge.integration.vanilla.DriverFurnace$Environment"
   ],
   "methods": {
    "getBurnTime": {
@@ -1615,7 +1615,7 @@
  },
  "inventory": {
   "classes": [
-   "li.cil.oc.fabric.integration.vanilla.DriverInventory$Environment"
+   "li.cil.oc.neoforge.integration.vanilla.DriverInventory$Environment"
   ],
   "methods": {
    "compareStacks": {
@@ -1680,7 +1680,7 @@
   "classes": [
    "li.cil.oc.core.impl.server.component.UpgradeInventoryController$Adapter",
    "li.cil.oc.core.impl.server.component.UpgradeInventoryController$Drone",
-   "li.cil.oc.fabric.server.component.UpgradeInventoryController$Robot"
+   "li.cil.oc.neoforge.server.component.UpgradeInventoryController$Robot"
   ],
   "methods": {
    "areStacksEquivalent": {
@@ -2124,8 +2124,7 @@
  },
  "net_splitter": {
   "classes": [
-   "li.cil.oc.core.impl.common.blockentity.NetSplitter",
-   "li.cil.oc.fabric.common.blockentity.NetSplitterTile"
+   "li.cil.oc.core.impl.common.blockentity.NetSplitter"
   ],
   "methods": {
    "close": {
@@ -2519,7 +2518,7 @@
    "li.cil.oc.core.impl.common.blockentity.RobotProxy",
    "li.cil.oc.core.impl.server.component.Robot",
    "li.cil.oc.core.impl.server.component.RobotBase",
-   "li.cil.oc.fabric.common.blockentity.RobotProxy"
+   "li.cil.oc.neoforge.common.blockentity.RobotProxy"
   ],
   "methods": {
    "compare": {
@@ -2829,8 +2828,8 @@
  },
  "sign": {
   "classes": [
-   "li.cil.oc.fabric.server.component.UpgradeSignInAdapter",
-   "li.cil.oc.fabric.server.component.UpgradeSignInRotatable"
+   "li.cil.oc.neoforge.server.component.UpgradeSignInAdapter",
+   "li.cil.oc.neoforge.server.component.UpgradeSignInRotatable"
   ],
   "methods": {
    "getValue": {
@@ -2874,7 +2873,7 @@
   "classes": [
    "li.cil.oc.core.impl.server.component.UpgradeTankController$Adapter",
    "li.cil.oc.core.impl.server.component.UpgradeTankController$Drone",
-   "li.cil.oc.fabric.server.component.UpgradeTankController$Robot"
+   "li.cil.oc.neoforge.server.component.UpgradeTankController$Robot"
   ],
   "methods": {
    "drain": {
@@ -2968,7 +2967,7 @@
  "trading": {
   "classes": [
    "li.cil.oc.core.impl.server.component.UpgradeTradingBase",
-   "li.cil.oc.fabric.server.component.UpgradeTrading"
+   "li.cil.oc.neoforge.server.component.UpgradeTrading"
   ],
   "methods": {
    "getTrades": {
@@ -2983,9 +2982,9 @@
  "transposer": {
   "classes": [
    "li.cil.oc.core.impl.server.component.TransposerBase",
-   "li.cil.oc.fabric.server.component.Transposer$Block",
-   "li.cil.oc.fabric.server.component.Transposer$Common",
-   "li.cil.oc.fabric.server.component.Transposer$Upgrade"
+   "li.cil.oc.neoforge.server.component.Transposer$Block",
+   "li.cil.oc.neoforge.server.component.Transposer$Common",
+   "li.cil.oc.neoforge.server.component.Transposer$Upgrade"
   ],
   "methods": {
    "areStacksEquivalent": {

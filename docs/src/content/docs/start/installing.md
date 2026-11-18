@@ -5,12 +5,13 @@ sidebar:
   order: 1
 ---
 
-wackasm is a **Fabric** mod for **Minecraft 1.21.1**. It needs:
+wackasm is a **NeoForge** mod for **Minecraft 1.21.1**. It needs:
 
-- [Fabric Loader](https://fabricmc.net/) 0.20.1 or newer, and
-  [Fabric API](https://modrinth.com/mod/fabric-api);
+- [NeoForge](https://neoforged.net/) 21.1.249 or newer;
 - [OpenComputers: Modernized](https://www.curseforge.com/minecraft/mc-mods/opencomputers-modernized)
-  1.10.7 or newer (its Fabric build).
+  1.10.7 or newer (its NeoForge build).
+
+wackasm 0.2.x was a Fabric mod. From 0.3.0 it is NeoForge only.
 
 Download `wackasm-oc-<version>.jar` from the
 [GitHub releases](https://github.com/DecDuck/wackasm/releases) and put it in

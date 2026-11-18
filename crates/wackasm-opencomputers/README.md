@@ -125,15 +125,15 @@ The wrappers come from OpenComputers: Modernized itself:
 `tools/extract_callbacks.py` reads the `@Callback` annotations and component
 names out of the mod jar into `tools/callbacks.json`, and
 `tools/gen_components.py` turns that into `src/components.rs`. The current
-wrappers are from OpenComputers: Modernized 1.10.7 (Fabric).
+wrappers are from OpenComputers: Modernized 1.10.7 (NeoForge).
 
 ```powershell
-python tools/extract_callbacks.py <opencomputers-fabric-1.10.7.jar> tools/callbacks.json
+python tools/extract_callbacks.py <opencomputers-neoforge-1.10.7.jar> tools/callbacks.json
 python tools/gen_components.py tools/callbacks.json src/components.rs
 ```
 
 The jar is in Gradle's cache after building `mc-mod` (look for
-`opencomputers-fabric-*.jar` under `~/.gradle/caches/modules-2`). The
+`opencomputers-neoforge-*.jar` under `~/.gradle/caches/modules-2`). The
 extractor also reads OpenComputers 1.7.5 jars.
 
 ## Caveats

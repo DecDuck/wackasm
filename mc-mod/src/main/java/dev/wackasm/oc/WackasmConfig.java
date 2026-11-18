@@ -8,7 +8,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Properties;
 
-import net.fabricmc.loader.api.FabricLoader;
+import net.neoforged.fml.loading.FMLPaths;
 
 /**
  * {@code config/wackasm.properties}, written with its defaults and comments on
@@ -56,7 +56,7 @@ public final class WackasmConfig {
     private static final String FILE_NAME = "wackasm.properties";
 
     static Path path() {
-        return FabricLoader.getInstance().getConfigDir().resolve(FILE_NAME);
+        return FMLPaths.CONFIGDIR.get().resolve(FILE_NAME);
     }
 
     /** Reads the file, creating it with the defaults if it's missing. */

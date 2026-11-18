@@ -2449,7 +2449,7 @@ impl Eeprom {
 
 /// The `energy_device` component (4 methods).
 ///
-/// Provided by OpenComputers' `DriverEnergy$Environment`.
+/// Provided by OpenComputers' `DriverEnergyStorage$Environment`.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct EnergyDevice(pub Address);
 
@@ -5725,7 +5725,7 @@ impl Navigation {
 
 /// The `net_splitter` component (4 methods).
 ///
-/// Provided by OpenComputers' `NetSplitter, NetSplitterTile`.
+/// Provided by OpenComputers' `NetSplitter`.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct NetSplitter(pub Address);
 

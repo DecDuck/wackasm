@@ -1,0 +1,49 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "type": "java",
+      "request": "launch",
+      "name": "Client",
+      "presentation": {
+        "group": "Mod Development - wackasm-oc",
+        "order": 0
+      },
+      "projectName": "wackasm-oc",
+      "mainClass": "net.neoforged.devlaunch.Main",
+      "args": [
+        "@C:\\Users\\DecDuck\\Dev\\wackasm\\mc-mod\\build\\moddev\\clientRunProgramArgs.txt"
+      ],
+      "vmArgs": [
+        "@C:\\Users\\DecDuck\\Dev\\wackasm\\mc-mod\\build\\moddev\\clientRunVmArgs.txt",
+        "-Dfml.modFolders\u003dwackasm%%C:\\Users\\DecDuck\\Dev\\wackasm\\mc-mod\\bin\\main"
+      ],
+      "cwd": "${workspaceFolder}\\runs\\client",
+      "env": {},
+      "console": "internalConsole",
+      "shortenCommandLine": "none"
+    },
+    {
+      "type": "java",
+      "request": "launch",
+      "name": "Server",
+      "presentation": {
+        "group": "Mod Development - wackasm-oc",
+        "order": 1
+      },
+      "projectName": "wackasm-oc",
+      "mainClass": "net.neoforged.devlaunch.Main",
+      "args": [
+        "@C:\\Users\\DecDuck\\Dev\\wackasm\\mc-mod\\build\\moddev\\serverRunProgramArgs.txt"
+      ],
+      "vmArgs": [
+        "@C:\\Users\\DecDuck\\Dev\\wackasm\\mc-mod\\build\\moddev\\serverRunVmArgs.txt",
+        "-Dfml.modFolders\u003dwackasm%%C:\\Users\\DecDuck\\Dev\\wackasm\\mc-mod\\bin\\main"
+      ],
+      "cwd": "${workspaceFolder}\\runs\\server",
+      "env": {},
+      "console": "internalConsole",
+      "shortenCommandLine": "none"
+    }
+  ]
+}

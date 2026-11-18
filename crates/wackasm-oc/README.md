@@ -2,7 +2,7 @@
 
 An [OpenComputers](https://github.com/MightyPirates/OpenComputers) architecture
 that runs WebAssembly guests on wackasm. The crate builds a `cdylib`
-(`wackasm_oc.dll` / `libwackasm_oc.so`) that the Fabric mod in [`mc-mod/`](../../mc-mod)
+(`wackasm_oc.dll` / `libwackasm_oc.so`) that the NeoForge mod in [`mc-mod/`](../../mc-mod)
 loads. The EEPROM BIOS is [`wackasm-oc-bios`](../wackasm-oc-bios) and the
 example shell is [`wackasm-oc-guest`](../wackasm-oc-guest).
 

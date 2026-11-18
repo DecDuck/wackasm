@@ -47,6 +47,8 @@ PACKAGES = (
     "li/cil/oc/neoforge/integration/opencomputers/",
     "li/cil/oc/neoforge/integration/minecraft/",
     "li/cil/oc/neoforge/integration/vanilla/",
+    # NeoForge capabilities: energy_device (DriverEnergyStorage).
+    "li/cil/oc/neoforge/integration/neoforge/",
 )
 
 # OpenComputers: Modernized's robot block entity proxy returns the robot's own

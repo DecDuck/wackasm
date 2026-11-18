@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.3.0
+
+### Mod
+
+- Moved from Fabric to **NeoForge** (Minecraft 1.21.1). Requires NeoForge
+  21.1.249 or newer and the NeoForge build of OpenComputers: Modernized
+  1.10.7 or newer. Fabric API is no longer needed. The config file
+  (`config/wackasm.properties`), items and recipes are unchanged.
+
+### `wackasm-opencomputers` crate
+
+- No API changes. The component bindings' source is now the NeoForge build of
+  OpenComputers: Modernized, which provides the same components.
+
 ## 0.2.0
 
 ### Mod
