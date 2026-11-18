@@ -89,11 +89,16 @@ jobs:
         run: cargo patch-crate --force
       - name: Rust tests
         run: cargo test -p wackasm-oc -p wackasm-opencomputers -p wackasm-wasi
-      # Java 21 runs Gradle (Loom) and builds for Minecraft 1.21.1.
+      # Fabric Loom needs Java 25 to run Gradle; the mod itself is compiled
+      # with a Java 21 toolchain for Minecraft 1.21.1. The last version listed
+      # becomes JAVA_HOME; the 21 install is handed to Gradle's toolchain
+      # lookup below.
       - uses: actions/setup-java@v6
         with:
           distribution: temurin
-          java-version: 21
+          java-version: |
+            21
+            25
       - uses: gradle/actions/setup-gradle@v6
       - uses: actions/download-artifact@v8
         with:
@@ -116,7 +121,7 @@ jobs:
             args+=("-Pmod_version=${GITHUB_REF_NAME#v}")
           fi
           chmod +x gradlew
-          ./gradlew build "${args[@]}"
+          ./gradlew build -Porg.gradle.java.installations.fromEnv=JAVA_HOME_21_X64 "${args[@]}"
       - name: Check the jar has every platform
         run: |
           jar=$(ls mc-mod/build/libs/wackasm-oc-*.jar | grep -v -- '-sources\.jar$')

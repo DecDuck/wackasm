@@ -13,7 +13,9 @@ sidebar:
 - [`patch-crate`](https://crates.io/crates/patch-crate), which provides
   `cargo patch-crate` (`cargo install patch-crate`). The interpreter builds against a
   patched `wasmparser` (`patches/`), applied with `cargo patch-crate`;
-- JDK 21 or newer, to run Gradle (Fabric Loom) and build for Minecraft 1.21.1;
+- JDK 25 or newer, to run Gradle (Fabric Loom needs it). The mod is compiled
+  with Java 21 for Minecraft 1.21.1; Gradle downloads that toolchain if it
+  isn't installed;
 - Node.js 22 or newer, for these docs.
 
 ## Layout

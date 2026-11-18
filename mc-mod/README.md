@@ -25,8 +25,9 @@ Requirements:
   (`rustup target add wasm32-unknown-unknown wasm32-wasip1`)
 * [`patch-crate`](https://crates.io/crates/patch-crate) (`cargo install
   patch-crate`), then `cargo patch-crate` once at the repository root
-* JDK 21 or newer to run Gradle (Fabric Loom); Minecraft 1.21.1 builds with
-  Java 21
+* JDK 25 or newer to run Gradle (Fabric Loom needs it); the mod is compiled
+  with a Java 21 toolchain for Minecraft 1.21.1, which Gradle downloads if
+  it isn't installed
 
 ```powershell
 cd mc-mod
