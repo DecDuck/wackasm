@@ -26,7 +26,35 @@ PACKAGES = (
     "li/cil/oc/integration/vanilla/",
     "li/cil/oc/server/fs/",
     "li/cil/oc/common/component/",
+    # OpenComputers: Modernized (1.21.1): the shared core, and its Fabric and
+    # NeoForge layers.
+    "li/cil/oc/core/impl/server/component/",
+    "li/cil/oc/core/impl/server/machine/",
+    "li/cil/oc/core/impl/server/fs/",
+    "li/cil/oc/core/impl/common/blockentity/",
+    "li/cil/oc/core/impl/common/item/",
+    "li/cil/oc/core/impl/common/component/",
+    "li/cil/oc/core/impl/integration/opencomputers/",
+    "li/cil/oc/core/impl/integration/minecraft/",
+    "li/cil/oc/core/impl/integration/vanilla/",
+    "li/cil/oc/fabric/server/component/",
+    "li/cil/oc/fabric/common/",
+    "li/cil/oc/fabric/integration/opencomputers/",
+    "li/cil/oc/fabric/integration/minecraft/",
+    "li/cil/oc/fabric/integration/vanilla/",
+    "li/cil/oc/neoforge/server/component/",
+    "li/cil/oc/neoforge/common/",
+    "li/cil/oc/neoforge/integration/opencomputers/",
+    "li/cil/oc/neoforge/integration/minecraft/",
+    "li/cil/oc/neoforge/integration/vanilla/",
 )
+
+# OpenComputers: Modernized's robot block entity proxy returns the robot's own
+# node from node(), so its callbacks (start, stop, isRunning, getName,
+# setName) are the robot component's.
+SHARED_NODES = {
+    "li/cil/oc/core/impl/common/blockentity/RobotProxy": "robot",
+}
 
 # Bytes following each opcode, for walking bytecode. -1: variable length.
 OPERAND_BYTES = {
@@ -192,9 +220,11 @@ class ClassFile:
                 index = struct.unpack(">H", code[pc + 1:pc + 3])[0]
                 if self.ref_name(index) == "withComponent" and last_string:
                     self.component_names.add(last_string)
-                # The Adapter's vanilla blocks: super(tileEntity, "furnace").
+                # The Adapter's vanilla blocks: super(tileEntity, "furnace")
+                # (a "block entity" in OpenComputers: Modernized).
                 elif (op == 0xb7 and self.ref_name(index) == "<init>" and last_string
-                      and (self.ref_owner(index) or "").endswith("/ManagedTileEntityEnvironment")):
+                      and (self.ref_owner(index) or "").endswith(
+                          ("/ManagedTileEntityEnvironment", "/ManagedBlockEntityEnvironment"))):
                     self.component_names.add(last_string)
             if size == -1:
                 if op == 0xc4:  # wide
@@ -237,6 +267,12 @@ def main(jar_path, out_path):
     for name, cls in list(classes.items()):
         if name.endswith("$class") and cls.component_names and name[:-6] in classes:
             classes[name[:-6]].component_names |= cls.component_names
+
+    # Classes whose callbacks are another component's because they share its
+    # node, without naming it themselves.
+    for name, component in SHARED_NODES.items():
+        if name in classes:
+            classes[name].component_names.add(component)
 
     # Names flow down: tier subclasses (DataCard$Tier1, Redstone$Vanilla...)
     # take their name from the base class or trait that builds the node.

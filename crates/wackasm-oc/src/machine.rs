@@ -1216,7 +1216,10 @@ fn handle_import(
                     Ok(next) => ImportAction::Replace(next),
                     // The caller keeps running and can report the failure itself.
                     Err(e) => {
-                        process.response = format!("{e:#}").into_bytes();
+                        let message = format!("{e:#}");
+                        // Logged too: the BIOS can only show one disk's failure.
+                        let _ = work_dir.append_log(key, &format!("exec of a {}-byte image failed: {message}", image.len()));
+                        process.response = message.into_bytes();
                         ImportAction::Return(vec![Value::from_i32(STATUS_ERROR)])
                     }
                 }

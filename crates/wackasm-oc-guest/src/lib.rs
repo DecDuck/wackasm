@@ -136,7 +136,8 @@ impl Terminal {
             }
             // key_down(keyboard, char, code, player)
             match signal.args.get(1).and_then(oc::number).unwrap_or(0.0) as u32 {
-                13 => {
+                // Enter: OpenComputers 1.7.5 sends CR (13), OpenComputers: Modernized LF (10).
+                13 | 10 => {
                     self.set(start, self.row, &format!("{shown} "));
                     self.newline();
                     return Some(line);

@@ -1,0 +1,126 @@
+// The native side of the mod. Applied from build.gradle.
+//
+// ---------------------------------------------------------------------------
+// Native side, all built with cargo and packaged into the jar:
+//   natives/<os>-<arch>/   wackasm_oc, the JNI library
+//   assets/wackasm/bios.wasm               the EEPROM (WebAssembly BIOS) code
+//   assets/wackasm/loot/shell/init.wasm    the "wackasm shell" loot floppy
+//   assets/wackasm/loot/shell/bin/*.wasm   example WASI programs on it
+// ---------------------------------------------------------------------------
+
+def repoRoot = projectDir.parentFile
+def guestDir = new File(repoRoot, 'crates/wackasm-oc-guest')
+def biosDir = new File(repoRoot, 'crates/wackasm-oc-bios')
+def programsDir = new File(repoRoot, 'crates/wackasm-oc-programs')
+def wasmOut = 'target/wasm32-unknown-unknown/release'
+// OpenComputers' default eepromSize.
+def eepromSize = 4096
+def skipCargo = providers.gradleProperty('skip_cargo').map { it.toBoolean() }.getOrElse(false)
+
+static String hostPlatform() {
+    def os = System.getProperty('os.name').toLowerCase(Locale.ROOT)
+    def arch = System.getProperty('os.arch').toLowerCase(Locale.ROOT)
+    def osName = os.contains('win') ? 'windows' : os.contains('mac') ? 'macos' : 'linux'
+    def archName = arch in ['amd64', 'x86_64'] ? 'x86_64' : arch in ['aarch64', 'arm64'] ? 'aarch64' : arch
+    return "${osName}-${archName}"
+}
+
+// A library for this platform in natives-extra/ (as CI provides, built on
+// its own runner) is used instead of building one here.
+def hostNativeProvided = new File(projectDir, "natives-extra/${hostPlatform()}").isDirectory()
+
+def cargoNative = tasks.register('cargoNative', Exec) {
+    group = 'wackasm'
+    description = 'Builds the wackasm_oc JNI library (cargo build --release)'
+    enabled = !skipCargo && !hostNativeProvided
+    workingDir = repoRoot
+    commandLine 'cargo', 'build', '-p', 'wackasm-oc', '--release'
+    // cargo does its own up-to-date checking.
+    outputs.upToDateWhen { false }
+}
+
+def cargoBios = tasks.register('cargoBios', Exec) {
+    group = 'wackasm'
+    description = 'Builds the WebAssembly BIOS for wasm32-unknown-unknown'
+    enabled = !skipCargo
+    workingDir = biosDir
+    commandLine 'cargo', 'build', '--release', '--target', 'wasm32-unknown-unknown'
+    outputs.upToDateWhen { false }
+}
+
+def cargoGuest = tasks.register('cargoGuest', Exec) {
+    group = 'wackasm'
+    description = 'Builds init.wasm for the shell floppy (wasm32-unknown-unknown)'
+    enabled = !skipCargo
+    workingDir = guestDir
+    commandLine 'cargo', 'build', '--release', '--target', 'wasm32-unknown-unknown'
+    outputs.upToDateWhen { false }
+}
+
+def cargoPrograms = tasks.register('cargoPrograms', Exec) {
+    group = 'wackasm'
+    description = 'Builds the example WASI programs for the shell floppy (wasm32-wasip1)'
+    enabled = !skipCargo
+    workingDir = programsDir
+    commandLine 'cargo', 'build', '--release', '--target', 'wasm32-wasip1'
+    outputs.upToDateWhen { false }
+}
+
+def stageNatives = tasks.register('stageNatives', Sync) {
+    group = 'wackasm'
+    description = 'Collects the native library, BIOS and shell into a resource directory'
+    dependsOn cargoNative, cargoBios, cargoGuest, cargoPrograms
+    into layout.buildDirectory.dir('generated/wackasm-resources')
+    if (!hostNativeProvided) {
+        from(new File(repoRoot, 'target/release')) {
+            include 'wackasm_oc.dll', 'libwackasm_oc.so', 'libwackasm_oc.dylib'
+            into "natives/${hostPlatform()}"
+        }
+    }
+    // Libraries cross-built for other platforms can be dropped in
+    // natives-extra/<os>-<arch>/ to ship a multi-platform jar.
+    from(file('natives-extra')) { into 'natives' }
+    from(new File(biosDir, "${wasmOut}/wackasm_oc_bios.wasm")) {
+        rename { 'bios.wasm' }
+        into 'assets/wackasm'
+    }
+    // A copy on the floppy, so `flash /bios.wasm` can restore the stock BIOS.
+    from(new File(biosDir, "${wasmOut}/wackasm_oc_bios.wasm")) {
+        rename { 'bios.wasm' }
+        into 'assets/wackasm/loot/shell'
+    }
+    from(new File(guestDir, "${wasmOut}/wackasm_oc_guest.wasm")) {
+        rename { 'init.wasm' }
+        into 'assets/wackasm/loot/shell'
+    }
+    from(new File(programsDir, 'target/wasm32-wasip1/release')) {
+        include '*.wasm'
+        into 'assets/wackasm/loot/shell/bin'
+    }
+    doLast {
+        def lib = fileTree(destinationDir) { include 'natives/**' }.files
+        if (lib.isEmpty()) throw new GradleException("No wackasm_oc library found in ${repoRoot}/target/release or natives-extra/")
+        def bios = new File(destinationDir, 'assets/wackasm/bios.wasm')
+        if (!bios.isFile()) throw new GradleException("BIOS was not built: ${bios}")
+        if (bios.length() > eepromSize) {
+            throw new GradleException("bios.wasm is ${bios.length()} bytes; an EEPROM holds ${eepromSize}")
+        }
+        def shell = new File(destinationDir, 'assets/wackasm/loot/shell')
+        if (!new File(shell, 'init.wasm').isFile()) {
+            throw new GradleException('Shell init.wasm was not built')
+        }
+        // The floppy's table of contents, for FloppyFileSystem: one
+        // "path<TAB>size<TAB>modified-ms" line per file. Reading files through
+        // the class loader works the same from a jar and in dev runs, where
+        // classes and resources are in different directories.
+        def lines = []
+        shell.eachFileRecurse(groovy.io.FileType.FILES) { f ->
+            def path = shell.toPath().relativize(f.toPath()).toString().replace('\\', '/')
+            lines << "${path}\t${f.length()}\t${f.lastModified()}"
+        }
+        new File(destinationDir, 'assets/wackasm/loot/shell.index').text = lines.sort().join('\n') + '\n'
+    }
+}
+
+sourceSets.main.resources.srcDir(stageNatives)
+

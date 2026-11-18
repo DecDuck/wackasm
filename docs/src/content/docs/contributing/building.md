@@ -13,8 +13,7 @@ sidebar:
 - [`patch-crate`](https://crates.io/crates/patch-crate), which provides
   `cargo patch-crate` (`cargo install patch-crate`). The interpreter builds against a
   patched `wasmparser` (`patches/`), applied with `cargo patch-crate`;
-- JDK 25 or newer, to run Gradle (RetroFuturaGradle 2.x needs it). Gradle downloads the Java 8 toolchain
-  Minecraft needs;
+- JDK 21 or newer, to run Gradle (Fabric Loom) and build for Minecraft 1.21.1;
 - Node.js 22 or newer, for these docs.
 
 ## Layout
@@ -27,7 +26,7 @@ crates/wackasm-opencomputers/   the guest library (published on crates.io)
 crates/wackasm-oc-bios/         the 4 KiB EEPROM BIOS (wasm32-unknown-unknown)
 crates/wackasm-oc-guest/        the shell, the floppy's /init.wasm
 crates/wackasm-oc-programs/     the floppy's /bin programs (wasm32-wasip1)
-mc-mod/                         the Forge mod (Java)
+mc-mod/                         the Fabric mod for Minecraft 1.21.1 (OpenComputers: Modernized)
 docs/                           this site (Starlight)
 ```
 
@@ -40,14 +39,19 @@ workspaces.
 cargo patch-crate
 cd mc-mod
 ./gradlew build        # build/libs/wackasm-oc-<version>.jar
-./gradlew runClient    # a development client with OpenComputers
+./gradlew runClient    # a development client with OpenComputers: Modernized (runs/client)
 ```
 
 `build` runs cargo for the native library, the BIOS, the shell and the
-programs, then packages them: the library under `natives/<os>-<arch>/`, the
-BIOS as `assets/wackasm/bios.wasm`, and the floppy under
-`assets/wackasm/loot/shell/`. It fails if the BIOS outgrows a 4096-byte
-EEPROM. `-Pskip_cargo=true` packages what is already built.
+programs (`natives.gradle`), then packages them: the library under
+`natives/<os>-<arch>/`, the BIOS as `assets/wackasm/bios.wasm`, and the
+floppy under `assets/wackasm/loot/shell/`. It fails if the BIOS outgrows a
+4096-byte EEPROM. `-Pskip_cargo=true` packages what is already built.
+
+Recipes are data in 1.21, and the BIOS's bytes are part of the EEPROM
+recipe's result, so `generateRecipes` writes both recipes from the built
+BIOS. They must make the same items as the `Items.registerEEPROM` and
+`Items.registerFloppy` calls in `WackasmMod`.
 
 The jar contains the native library for the platform it was built on. For a
 multi-platform jar, put other platforms' builds in
@@ -58,7 +62,7 @@ multi-platform jar, put other platforms' builds in
 
 ```sh
 cargo test --workspace         # interpreter, spec tests, machine and ABI tests
-cd mc-mod && ./gradlew test    # Java codec and call-budget tests
+cd mc-mod && ./gradlew test    # Java codec, call-budget, memory and config tests
 ```
 
 ## Without Minecraft

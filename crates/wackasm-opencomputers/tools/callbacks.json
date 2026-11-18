@@ -1,7 +1,7 @@
 {
  "assembler": {
   "classes": [
-   "li.cil.oc.common.tileentity.Assembler"
+   "li.cil.oc.core.impl.common.blockentity.Assembler"
   ],
   "methods": {
    "start": {
@@ -22,13 +22,13 @@
  },
  "barcode_reader": {
   "classes": [
-   "li.cil.oc.server.component.UpgradeBarcodeReader"
+   "li.cil.oc.core.impl.server.component.UpgradeBarcodeReader"
   ],
   "methods": {}
  },
  "beacon": {
   "classes": [
-   "li.cil.oc.integration.minecraft.DriverBeacon$Environment"
+   "li.cil.oc.fabric.integration.vanilla.DriverBeacon$Environment"
   ],
   "methods": {
    "getLevels": {
@@ -56,7 +56,7 @@
  },
  "brewing_stand": {
   "classes": [
-   "li.cil.oc.integration.minecraft.DriverBrewingStand$Environment"
+   "li.cil.oc.fabric.integration.vanilla.DriverBrewingStand$Environment"
   ],
   "methods": {
    "getBrewTime": {
@@ -70,7 +70,8 @@
  },
  "chunkloader": {
   "classes": [
-   "li.cil.oc.server.component.UpgradeChunkloader"
+   "li.cil.oc.core.impl.server.component.UpgradeChunkloaderBase",
+   "li.cil.oc.fabric.server.component.UpgradeChunkloader"
   ],
   "methods": {
    "isActive": {
@@ -91,7 +92,7 @@
  },
  "command_block": {
   "classes": [
-   "li.cil.oc.integration.minecraft.DriverCommandBlock$Environment"
+   "li.cil.oc.core.impl.integration.vanilla.DriverCommandBlock$Environment"
   ],
   "methods": {
    "executeCommand": {
@@ -119,7 +120,7 @@
  },
  "comparator": {
   "classes": [
-   "li.cil.oc.integration.minecraft.DriverComparator$Environment"
+   "li.cil.oc.core.impl.integration.vanilla.DriverComparator$Environment"
   ],
   "methods": {
    "getOutputSignal": {
@@ -133,7 +134,7 @@
  },
  "computer": {
   "classes": [
-   "li.cil.oc.server.machine.Machine"
+   "li.cil.oc.core.impl.server.machine.MachineBase"
   ],
   "methods": {
    "beep": {
@@ -144,7 +145,7 @@
     "setter": false
    },
    "getDeviceInfo": {
-    "direct": true,
+    "direct": false,
     "doc": "function():table -- Collect information on all connected devices.",
     "getter": false,
     "limit": 2147483647,
@@ -182,7 +183,8 @@
  },
  "crafting": {
   "classes": [
-   "li.cil.oc.server.component.UpgradeCrafting"
+   "li.cil.oc.core.impl.server.component.UpgradeCraftingBase",
+   "li.cil.oc.fabric.server.component.UpgradeCrafting"
   ],
   "methods": {
    "craft": {
@@ -196,10 +198,10 @@
  },
  "data": {
   "classes": [
-   "li.cil.oc.server.component.DataCard",
-   "li.cil.oc.server.component.DataCard$Tier1",
-   "li.cil.oc.server.component.DataCard$Tier2",
-   "li.cil.oc.server.component.DataCard$Tier3"
+   "li.cil.oc.core.impl.server.component.DataCard",
+   "li.cil.oc.core.impl.server.component.DataCard$Tier1",
+   "li.cil.oc.core.impl.server.component.DataCard$Tier2",
+   "li.cil.oc.core.impl.server.component.DataCard$Tier3"
   ],
   "methods": {
    "crc32": {
@@ -212,6 +214,13 @@
    "decode64": {
     "direct": true,
     "doc": "function(data:string):string -- Applies base64 decoding to the data.",
+    "getter": false,
+    "limit": 32,
+    "setter": false
+   },
+   "decodeNBT": {
+    "direct": true,
+    "doc": "function(data:string):table -- Decode gzipped binary NBT data.",
     "getter": false,
     "limit": 32,
     "setter": false
@@ -260,7 +269,7 @@
    },
    "encrypt": {
     "direct": true,
-    "doc": "function(data:string, key: string, iv:string):string -- Encrypt data with AES. Result is binary data.",
+    "doc": "function(data:string, key:string, iv:string):string -- Encrypt data with AES. Result is binary data.",
     "getter": false,
     "limit": 8,
     "setter": false
@@ -311,7 +320,7 @@
  },
  "database": {
   "classes": [
-   "li.cil.oc.server.component.UpgradeDatabase"
+   "li.cil.oc.core.impl.server.component.UpgradeDatabase"
   ],
   "methods": {
    "clear": {
@@ -355,12 +364,20 @@
     "getter": false,
     "limit": 2147483647,
     "setter": false
+   },
+   "set": {
+    "direct": false,
+    "doc": "function(slot:number, id:string, damage:number, nbt:string):boolean -- Sets an item into the specified database slot. The NBT tag is expected in string (SNBT) format.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
    }
   }
  },
  "debug": {
   "classes": [
-   "li.cil.oc.server.component.DebugCard"
+   "li.cil.oc.core.impl.server.component.DebugCardBase",
+   "li.cil.oc.fabric.server.component.DebugCard"
   ],
   "methods": {
    "changeBuffer": {
@@ -400,14 +417,7 @@
    },
    "getWorld": {
     "direct": false,
-    "doc": "function([id:number]):userdata -- Get the world object for the specified dimension ID, or the container's.",
-    "getter": false,
-    "limit": 2147483647,
-    "setter": false
-   },
-   "getWorlds": {
-    "direct": false,
-    "doc": "function():table -- Get a list of all world IDs, loaded and unloaded.",
+    "doc": "function():userdata -- Get the world object of the container.",
     "getter": false,
     "limit": 2147483647,
     "setter": false
@@ -449,7 +459,7 @@
    },
    "scanContentsAt": {
     "direct": false,
-    "doc": "function(x: number, y: number, z: number[, worldId: number]):boolean, string, table -- returns contents at the location in world by id (default host world)",
+    "doc": "function(x: number, y: number, z: number):boolean, string, table -- returns contents at the location in the host world",
     "getter": false,
     "limit": 2147483647,
     "setter": false
@@ -479,8 +489,9 @@
  },
  "disk_drive": {
   "classes": [
-   "li.cil.oc.common.tileentity.DiskDrive",
-   "li.cil.oc.server.component.DiskDriveMountable"
+   "li.cil.oc.core.impl.common.blockentity.DiskDrive",
+   "li.cil.oc.core.impl.server.component.DiskDriveMountableBase",
+   "li.cil.oc.fabric.server.component.DiskDriveMountable"
   ],
   "methods": {
    "eject": {
@@ -508,7 +519,7 @@
  },
  "drive": {
   "classes": [
-   "li.cil.oc.server.component.Drive"
+   "li.cil.oc.core.impl.server.component.Drive"
   ],
   "methods": {
    "getCapacity": {
@@ -578,7 +589,8 @@
  },
  "drone": {
   "classes": [
-   "li.cil.oc.server.component.Drone"
+   "li.cil.oc.core.impl.server.component.DroneBase",
+   "li.cil.oc.fabric.server.component.Drone"
   ],
   "methods": {
    "compare": {
@@ -625,7 +637,7 @@
    },
    "drain": {
     "direct": false,
-    "doc": "function(side:boolean[, amount:number=1000]):boolean, number or string -- Drains the specified amount of fluid from the specified side. Returns the amount drained, or an error message.",
+    "doc": "function(side:number[, amount:number=1000]):boolean, number or string -- Drains the specified amount of fluid from the specified side. Returns the amount drained, or an error message.",
     "getter": false,
     "limit": 2147483647,
     "setter": false
@@ -639,7 +651,7 @@
    },
    "fill": {
     "direct": false,
-    "doc": "function(side:number[, amount:number=1000]):boolean, number of string -- Eject the specified amount of fluid to the specified side. Returns the amount ejected or an error message.",
+    "doc": "function(side:number[, amount:number=1000]):boolean, number or string -- Eject the specified amount of fluid to the specified side. Returns the amount ejected or an error message.",
     "getter": false,
     "limit": 2147483647,
     "setter": false
@@ -730,7 +742,7 @@
    },
    "setAcceleration": {
     "direct": false,
-    "doc": "function(value:number):number -- Try to set the acceleration to the specified value and return the new acceleration.",
+    "doc": "function(value:number):number -- Try to set the acceleration.",
     "getter": false,
     "limit": 2147483647,
     "setter": false
@@ -816,7 +828,7 @@
  },
  "eeprom": {
   "classes": [
-   "li.cil.oc.server.component.EEPROM"
+   "li.cil.oc.core.impl.server.component.EEPROM"
   ],
   "methods": {
    "get": {
@@ -891,9 +903,44 @@
    }
   }
  },
+ "energy_device": {
+  "classes": [
+   "li.cil.oc.fabric.integration.vanilla.DriverEnergy$Environment"
+  ],
+  "methods": {
+   "canExtract": {
+    "direct": false,
+    "doc": "function():boolean -- Returns whether this component can have energy extracted from the connected side.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "canReceive": {
+    "direct": false,
+    "doc": "function():boolean -- Returns whether this component can receive energy on the connected side.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "getEnergyStored": {
+    "direct": false,
+    "doc": "function():number -- Returns the amount of stored energy on the connected side.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "getMaxEnergyStored": {
+    "direct": false,
+    "doc": "function():number -- Returns the maximum amount of stored energy on the connected side.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   }
+  }
+ },
  "experience": {
   "classes": [
-   "li.cil.oc.server.component.UpgradeExperience"
+   "li.cil.oc.core.impl.server.component.UpgradeExperience"
   ],
   "methods": {
    "consume": {
@@ -914,7 +961,7 @@
  },
  "filesystem": {
   "classes": [
-   "li.cil.oc.server.component.FileSystem"
+   "li.cil.oc.core.impl.server.component.FileSystem"
   ],
   "methods": {
    "close": {
@@ -1047,7 +1094,7 @@
  },
  "fluid_handler": {
   "classes": [
-   "li.cil.oc.integration.minecraft.DriverFluidHandler$Environment"
+   "li.cil.oc.fabric.integration.vanilla.DriverFluidHandler$Environment"
   ],
   "methods": {
    "getTankInfo": {
@@ -1061,7 +1108,7 @@
  },
  "fluid_tank": {
   "classes": [
-   "li.cil.oc.integration.minecraft.DriverFluidTank$Environment"
+   "li.cil.oc.fabric.integration.vanilla.DriverFluidTank$Environment"
   ],
   "methods": {
    "getInfo": {
@@ -1075,7 +1122,7 @@
  },
  "furnace": {
   "classes": [
-   "li.cil.oc.integration.minecraft.DriverFurnace$Environment"
+   "li.cil.oc.fabric.integration.vanilla.DriverFurnace$Environment"
   ],
   "methods": {
    "getBurnTime": {
@@ -1117,7 +1164,7 @@
  },
  "generator": {
   "classes": [
-   "li.cil.oc.server.component.UpgradeGenerator"
+   "li.cil.oc.core.impl.server.component.UpgradeGenerator"
   ],
   "methods": {
    "count": {
@@ -1145,7 +1192,8 @@
  },
  "geolyzer": {
   "classes": [
-   "li.cil.oc.server.component.Geolyzer"
+   "li.cil.oc.core.impl.server.component.Geolyzer",
+   "li.cil.oc.core.impl.server.component.GeolyzerBase"
   ],
   "methods": {
    "analyze": {
@@ -1194,8 +1242,9 @@
  },
  "gpu": {
   "classes": [
-   "li.cil.oc.server.component.APU",
-   "li.cil.oc.server.component.GraphicsCard"
+   "li.cil.oc.core.impl.server.component.APU",
+   "li.cil.oc.core.impl.server.component.GraphicsCard",
+   "li.cil.oc.core.impl.server.component.GraphicsCardBase"
   ],
   "methods": {
    "allocateBuffer": {
@@ -1291,7 +1340,7 @@
    },
    "getDepth": {
     "direct": true,
-    "doc": "function():number -- Returns the currently set color depth.",
+    "doc": "function():number -- Returns the currently set color depth in bits.",
     "getter": false,
     "limit": 2147483647,
     "setter": false
@@ -1333,7 +1382,7 @@
    },
    "maxDepth": {
     "direct": true,
-    "doc": "function():number -- Get the maximum supported color depth.",
+    "doc": "function():number -- Gets the maximum supported color depth in bits.",
     "getter": false,
     "limit": 2147483647,
     "setter": false
@@ -1412,7 +1461,7 @@
  },
  "hologram": {
   "classes": [
-   "li.cil.oc.common.tileentity.Hologram"
+   "li.cil.oc.core.impl.common.blockentity.Hologram"
   ],
   "methods": {
    "clear": {
@@ -1531,7 +1580,7 @@
  },
  "internet": {
   "classes": [
-   "li.cil.oc.server.component.InternetCard"
+   "li.cil.oc.core.impl.server.component.InternetCard"
   ],
   "methods": {
    "connect": {
@@ -1566,7 +1615,7 @@
  },
  "inventory": {
   "classes": [
-   "li.cil.oc.integration.minecraft.DriverInventory$Environment"
+   "li.cil.oc.fabric.integration.vanilla.DriverInventory$Environment"
   ],
   "methods": {
    "compareStacks": {
@@ -1629,14 +1678,14 @@
  },
  "inventory_controller": {
   "classes": [
-   "li.cil.oc.server.component.UpgradeInventoryController$Adapter",
-   "li.cil.oc.server.component.UpgradeInventoryController$Drone",
-   "li.cil.oc.server.component.UpgradeInventoryController$Robot"
+   "li.cil.oc.core.impl.server.component.UpgradeInventoryController$Adapter",
+   "li.cil.oc.core.impl.server.component.UpgradeInventoryController$Drone",
+   "li.cil.oc.fabric.server.component.UpgradeInventoryController$Robot"
   ],
   "methods": {
    "areStacksEquivalent": {
     "direct": false,
-    "doc": "function(side:number, slotA:number, slotB:number):boolean -- Get whether the items in the two specified slots of the inventory on the specified side of the device are equivalent (have shared OreDictionary IDs).",
+    "doc": "function(side:number, slotA:number, slotB:number):boolean -- Get whether the items in the two specified slots of the inventory on the specified side of the device are equivalent (have shared item tags).",
     "getter": false,
     "limit": 2147483647,
     "setter": false
@@ -1692,7 +1741,7 @@
    },
    "getInventoryName": {
     "direct": false,
-    "doc": "function(side:number):string -- Get the the name of the inventory on the specified side of the device.",
+    "doc": "function(side:number):string -- Get the name of the inventory on the specified side of the device.",
     "getter": false,
     "limit": 2147483647,
     "setter": false
@@ -1739,9 +1788,37 @@
     "limit": 2147483647,
     "setter": false
    },
+   "getUpgradeContainerTier": {
+    "direct": false,
+    "doc": "function(slot:number):number -- get upgrade container tier at the given slot.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "getUpgradeContainerType": {
+    "direct": false,
+    "doc": "function(slot:number):string -- get upgrade container type at the given slot.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "installUpgrade": {
+    "direct": false,
+    "doc": "function([slot:number]):boolean -- Swaps the installed upgrade in the slot (1 by default) with the content of the currently selected inventory slot.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
    "isEquivalentTo": {
     "direct": false,
     "doc": "function(otherSlot:number):boolean -- Get whether the stack in the selected slot is equivalent to the item in the specified slot (have shared OreDictionary IDs).",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "setStackDisplayName": {
+    "direct": false,
+    "doc": "function(side:number, slot:number, label:string):boolean -- Change the display name of the stack.",
     "getter": false,
     "limit": 2147483647,
     "setter": false
@@ -1778,7 +1855,7 @@
  },
  "jukebox": {
   "classes": [
-   "li.cil.oc.integration.minecraft.DriverRecordPlayer$Environment"
+   "li.cil.oc.core.impl.integration.vanilla.DriverRecordPlayer$Environment"
   ],
   "methods": {
    "getRecord": {
@@ -1806,13 +1883,13 @@
  },
  "keyboard": {
   "classes": [
-   "li.cil.oc.server.component.Keyboard"
+   "li.cil.oc.core.impl.server.component.Keyboard"
   ],
   "methods": {}
  },
  "leash": {
   "classes": [
-   "li.cil.oc.server.component.UpgradeLeash"
+   "li.cil.oc.core.impl.server.component.UpgradeLeash"
   ],
   "methods": {
    "leash": {
@@ -1833,8 +1910,7 @@
  },
  "microcontroller": {
   "classes": [
-   "li.cil.oc.common.tileentity.Microcontroller",
-   "li.cil.oc.common.tileentity.Microcontroller$$anonfun$2"
+   "li.cil.oc.core.impl.common.blockentity.Microcontroller"
   ],
   "methods": {
    "isRunning": {
@@ -1883,7 +1959,7 @@
  },
  "mob_spawner": {
   "classes": [
-   "li.cil.oc.integration.minecraft.DriverMobSpawner$Environment"
+   "li.cil.oc.core.impl.integration.vanilla.DriverMobSpawner$Environment"
   ],
   "methods": {
    "getSpawningMobName": {
@@ -1897,10 +1973,10 @@
  },
  "modem": {
   "classes": [
-   "li.cil.oc.server.component.NetworkCard",
-   "li.cil.oc.server.component.WirelessNetworkCard",
-   "li.cil.oc.server.component.WirelessNetworkCard$Tier1",
-   "li.cil.oc.server.component.WirelessNetworkCard$Tier2"
+   "li.cil.oc.core.impl.server.component.NetworkCard",
+   "li.cil.oc.core.impl.server.component.WirelessNetworkCard",
+   "li.cil.oc.core.impl.server.component.WirelessNetworkCard$Tier1",
+   "li.cil.oc.core.impl.server.component.WirelessNetworkCard$Tier2"
   ],
   "methods": {
    "broadcast": {
@@ -1952,6 +2028,13 @@
     "limit": 2147483647,
     "setter": false
    },
+   "maxPacketSize": {
+    "direct": true,
+    "doc": "function():number -- Gets the maximum packet size (config setting).",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
    "open": {
     "direct": false,
     "doc": "function(port:number):boolean -- Opens the specified port. Returns true if the port was opened.",
@@ -1961,7 +2044,7 @@
    },
    "send": {
     "direct": false,
-    "doc": "function(address:string, port:number, data...) -- Sends the specified data to the specified target.",
+    "doc": "function(address:string, port:number, data...) -- Sends the specified data.",
     "getter": false,
     "limit": 2147483647,
     "setter": false
@@ -1984,7 +2067,7 @@
  },
  "motion_sensor": {
   "classes": [
-   "li.cil.oc.server.component.MotionSensor"
+   "li.cil.oc.core.impl.server.component.MotionSensor"
   ],
   "methods": {
    "getSensitivity": {
@@ -2005,7 +2088,8 @@
  },
  "navigation": {
   "classes": [
-   "li.cil.oc.server.component.UpgradeNavigation"
+   "li.cil.oc.core.impl.server.component.UpgradeNavigation",
+   "li.cil.oc.core.impl.server.component.UpgradeNavigationBase"
   ],
   "methods": {
    "findWaypoints": {
@@ -2040,7 +2124,8 @@
  },
  "net_splitter": {
   "classes": [
-   "li.cil.oc.common.tileentity.NetSplitter"
+   "li.cil.oc.core.impl.common.blockentity.NetSplitter",
+   "li.cil.oc.fabric.common.blockentity.NetSplitterTile"
   ],
   "methods": {
    "close": {
@@ -2075,7 +2160,7 @@
  },
  "note_block": {
   "classes": [
-   "li.cil.oc.integration.minecraft.DriverNoteBlock$Environment"
+   "li.cil.oc.core.impl.integration.vanilla.DriverNoteBlock$Environment"
   ],
   "methods": {
    "getPitch": {
@@ -2094,7 +2179,7 @@
    },
    "trigger": {
     "direct": false,
-    "doc": "function([pitch:number]):boolean -- Triggers the note block if possible. Allows setting the pitch for to save a tick.",
+    "doc": "function([pitch:number]):boolean -- Triggers the note block if possible. Allows setting the pitch to save a tick.",
     "getter": false,
     "limit": 2147483647,
     "setter": false
@@ -2103,14 +2188,14 @@
  },
  "piston": {
   "classes": [
-   "li.cil.oc.server.component.UpgradePiston",
-   "li.cil.oc.server.component.UpgradePiston$Drone",
-   "li.cil.oc.server.component.UpgradePiston$Rotatable",
-   "li.cil.oc.server.component.UpgradePiston$Tablet",
-   "li.cil.oc.server.component.UpgradeStickyPiston",
-   "li.cil.oc.server.component.UpgradeStickyPiston$Drone",
-   "li.cil.oc.server.component.UpgradeStickyPiston$Rotatable",
-   "li.cil.oc.server.component.UpgradeStickyPiston$Tablet"
+   "li.cil.oc.core.impl.server.component.UpgradePiston",
+   "li.cil.oc.core.impl.server.component.UpgradePiston$Drone",
+   "li.cil.oc.core.impl.server.component.UpgradePiston$Rotatable",
+   "li.cil.oc.core.impl.server.component.UpgradePiston$Tablet",
+   "li.cil.oc.core.impl.server.component.UpgradeStickyPiston",
+   "li.cil.oc.core.impl.server.component.UpgradeStickyPiston$Drone",
+   "li.cil.oc.core.impl.server.component.UpgradeStickyPiston$Rotatable",
+   "li.cil.oc.core.impl.server.component.UpgradeStickyPiston$Tablet"
   ],
   "methods": {
    "isSticky": {
@@ -2138,7 +2223,7 @@
  },
  "printer3d": {
   "classes": [
-   "li.cil.oc.common.tileentity.Printer"
+   "li.cil.oc.core.impl.common.blockentity.Printer"
   ],
   "methods": {
    "addShape": {
@@ -2271,15 +2356,13 @@
  },
  "redstone": {
   "classes": [
-   "li.cil.oc.server.component.Redstone$Bundled",
-   "li.cil.oc.server.component.Redstone$BundledWireless",
-   "li.cil.oc.server.component.Redstone$Vanilla",
-   "li.cil.oc.server.component.Redstone$VanillaWireless",
-   "li.cil.oc.server.component.Redstone$Wireless",
-   "li.cil.oc.server.component.RedstoneBundled",
-   "li.cil.oc.server.component.RedstoneSignaller",
-   "li.cil.oc.server.component.RedstoneVanilla",
-   "li.cil.oc.server.component.RedstoneWireless"
+   "li.cil.oc.core.impl.server.component.Redstone$Bundled",
+   "li.cil.oc.core.impl.server.component.Redstone$BundledWireless",
+   "li.cil.oc.core.impl.server.component.Redstone$Vanilla",
+   "li.cil.oc.core.impl.server.component.Redstone$VanillaWireless",
+   "li.cil.oc.core.impl.server.component.Redstone$Wireless",
+   "li.cil.oc.core.impl.server.component.RedstoneSignaller",
+   "li.cil.oc.core.impl.server.component.RedstoneVanilla"
   ],
   "methods": {
    "getBundledInput": {
@@ -2345,6 +2428,13 @@
     "limit": 2147483647,
     "setter": false
    },
+   "getWirelessProviders": {
+    "direct": true,
+    "doc": "function():table -- Get the list of enabled wireless providers.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
    "setBundledOutput": {
     "direct": false,
     "doc": "function([side:number[, color:number,]] value:number or table):number or table --  Fewer params to assign set of outputs. Returns previous values",
@@ -2379,19 +2469,57 @@
     "getter": false,
     "limit": 2147483647,
     "setter": false
+   },
+   "setWirelessProviders": {
+    "direct": false,
+    "doc": "function(providers:table):table -- Set the enabled wireless providers.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
    }
   }
  },
  "relay": {
   "classes": [
-   "li.cil.oc.common.tileentity.Relay$$anonfun$3"
+   "li.cil.oc.core.impl.common.blockentity.Relay"
   ],
-  "methods": {}
+  "methods": {
+   "getStrength": {
+    "direct": true,
+    "doc": "function():number -- Get the signal strength (range) used when relaying messages.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "isRepeater": {
+    "direct": true,
+    "doc": "function():boolean -- Get whether the access point currently acts as a repeater (resend received wireless packets wirelessly).",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "setRepeater": {
+    "direct": false,
+    "doc": "function(enabled:boolean):boolean -- Set whether the access point should act as a repeater.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "setStrength": {
+    "direct": false,
+    "doc": "function(strength:number):number -- Set the signal strength (range) used when relaying messages.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   }
+  }
  },
  "robot": {
   "classes": [
-   "li.cil.oc.common.tileentity.RobotProxy",
-   "li.cil.oc.server.component.Robot"
+   "li.cil.oc.core.impl.common.blockentity.RobotProxy",
+   "li.cil.oc.core.impl.server.component.Robot",
+   "li.cil.oc.core.impl.server.component.RobotBase",
+   "li.cil.oc.fabric.common.blockentity.RobotProxy"
   ],
   "methods": {
    "compare": {
@@ -2438,7 +2566,7 @@
    },
    "drain": {
     "direct": false,
-    "doc": "function(side:boolean[, amount:number=1000]):boolean, number or string -- Drains the specified amount of fluid from the specified side. Returns the amount drained, or an error message.",
+    "doc": "function(side:number[, amount:number=1000]):boolean, number or string -- Drains the specified amount of fluid from the specified side. Returns the amount drained, or an error message.",
     "getter": false,
     "limit": 2147483647,
     "setter": false
@@ -2459,7 +2587,7 @@
    },
    "fill": {
     "direct": false,
-    "doc": "function(side:number[, amount:number=1000]):boolean, number of string -- Eject the specified amount of fluid to the specified side. Returns the amount ejected or an error message.",
+    "doc": "function(side:number[, amount:number=1000]):boolean, number or string -- Eject the specified amount of fluid to the specified side. Returns the amount ejected or an error message.",
     "getter": false,
     "limit": 2147483647,
     "setter": false
@@ -2629,8 +2757,9 @@
  },
  "screen": {
   "classes": [
-   "li.cil.oc.common.component.Screen",
-   "li.cil.oc.common.component.TextBuffer"
+   "li.cil.oc.core.impl.common.component.Screen",
+   "li.cil.oc.core.impl.common.component.TextBuffer",
+   "li.cil.oc.core.impl.common.component.TextBufferBase"
   ],
   "methods": {
    "getAspectRatio": {
@@ -2684,14 +2813,14 @@
    },
    "turnOff": {
     "direct": false,
-    "doc": "function():boolean -- Turns off the screen. Returns true if it was on.",
+    "doc": "function():boolean -- Turns the screen off. Returns whether the state changed, and whether it is now on.",
     "getter": false,
     "limit": 2147483647,
     "setter": false
    },
    "turnOn": {
     "direct": false,
-    "doc": "function():boolean -- Turns the screen on. Returns true if it was off.",
+    "doc": "function():boolean -- Turns the screen on. Returns whether the state changed, and whether it is now on.",
     "getter": false,
     "limit": 2147483647,
     "setter": false
@@ -2700,8 +2829,8 @@
  },
  "sign": {
   "classes": [
-   "li.cil.oc.server.component.UpgradeSignInAdapter",
-   "li.cil.oc.server.component.UpgradeSignInRotatable"
+   "li.cil.oc.fabric.server.component.UpgradeSignInAdapter",
+   "li.cil.oc.fabric.server.component.UpgradeSignInRotatable"
   ],
   "methods": {
    "getValue": {
@@ -2722,7 +2851,7 @@
  },
  "tablet": {
   "classes": [
-   "li.cil.oc.server.component.Tablet"
+   "li.cil.oc.core.impl.server.component.Tablet"
   ],
   "methods": {
    "getPitch": {
@@ -2743,9 +2872,9 @@
  },
  "tank_controller": {
   "classes": [
-   "li.cil.oc.server.component.UpgradeTankController$Adapter",
-   "li.cil.oc.server.component.UpgradeTankController$Drone",
-   "li.cil.oc.server.component.UpgradeTankController$Robot"
+   "li.cil.oc.core.impl.server.component.UpgradeTankController$Adapter",
+   "li.cil.oc.core.impl.server.component.UpgradeTankController$Drone",
+   "li.cil.oc.fabric.server.component.UpgradeTankController$Robot"
   ],
   "methods": {
    "drain": {
@@ -2771,7 +2900,7 @@
    },
    "getFluidInTank": {
     "direct": false,
-    "doc": "function(side:number [, tank:number]):table -- Get a description of the fluid in the the tank on the specified side.",
+    "doc": "function(side:number [, tank:number]):table -- Get a description of the fluid in the tank on the specified side.",
     "getter": false,
     "limit": 2147483647,
     "setter": false
@@ -2797,6 +2926,13 @@
     "limit": 2147483647,
     "setter": false
    },
+   "getTankCount": {
+    "direct": false,
+    "doc": "function(side:number):number -- Get the number of tanks available on the specified side.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
    "getTankLevel": {
     "direct": false,
     "doc": "function(side:number [, tank:number]):number -- Get the amount of fluid in the tank on the specified side.",
@@ -2815,9 +2951,9 @@
  },
  "tractor_beam": {
   "classes": [
-   "li.cil.oc.server.component.UpgradeTractorBeam$Common",
-   "li.cil.oc.server.component.UpgradeTractorBeam$Drone",
-   "li.cil.oc.server.component.UpgradeTractorBeam$Player"
+   "li.cil.oc.core.impl.server.component.UpgradeTractorBeam$Common",
+   "li.cil.oc.core.impl.server.component.UpgradeTractorBeam$Drone",
+   "li.cil.oc.core.impl.server.component.UpgradeTractorBeam$Player"
   ],
   "methods": {
    "suck": {
@@ -2831,7 +2967,8 @@
  },
  "trading": {
   "classes": [
-   "li.cil.oc.server.component.UpgradeTrading"
+   "li.cil.oc.core.impl.server.component.UpgradeTradingBase",
+   "li.cil.oc.fabric.server.component.UpgradeTrading"
   ],
   "methods": {
    "getTrades": {
@@ -2845,14 +2982,15 @@
  },
  "transposer": {
   "classes": [
-   "li.cil.oc.server.component.Transposer$Block",
-   "li.cil.oc.server.component.Transposer$Common",
-   "li.cil.oc.server.component.Transposer$Upgrade"
+   "li.cil.oc.core.impl.server.component.TransposerBase",
+   "li.cil.oc.fabric.server.component.Transposer$Block",
+   "li.cil.oc.fabric.server.component.Transposer$Common",
+   "li.cil.oc.fabric.server.component.Transposer$Upgrade"
   ],
   "methods": {
    "areStacksEquivalent": {
     "direct": false,
-    "doc": "function(side:number, slotA:number, slotB:number):boolean -- Get whether the items in the two specified slots of the inventory on the specified side of the device are equivalent (have shared OreDictionary IDs).",
+    "doc": "function(side:number, slotA:number, slotB:number):boolean -- Get whether the items in the two specified slots of the inventory on the specified side of the device are equivalent (have shared item tags).",
     "getter": false,
     "limit": 2147483647,
     "setter": false
@@ -2878,16 +3016,44 @@
     "limit": 2147483647,
     "setter": false
    },
+   "getContainerCapacityInSlot": {
+    "direct": false,
+    "doc": "function(side:number, slot:number):number -- Get the capacity of the fluid container in the specified slot.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "getContainerLevelInSlot": {
+    "direct": false,
+    "doc": "function(side:number, slot:number):number -- Get the level of the fluid container in the specified slot.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "getFluidInContainerInSlot": {
+    "direct": false,
+    "doc": "function(side:number, slot:number):table -- Get a description of the fluid in the container in the specified slot.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
    "getFluidInTank": {
     "direct": false,
-    "doc": "function(side:number [, tank:number]):table -- Get a description of the fluid in the the tank on the specified side.",
+    "doc": "function(side:number [, tank:number]):table -- Get a description of the fluid in the tank on the specified side.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "getFluidTransferRate": {
+    "direct": false,
+    "doc": "function():number -- Returns the fluid transfer rate in liters per second.",
     "getter": false,
     "limit": 2147483647,
     "setter": false
    },
    "getInventoryName": {
     "direct": false,
-    "doc": "function(side:number):string -- Get the the name of the inventory on the specified side of the device.",
+    "doc": "function(side:number):string -- Get the name of the inventory on the specified side of the device.",
     "getter": false,
     "limit": 2147483647,
     "setter": false
@@ -2927,9 +3093,23 @@
     "limit": 2147483647,
     "setter": false
    },
+   "getTankCount": {
+    "direct": false,
+    "doc": "function(side:number):number -- Get the number of tanks available on the specified side.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
    "getTankLevel": {
     "direct": false,
     "doc": "function(side:number [, tank:number]):number -- Get the amount of fluid in the tank on the specified side.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "setStackDisplayName": {
+    "direct": false,
+    "doc": "function(side:number, slot:number, label:string):boolean -- Change the display name of the stack.",
     "getter": false,
     "limit": 2147483647,
     "setter": false
@@ -2941,9 +3121,37 @@
     "limit": 2147483647,
     "setter": false
    },
+   "swap": {
+    "direct": false,
+    "doc": "function(sourceSide:number, sinkSide:number, sourceSlot:number, sinkSlot:number[, safe:boolean]):boolean -- Swap two inventory slots if and only if both directions succeed.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
    "transferFluid": {
     "direct": false,
-    "doc": "function(sourceSide:number, sinkSide:number[, count:number]):number -- Transfer some items between two inventories.",
+    "doc": "function(sourceSide:number, sinkSide:number[, count:number [, sourceTank:number]]):boolean, number -- Transfer some fluid between two tanks. Returns operation result and filled amount",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "transferFluidBetweenContainers": {
+    "direct": false,
+    "doc": "function(sourceSide:number, sourceSlot:number, sinkSide:number, sinkSlot:number[, count:number, ...]):boolean, number -- Transfer some fluid between containers.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "transferFluidFromContainerToTank": {
+    "direct": false,
+    "doc": "function(inventorySide:number, inventorySlot:number, tankSide:number[, count:number[, outputSide:number[, outputSlot:number]]]):boolean, number -- Transfer some fluid from the container to the tank.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "transferFluidFromTankToContainer": {
+    "direct": false,
+    "doc": "function(tankSide:number, inventorySide:number, inventorySlot:number[, count:number[, sourceTank:number[, outputSide:number[, outputSlot:number]]]]):boolean, number -- Transfer some fluid from the tank to the container.",
     "getter": false,
     "limit": 2147483647,
     "setter": false
@@ -2959,7 +3167,7 @@
  },
  "tunnel": {
   "classes": [
-   "li.cil.oc.server.component.LinkedCard"
+   "li.cil.oc.core.impl.server.component.LinkedCard"
   ],
   "methods": {
    "getChannel": {
@@ -3001,7 +3209,7 @@
  },
  "waypoint": {
   "classes": [
-   "li.cil.oc.common.tileentity.Waypoint"
+   "li.cil.oc.core.impl.common.blockentity.Waypoint"
   ],
   "methods": {
    "getLabel": {

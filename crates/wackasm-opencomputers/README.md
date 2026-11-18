@@ -41,7 +41,7 @@ has a worked example (`demo`).
 ## What's in it
 
 * **`components`**: one struct per component type, one method per callback:
-  52 component types and 375 methods. `Gpu`, `Screen`, `Filesystem`, `Eeprom`,
+  53 component types and 402 methods. `Gpu`, `Screen`, `Filesystem`, `Eeprom`,
   `Internet`, `Modem`, `Tunnel`, `Redstone`, `Robot`, `Drone`,
   `InventoryController`, `Transposer`, `Geolyzer`, `Hologram`, `Printer3d`,
   `Data`, `Database`, `Debug`, the Adapter's vanilla blocks (`Furnace`,
@@ -121,18 +121,20 @@ exact, and `Number::as_i64`, `as_f64` and friends convert either way.
 
 ## Regenerating
 
-The wrappers come from OpenComputers itself: `tools/extract_callbacks.py`
-reads the `@Callback` annotations and component names out of the mod jar
-into `tools/callbacks.json`, and `tools/gen_components.py` turns that into
-`src/components.rs`.
+The wrappers come from OpenComputers: Modernized itself:
+`tools/extract_callbacks.py` reads the `@Callback` annotations and component
+names out of the mod jar into `tools/callbacks.json`, and
+`tools/gen_components.py` turns that into `src/components.rs`. The current
+wrappers are from OpenComputers: Modernized 1.10.7 (Fabric).
 
 ```powershell
-python tools/extract_callbacks.py <OpenComputers-MC1.12.2-1.7.5.221.jar> tools/callbacks.json
+python tools/extract_callbacks.py <opencomputers-fabric-1.10.7.jar> tools/callbacks.json
 python tools/gen_components.py tools/callbacks.json src/components.rs
 ```
 
 The jar is in Gradle's cache after building `mc-mod` (look for
-`OpenComputers-MC1.12.2-*.jar` under `~/.gradle/caches/modules-2`).
+`opencomputers-fabric-*.jar` under `~/.gradle/caches/modules-2`). The
+extractor also reads OpenComputers 1.7.5 jars.
 
 ## Caveats
 

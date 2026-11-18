@@ -16,8 +16,8 @@ hero:
 import { Card, CardGrid } from '@astrojs/starlight/components';
 
 wackasm is a WebAssembly interpreter written in Rust. This mod plugs it into
-[OpenComputers](https://github.com/MightyPirates/OpenComputers) for Minecraft
-1.12.2 as a new CPU architecture, next to Lua. A wasm computer boots from an
+[OpenComputers: Modernized](https://github.com/habzg/OpenComputers-Modernized)
+for Minecraft 1.21.1 (Fabric) as a new CPU architecture, next to Lua. A wasm computer boots from an
 EEPROM, runs a shell from a floppy disk, and runs ordinary **WASI** programs
 that read files, talk to components and use the internet.
 
@@ -31,7 +31,7 @@ that read files, talk to components and use the internet.
     stdin just work; the shell passes arguments and a working directory.
   </Card>
   <Card title="Every component, typed" icon="puzzle">
-    The `wackasm-opencomputers` crate wraps all 52 component types and 375
+    The `wackasm-opencomputers` crate wraps all 53 component types and 402
     methods, plus signals, processes and the internet card.
   </Card>
   <Card title="Saves mid-instruction" icon="setting">

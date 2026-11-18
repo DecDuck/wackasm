@@ -1,6 +1,6 @@
 [package]
 name = "wackasm-oc"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2024"
 publish = false
 description = "OpenComputers architecture backed by wackasm, exposed to the JVM over JNI"

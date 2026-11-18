@@ -1,13 +1,8 @@
 pluginManagement {
     repositories {
         maven {
-            // RetroFuturaGradle: maintained 1.7.10/1.12.2 Forge tooling
-            name = 'GTNH Maven'
-            url = 'https://nexus.gtnewhorizons.com/repository/public/'
-            mavenContent {
-                includeGroup 'com.gtnewhorizons'
-                includeGroup 'com.gtnewhorizons.retrofuturagradle'
-            }
+            name = 'Fabric'
+            url = 'https://maven.fabricmc.net/'
         }
         gradlePluginPortal()
         mavenCentral()
@@ -15,8 +10,8 @@ pluginManagement {
 }
 
 plugins {
-    // Downloads the Java 8 toolchain Minecraft 1.12.2 needs.
+    // Downloads the Java 21 toolchain Minecraft 1.21.1 needs.
     id 'org.gradle.toolchains.foojay-resolver-convention' version '1.0.0'
 }
 
-rootProject.name = 'wackasm-oc-mod'
+rootProject.name = 'wackasm-oc'

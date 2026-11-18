@@ -7,7 +7,8 @@ In more words, `wackasm` was built so that you could run a WASM module that uses
 ## OpenComputers
 
 wackasm also powers a WebAssembly architecture for the OpenComputers
-Minecraft mod (`mc-mod/`), with a Rust library for programs,
+Minecraft mod, in `mc-mod/`: a Fabric mod for Minecraft 1.21.1 with
+OpenComputers: Modernized. Programs use a Rust library,
 [`wackasm-opencomputers`](https://crates.io/crates/wackasm-opencomputers).
 Documentation: <https://decduck.github.io/wackasm/>. Release jars are on the
 [releases page](https://github.com/DecDuck/wackasm/releases).

@@ -17,7 +17,7 @@ change.
 
 ```toml
 [dependencies]
-wackasm-opencomputers = { version = "0.1", features = ["async"] }
+wackasm-opencomputers = { version = "0.2", features = ["async"] }
 ```
 
 The feature is optional. Without it nothing changes, and with it the

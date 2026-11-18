@@ -5,15 +5,16 @@ sidebar:
   order: 1
 ---
 
-wackasm is a Forge mod for **Minecraft 1.12.2**. It needs:
+wackasm is a **Fabric** mod for **Minecraft 1.21.1**. It needs:
 
-- Minecraft Forge for 1.12.2;
-- [OpenComputers](https://github.com/MightyPirates/OpenComputers) **1.7.5** or
-  newer for 1.12.2.
+- [Fabric Loader](https://fabricmc.net/) 0.20.1 or newer, and
+  [Fabric API](https://modrinth.com/mod/fabric-api);
+- [OpenComputers: Modernized](https://www.curseforge.com/minecraft/mc-mods/opencomputers-modernized)
+  1.10.7 or newer (its Fabric build).
 
 Download `wackasm-oc-<version>.jar` from the
 [GitHub releases](https://github.com/DecDuck/wackasm/releases) and put it in
-your `mods/` folder next to OpenComputers. Install it on the server and on
+your `mods/` folder next to OpenComputers: Modernized, on the server and on
 every client.
 
 ## Supported platforms

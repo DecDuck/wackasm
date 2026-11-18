@@ -46,7 +46,9 @@ class CallBudgetTest {
         Component disk = fake(Component.class, (name, args) -> {
             switch (name) {
                 case "canBeSeenFrom": return visible;
-                case "annotation": return args[0].equals("read") ? callback(true, 15) : callback(false, Integer.MAX_VALUE);
+                case "annotation":
+                    if (args[0].equals("missing")) return null;
+                    return args[0].equals("read") ? callback(true, 15) : callback(false, Integer.MAX_VALUE);
                 case "invoke": invoked.add((String) args[0]); return new Object[] {"ok"};
                 default: return null;
             }
@@ -70,10 +72,27 @@ class CallBudgetTest {
     }
 
     @Test
-    void multiplierOneUsesOpenComputersOwnInvoke() throws Exception {
-        assertArrayEquals(new Object[] {"via machine"}, architecture().call("disk", "read", new Object[0]));
-        assertEquals(java.util.Arrays.asList("machine.read"), invoked);
-        assertTrue(charges.isEmpty(), "Machine.invoke does its own charging");
+    void multiplierOneChargesWhatOpenComputersDoes() throws Exception {
+        // OC:M's Machine.invoke charges 1/limit for a direct call; so does ours.
+        assertArrayEquals(new Object[] {"ok"}, architecture().call("disk", "read", new Object[0]));
+        assertEquals(java.util.Arrays.asList("read"), invoked);
+        assertEquals(1, charges.size());
+        assertEquals(1.0 / 15, charges.get(0), 1e-12);
+    }
+
+    @Test
+    void nullResultsBecomeAnEmptyArray() {
+        // filesystem.read returns null at end of file in OpenComputers: Modernized.
+        assertArrayEquals(new Object[0], WackasmArchitecture.results(null));
+        Object[] some = {"x"};
+        assertSame(some, WackasmArchitecture.results(some));
+    }
+
+    @Test
+    void unknownMethodsAreNoSuchMethod() {
+        // OC:M's own invoke would throw a NullPointerException here.
+        assertThrows(NoSuchMethodException.class, () -> architecture().call("disk", "missing", new Object[0]));
+        assertTrue(invoked.isEmpty());
     }
 
     @Test

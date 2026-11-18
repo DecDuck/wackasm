@@ -6,7 +6,7 @@ sidebar:
 ---
 
 `wackasm-opencomputers` has a struct for every OpenComputers component type
-(52 of them, 375 methods), generated from OpenComputers' own callbacks. Each
+(53 of them, 402 methods), generated from OpenComputers: Modernized's own callbacks. Each
 method keeps OpenComputers' documentation, its Lua signature, and whether it
 is a direct call.
 

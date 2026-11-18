@@ -1,16 +1,16 @@
 # Wackasm for OpenComputers
 
-A Minecraft 1.12.2 Forge mod that adds a **WebAssembly** architecture to
-[OpenComputers](https://github.com/MightyPirates/OpenComputers), running
-guests on the wackasm interpreter. Machines are fully suspendable: a computer
-can be saved and reloaded mid-instruction, even in the middle of a component
-call.
+A Minecraft 1.21.1 Fabric mod that adds a **WebAssembly** architecture to
+[OpenComputers: Modernized](https://github.com/habzg/OpenComputers-Modernized),
+running guests on the wackasm interpreter. Machines are fully suspendable: a
+computer can be saved and reloaded mid-instruction, even in the middle of a
+component call.
 
 Player and programmer documentation: <https://decduck.github.io/wackasm/>
 (source in [`docs/`](../docs)). This file covers building the mod.
 
 ```
-mc-mod/                     this Forge mod (Java)
+mc-mod/                     this Fabric mod (Java)
 crates/wackasm-oc/          JNI library: suspension, snapshots, guest ABI
 crates/wackasm-oc-bios/     the 4 KiB WebAssembly BIOS (EEPROM code)
 crates/wackasm-oc-guest/    the "wackasm shell" floppy's /init.wasm
@@ -23,22 +23,35 @@ Requirements:
 * a Rust **nightly** toolchain (wackasm uses nightly features) with the
   `wasm32-unknown-unknown` and `wasm32-wasip1` targets
   (`rustup target add wasm32-unknown-unknown wasm32-wasip1`)
-* JDK 25+ to run Gradle (RetroFuturaGradle 2.x is compiled for Java 25).
-  Gradle downloads the Java 8 toolchain that
-  Minecraft needs.
+* [`patch-crate`](https://crates.io/crates/patch-crate) (`cargo install
+  patch-crate`), then `cargo patch-crate` once at the repository root
+* JDK 21 or newer to run Gradle (Fabric Loom); Minecraft 1.21.1 builds with
+  Java 21
 
 ```powershell
 cd mc-mod
-./gradlew build        # build/libs/wackasm-oc-0.1.0.jar
-./gradlew runClient    # dev client with OpenComputers loaded
-./gradlew runServer
+./gradlew build        # build/libs/wackasm-oc-<version>.jar
+./gradlew runClient    # dev client with OpenComputers: Modernized (in runs/client)
+./gradlew runServer    # dev server (in runs/server)
+./gradlew test         # codec, call-budget, memory and config tests
 ```
 
-`build` runs cargo for the JNI library, the BIOS and the shell, then packages
-the library under `natives/<os>-<arch>/`, the BIOS as `assets/wackasm/bios.wasm`
-and the shell as `assets/wackasm/loot/shell/init.wasm`. It fails if the BIOS
-outgrows a 4096-byte EEPROM. Pass `-Pskip_cargo=true` to package what is
-already built. `./gradlew test` runs the Java codec tests.
+`build` runs cargo for the JNI library, the BIOS, the shell and the
+programs, then packages the library under `natives/<os>-<arch>/`, the BIOS as
+`assets/wackasm/bios.wasm` and the floppy under `assets/wackasm/loot/shell/`.
+It fails if the BIOS outgrows a 4096-byte EEPROM. Pass `-Pskip_cargo=true` to
+package what is already built.
+
+1.21 recipes are data, and the EEPROM recipe's result contains the BIOS's
+bytes, so `generateRecipes` writes both recipes (EEPROM + paper, floppy +
+paper) from the built BIOS. They must make the same items as the
+`Items.registerEEPROM` and `Items.registerFloppy` calls in `WackasmMod`.
+
+OpenComputers: Modernized sets up its API in its own main entrypoint, and
+Fabric doesn't order main entrypoints by dependency, so `WackasmMod`
+registers as soon as the API exists: in its main entrypoint if
+OpenComputers' ran first, otherwise in the client or dedicated-server
+entrypoint, which Fabric runs after every main entrypoint.
 
 The jar only contains a library for the platform it was built on. For a
 multi-platform jar, put cross-built libraries in
@@ -196,7 +209,8 @@ under `-Dwackasm.workdir`):
 
 ## Configuration
 
-`config/wackasm.cfg` (created on first start):
+`config/wackasm.properties` (created with comments on first start, and read
+again whenever a world or server starts):
 
 | setting | default | meaning |
 |---|---|---|

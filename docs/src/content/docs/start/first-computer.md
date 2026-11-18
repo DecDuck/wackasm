@@ -13,8 +13,8 @@ BIOS boots an operating system from a disk.
    programs need more. See [Hardware](/wackasm/reference/hardware/).
 2. **Switch the CPU to WebAssembly.** Sneak and right-click the CPU item
    until its tooltip says **WebAssembly (wackasm)**, then put it in the case.
-3. **Insert an EEPROM (WebAssembly BIOS).** Craft a blank EEPROM with a piece
-   of paper (shapeless), or take one from the OpenComputers creative tab.
+3. **Insert an EEPROM (WebAssembly BIOS).** Craft an EEPROM with a piece of
+   paper (shapeless), or take one from the OpenComputers creative tab.
 4. **Insert the wackasm shell floppy.** Craft a floppy disk with a piece of
    paper, or take it from the creative tab.
 5. **Turn it on.** The BIOS binds the GPU to the screen, finds `/init.wasm`,

@@ -158,6 +158,10 @@ impl<'a> Reader<'a> {
 
 /// Last failure, shown in the "no bootable medium found" message.
 static mut REASON: Buf<128> = Buf::new();
+/// The reason before the current disk's attempt, so a disk without
+/// `/init.wasm` (the computer's tmpfs, say) doesn't hide why an earlier disk
+/// that had one failed.
+static mut EARLIER: Buf<128> = Buf::new();
 
 #[allow(static_mut_refs)]
 fn set_reason(msg: &[u8]) {
@@ -210,8 +214,21 @@ fn image_base() -> usize {
 }
 
 /// Reads `/init.wasm` from `fs` into fresh memory. Returns where it landed and its length.
+#[allow(static_mut_refs)]
 fn read_init(fs: &[u8]) -> Option<(usize, usize)> {
-    let mut opened = call(fs, b"open", Args::new(1).str(b"/init.wasm"))?;
+    unsafe {
+        EARLIER.len = 0;
+        EARLIER.extend(REASON.bytes());
+    }
+    let Some(mut opened) = call(fs, b"open", Args::new(1).str(b"/init.wasm")) else {
+        // No /init.wasm here: keep an earlier, more useful reason.
+        unsafe {
+            if EARLIER.len > 0 {
+                set_reason(EARLIER.bytes());
+            }
+        }
+        return None;
+    };
     let Some(handle) = opened.userdata() else {
         // open returned nil plus a reason
         set_reason(opened.blob().unwrap_or(b"cannot open /init.wasm"));

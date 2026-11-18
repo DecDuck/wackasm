@@ -1,7 +1,9 @@
 .gradle/
 build/
 run/
+runs/
 out/
 *.iml
 .idea/
 natives-extra/
+logs/

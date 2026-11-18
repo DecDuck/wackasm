@@ -2,7 +2,8 @@ package dev.wackasm.oc;
 
 import java.io.File;
 
-import net.minecraftforge.common.DimensionManager;
+import net.minecraft.server.MinecraftServer;
+import net.minecraft.world.level.storage.LevelResource;
 
 /**
  * Picks the native work dir. It defaults to {@code <world save>/wackasm} so
@@ -19,8 +20,10 @@ final class WackasmPaths {
         if (override != null) {
             dir = new File(override);
         } else {
-            File save = DimensionManager.getCurrentSaveRootDirectory();
-            dir = save != null ? new File(save, "wackasm") : new File("wackasm");
+            MinecraftServer server = WackasmMod.server;
+            dir = server != null
+                    ? server.getWorldPath(LevelResource.ROOT).resolve("wackasm").normalize().toFile()
+                    : new File("wackasm");
         }
         return dir.getAbsoluteFile().getPath();
     }

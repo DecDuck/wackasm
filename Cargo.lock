@@ -911,7 +911,7 @@ checksum = "06abde3611657adf66d383f00b093d7faecc7fa57071cce2578660c9f1010821"
 
 [[package]]
 name = "wackasm"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "bitcode",
@@ -928,7 +928,7 @@ dependencies = [
 
 [[package]]
 name = "wackasm-cli"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "serde",
@@ -938,7 +938,7 @@ dependencies = [
 
 [[package]]
 name = "wackasm-oc"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "bitcode",
@@ -952,11 +952,11 @@ dependencies = [
 
 [[package]]
 name = "wackasm-opencomputers"
-version = "0.1.0"
+version = "0.2.0"
 
 [[package]]
 name = "wackasm-spec-tests"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "clap",
@@ -967,7 +967,7 @@ dependencies = [
 
 [[package]]
 name = "wackasm-wasi"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "getrandom",
@@ -987,7 +987,7 @@ dependencies = [
 
 [[package]]
 name = "wasi"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "getrandom",
 ]

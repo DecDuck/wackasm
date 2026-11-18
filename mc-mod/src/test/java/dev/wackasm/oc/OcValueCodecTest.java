@@ -8,7 +8,8 @@ import java.util.Map;
 import li.cil.oc.api.machine.Arguments;
 import li.cil.oc.api.machine.Context;
 import li.cil.oc.api.machine.Value;
-import net.minecraft.nbt.NBTTagCompound;
+import net.minecraft.core.HolderLookup;
+import net.minecraft.nbt.CompoundTag;
 import org.junit.jupiter.api.Test;
 
 class OcValueCodecTest {
@@ -27,8 +28,8 @@ class OcValueCodecTest {
         @Override public void unapply(Context c, Arguments a) {}
         @Override public Object[] call(Context c, Arguments a) { return null; }
         @Override public void dispose(Context c) { disposed = true; }
-        @Override public void load(NBTTagCompound nbt) { handle = nbt.getInteger("h"); }
-        @Override public void save(NBTTagCompound nbt) { nbt.setInteger("h", handle); }
+        @Override public void load(CompoundTag nbt, HolderLookup.Provider registries) { handle = nbt.getInt("h"); }
+        @Override public void save(CompoundTag nbt, HolderLookup.Provider registries) { nbt.putInt("h", handle); }
     }
 
     /**
@@ -92,11 +93,11 @@ class OcValueCodecTest {
         UserdataTable table = new UserdataTable();
         FakeHandle handle = new FakeHandle(42);
         int id = table.idOf(handle);
-        NBTTagCompound nbt = new NBTTagCompound();
-        table.save(nbt);
+        CompoundTag nbt = new CompoundTag();
+        table.save(nbt, null); // the fake ignores the registries
 
         UserdataTable restored = new UserdataTable();
-        restored.load(nbt);
+        restored.load(nbt, null);
         FakeHandle back = (FakeHandle) restored.get(id);
         assertEquals(42, back.handle);
         // New ids don't collide with restored ones.

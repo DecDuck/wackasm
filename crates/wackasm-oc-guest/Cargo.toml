@@ -1,6 +1,6 @@
 [package]
 name = "wackasm-oc-guest"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2024"
 publish = false
 description = "Example OpenComputers guest for the wackasm architecture; bundled as the mod's default boot.wasm"

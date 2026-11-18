@@ -17,8 +17,11 @@ import li.cil.oc.api.machine.Signal;
 import li.cil.oc.api.machine.Value;
 import li.cil.oc.api.network.Component;
 import li.cil.oc.api.network.Node;
-import net.minecraft.item.ItemStack;
-import net.minecraft.nbt.NBTTagCompound;
+import net.minecraft.core.HolderLookup;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.server.MinecraftServer;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.Level;
 
 /**
  * An OpenComputers architecture that runs WebAssembly on wackasm.
@@ -35,7 +38,7 @@ import net.minecraft.nbt.NBTTagCompound;
  * suspended guest, including any pending request, is serialized into the
  * native work dir on save, and NBT only stores the key that names it.
  *
- * <p>Settings live in {@link WackasmConfig} ({@code config/wackasm.cfg}). System properties:
+ * <p>Settings live in {@link WackasmConfig} ({@code config/wackasm.properties}). System properties:
  * <ul>
  *   <li>{@code wackasm.workdir}: native work dir (default {@code <world>/wackasm}); see {@link WackasmPaths}.</li>
  * </ul>
@@ -120,15 +123,15 @@ public final class WackasmArchitecture implements Architecture {
     }
 
     @Override
-    public void save(NBTTagCompound nbt) {
+    public void save(CompoundTag nbt) {
         if (handle == 0) return;
         try {
             WackasmNative.save(handle);
-            nbt.setString(NBT_KEY, key);
+            nbt.putString(NBT_KEY, key);
             // Saved together with the snapshot, so the ids in it stay valid.
-            NBTTagCompound values = new NBTTagCompound();
-            userdata.save(values);
-            nbt.setTag("wackasm:userdata", values);
+            CompoundTag values = new CompoundTag();
+            userdata.save(values, registries());
+            nbt.put("wackasm:userdata", values);
         } catch (IllegalStateException e) {
             // Without a snapshot the machine restarts after the next load.
             machine.crash("wackasm: failed to save: " + e.getMessage());
@@ -136,15 +139,15 @@ public final class WackasmArchitecture implements Architecture {
     }
 
     @Override
-    public void load(NBTTagCompound nbt) {
+    public void load(CompoundTag nbt) {
         close();
-        if (!nbt.hasKey(NBT_KEY)) return;
+        if (!nbt.contains(NBT_KEY)) return;
         key = nbt.getString(NBT_KEY);
         try {
             handle = WackasmNative.create(WackasmPaths.workDir(), key, machine.node().address());
             WackasmNative.setMemoryLimit(handle, memoryBytes);
             initialized = WackasmNative.load(handle);
-            if (initialized) userdata.load(nbt.getCompoundTag("wackasm:userdata"));
+            if (initialized) userdata.load(nbt.getCompound("wackasm:userdata"), registries());
         } catch (IllegalStateException e) {
             initialized = false;
         }
@@ -176,8 +179,11 @@ public final class WackasmArchitecture implements Architecture {
                         return new ExecutionResult.Shutdown(false);
                     case WackasmNative.RUN_SHUTDOWN:
                         return new ExecutionResult.Shutdown(Boolean.TRUE.equals(payload()[0]));
-                    case WackasmNative.RUN_ERROR:
-                        return new ExecutionResult.Error(String.valueOf(payload()[0]));
+                    case WackasmNative.RUN_ERROR: {
+                        String message = String.valueOf(payload()[0]);
+                        WackasmMod.log.debug("wasm computer {} stopped: {}", machine.node().address(), message);
+                        return new ExecutionResult.Error(message);
+                    }
                     case WackasmNative.RUN_INVOKE: {
                         Object[] p = payload();
                         String address = (String) p[0], method = (String) p[1];
@@ -382,7 +388,7 @@ public final class WackasmArchitecture implements Architecture {
     /** Performs a component call and responds with its results or its error. */
     private void invoke(String address, String method, Object[] args) throws LimitReachedException {
         try {
-            respondOk(call(address, method, args));
+            respondOk(results(call(address, method, args)));
         } catch (LimitReachedException e) {
             throw e;
         } catch (NoSuchMethodException e) {
@@ -404,14 +410,26 @@ public final class WackasmArchitecture implements Architecture {
      */
     private void invokeValue(Value value, String method, Object[] args) throws LimitReachedException {
         try {
-            respondOk(machine.invoke(value, method, args));
+            respondOk(results(machine.invoke(value, method, args)));
         } catch (LimitReachedException e) {
             throw e;
-        } catch (NoSuchMethodException e) {
-            respondStatus(WackasmNative.STATUS_NO_SUCH_METHOD, "no such method: " + method);
         } catch (Throwable t) {
-            respondStatus(WackasmNative.STATUS_ERROR, String.valueOf(t.getMessage()));
+            if (t.getCause() instanceof NoSuchMethodException) {
+                respondStatus(WackasmNative.STATUS_NO_SUCH_METHOD, "no such method: " + method);
+            } else {
+                respondStatus(WackasmNative.STATUS_ERROR, String.valueOf(t.getMessage()));
+            }
         }
+    }
+
+    /**
+     * A callback's results as the guest expects them: always an array.
+     * OpenComputers: Modernized's callbacks return {@code null} for "no
+     * results" (filesystem.read at end of file, for one), which would
+     * otherwise reach the guest as an empty reply that the BIOS can't parse.
+     */
+    static Object[] results(Object[] results) {
+        return results == null ? new Object[0] : results;
     }
 
     private boolean isDirect(Value value, String method) {
@@ -486,8 +504,6 @@ public final class WackasmArchitecture implements Architecture {
      */
     Object[] call(String address, String method, Object[] args) throws Exception {
         double multiplier = WackasmConfig.callBudgetMultiplier;
-        if (multiplier == 1.0) return machine.invoke(address, method, args);
-
         Node self = machine.node();
         if (self == null || self.network() == null) throw new LimitReachedException();
         Node node = self.network().node(address);
@@ -497,7 +513,8 @@ public final class WackasmArchitecture implements Architecture {
             throw new IllegalArgumentException("no such component");
         }
         Callback callback = component.annotation(method);
-        if (callback != null && callback.direct()) {
+        if (callback == null) throw new NoSuchMethodException(method);
+        if (callback.direct()) {
             // Throws LimitReachedException once the tick's budget is spent.
             machine.consumeCallBudget(1.0 / callback.limit() / multiplier);
         }
@@ -529,6 +546,18 @@ public final class WackasmArchitecture implements Architecture {
             }
         }
         return null;
+    }
+
+    /**
+     * What userdata values need to save and load themselves: the registries
+     * of the computer's level, or the server's if it has no level yet.
+     */
+    private HolderLookup.Provider registries() {
+        Level level = machine.host() == null ? null : machine.host().level();
+        if (level != null) return level.registryAccess();
+        MinecraftServer server = WackasmMod.server;
+        if (server != null) return server.registryAccess();
+        throw new IllegalStateException("no registries to save userdata with");
     }
 
     private static short clampShort(long v) {

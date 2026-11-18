@@ -6,8 +6,10 @@ import java.util.Map;
 
 import li.cil.oc.api.machine.Context;
 import li.cil.oc.api.machine.Value;
-import net.minecraft.nbt.NBTTagCompound;
-import net.minecraft.nbt.NBTTagList;
+import net.minecraft.core.HolderLookup;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.Tag;
 
 /**
  * The host objects a guest holds, by the ids that cross the codec as
@@ -65,37 +67,37 @@ final class UserdataTable {
         nextId = 1;
     }
 
-    void save(NBTTagCompound nbt) {
-        NBTTagList list = new NBTTagList();
+    void save(CompoundTag nbt, HolderLookup.Provider registries) {
+        ListTag list = new ListTag();
         for (Map.Entry<Integer, Value> e : byId.entrySet()) {
-            NBTTagCompound entry = new NBTTagCompound();
-            entry.setInteger("id", e.getKey());
-            entry.setString("class", e.getValue().getClass().getName());
-            NBTTagCompound data = new NBTTagCompound();
-            e.getValue().save(data);
-            entry.setTag("data", data);
-            list.appendTag(entry);
+            CompoundTag entry = new CompoundTag();
+            entry.putInt("id", e.getKey());
+            entry.putString("class", e.getValue().getClass().getName());
+            CompoundTag data = new CompoundTag();
+            e.getValue().save(data, registries);
+            entry.put("data", data);
+            list.add(entry);
         }
-        nbt.setTag("values", list);
-        nbt.setInteger("nextId", nextId);
+        nbt.put("values", list);
+        nbt.putInt("nextId", nextId);
     }
 
-    void load(NBTTagCompound nbt) {
+    void load(CompoundTag nbt, HolderLookup.Provider registries) {
         byId.clear();
         byValue.clear();
-        NBTTagList list = nbt.getTagList("values", 10 /* compound */);
-        for (int i = 0; i < list.tagCount(); i++) {
-            NBTTagCompound entry = list.getCompoundTagAt(i);
+        ListTag list = nbt.getList("values", Tag.TAG_COMPOUND);
+        for (int i = 0; i < list.size(); i++) {
+            CompoundTag entry = list.getCompound(i);
             try {
-                Value value = (Value) Class.forName(entry.getString("class")).newInstance();
-                value.load(entry.getCompoundTag("data"));
-                byId.put(entry.getInteger("id"), value);
-                byValue.put(value, entry.getInteger("id"));
+                Value value = (Value) Class.forName(entry.getString("class")).getDeclaredConstructor().newInstance();
+                value.load(entry.getCompound("data"), registries);
+                byId.put(entry.getInt("id"), value);
+                byValue.put(value, entry.getInt("id"));
             } catch (ReflectiveOperationException | ClassCastException e) {
                 // The mod that provided it is gone. The guest will see nil for this id.
-                if (WackasmMod.log != null) WackasmMod.log.warn("Dropping unrestorable userdata {}", entry, e);
+                WackasmMod.log.warn("Dropping unrestorable userdata {}", entry, e);
             }
         }
-        nextId = Math.max(1, nbt.getInteger("nextId"));
+        nextId = Math.max(1, nbt.getInt("nextId"));
     }
 }

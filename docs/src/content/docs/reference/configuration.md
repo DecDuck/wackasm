@@ -5,9 +5,11 @@ sidebar:
   order: 2
 ---
 
-## config/wackasm.cfg
+## config/wackasm.properties
 
-Created on first start.
+Created with comments on first start. It's read again whenever a world (or a
+server) starts, so edits apply without restarting Minecraft. Values out of
+range are clamped, and unreadable ones fall back to the default.
 
 | setting | default | meaning |
 |---|---|---|
