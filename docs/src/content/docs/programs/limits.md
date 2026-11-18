@@ -2,7 +2,7 @@
 title: Limits
 description: What programs can't do yet.
 sidebar:
-  order: 8
+  order: 9
 ---
 
 ## WebAssembly

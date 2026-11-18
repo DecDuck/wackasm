@@ -37,6 +37,9 @@ With the crate's `async` feature, every method also has an `_async` twin
 (`gpu.set_async(...)`) that doesn't block; see
 [Async programs](/wackasm/programs/async/).
 
+Every method, with OpenComputers' documentation for it, is in the
+[API reference](/wackasm/rustdoc/wackasm_opencomputers/components/index.html).
+
 ## Finding components
 
 - `Gpu::first()`: the first one, by address;

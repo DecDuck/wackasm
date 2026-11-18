@@ -20,7 +20,8 @@ cargo add wackasm-opencomputers
 [`wackasm-opencomputers`](https://crates.io/crates/wackasm-opencomputers) is
 optional for plain programs, but it's what starts your program in the shell's
 current directory, and it gives you components, signals, processes and the
-internet card ([docs.rs](https://docs.rs/wackasm-opencomputers)).
+internet card. Its [API reference](/wackasm/rustdoc/wackasm_opencomputers/) is built from the
+latest sources; [docs.rs](https://docs.rs/wackasm-opencomputers) has the released versions.
 
 ## Write it
 

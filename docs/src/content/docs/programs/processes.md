@@ -2,7 +2,7 @@
 title: Running other programs
 description: The process API, in the style of std::process.
 sidebar:
-  order: 4
+  order: 5
 ---
 
 WASI can't start processes, so `wackasm_opencomputers::process` provides an

@@ -53,3 +53,4 @@ The floppy also holds the stock BIOS as `/bios.wasm`, for restoring it.
 | `echo ARGS...` | prints its arguments |
 | `hello [ARGS...]` | asks your name and greets you; shows argv and stdin |
 | `demo` | the `wackasm-opencomputers` crate in action: lists components, draws on the screen and waits for a key |
+| `gfx [SCENE]` | a graphics tour: colour, braille, bars and an animation, drawn with the crate's [`draw` module](/wackasm/programs/graphics/) |

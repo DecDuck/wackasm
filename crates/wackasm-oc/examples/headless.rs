@@ -38,8 +38,6 @@ const KEYBOARD: &str = "keyboard-0000";
 const EEPROM: &str = "eeprom-0000";
 const DISK: &str = "disk-0000";
 const INTERNET: &str = "internet-0000";
-const W: usize = 50;
-const H: usize = 16;
 /// OpenComputers' default `maxReadBuffer`.
 const MAX_READ: usize = 2048;
 
@@ -100,8 +98,355 @@ fn http_fetch(url: &str, method: &str, body: &[u8], headers: &[(String, String)]
     Ok((code, message, headers, reply[split + 4..].to_vec()))
 }
 
+/// One character cell: the character and its colours (24-bit RGB).
+#[derive(Clone, Copy, PartialEq)]
+struct Cell {
+    ch: char,
+    fg: u32,
+    bg: u32,
+}
+
+const BLANK: Cell = Cell { ch: ' ', fg: 0xFFFFFF, bg: 0x000000 };
+
+/// A screen-sized or allocated GPU buffer.
+#[derive(Clone)]
+struct Buffer {
+    w: usize,
+    h: usize,
+    cells: Vec<Cell>,
+}
+
+impl Buffer {
+    fn new(w: usize, h: usize) -> Buffer {
+        Buffer { w, h, cells: vec![BLANK; w * h] }
+    }
+
+    fn get(&self, x: i64, y: i64) -> Option<Cell> {
+        ((1..=self.w as i64).contains(&x) && (1..=self.h as i64).contains(&y))
+            .then(|| self.cells[(y as usize - 1) * self.w + x as usize - 1])
+    }
+
+    fn put(&mut self, x: i64, y: i64, cell: Cell) {
+        if (1..=self.w as i64).contains(&x) && (1..=self.h as i64).contains(&y) {
+            self.cells[(y as usize - 1) * self.w + x as usize - 1] = cell;
+        }
+    }
+}
+
+/// A tier 3 GPU: 24-bit colours kept exactly (a real GPU maps them to its
+/// palette), a 16-colour palette, and video buffers. Buffer 0 is the screen.
+struct GpuSim {
+    buffers: std::collections::BTreeMap<i64, Buffer>,
+    active: i64,
+    next_buffer: i64,
+    fg: u32,
+    bg: u32,
+    depth: i64,
+    palette: [u32; 16],
+    /// Video memory, in cells, for allocated buffers.
+    memory: usize,
+}
+
+fn num(args: &[OcValue], i: usize, default: i64) -> i64 {
+    match args.get(i) {
+        Some(OcValue::Int(n)) => *n,
+        Some(OcValue::Float(f)) => *f as i64,
+        _ => default,
+    }
+}
+
+impl GpuSim {
+    fn new(w: usize, h: usize) -> GpuSim {
+        let mut buffers = std::collections::BTreeMap::new();
+        buffers.insert(0, Buffer::new(w, h));
+        // OpenComputers' tier 3 default palette: 16 greys.
+        let palette = std::array::from_fn(|i| {
+            let v = (i as u32 + 1) * 0x0F;
+            (v << 16) | (v << 8) | v
+        });
+        GpuSim { buffers, active: 0, next_buffer: 1, fg: 0xFFFFFF, bg: 0x000000, depth: 8, palette, memory: 3 * w * h }
+    }
+
+    fn screen_size(&self) -> (usize, usize) {
+        let s = &self.buffers[&0];
+        (s.w, s.h)
+    }
+
+    fn used_memory(&self) -> usize {
+        self.buffers.iter().filter(|(id, _)| **id != 0).map(|(_, b)| b.w * b.h).sum()
+    }
+
+    fn active(&mut self) -> &mut Buffer {
+        self.buffers.get_mut(&self.active).expect("active buffer exists")
+    }
+
+    fn call(&mut self, method: &str, args: &[OcValue]) -> Result<Vec<OcValue>, String> {
+        let (sw, sh) = self.screen_size();
+        let int = |v: i64| OcValue::Int(v);
+        Ok(match method {
+            "bind" => vec![OcValue::Bool(true)],
+            "getScreen" => vec![OcValue::str(SCREEN)],
+            "getResolution" | "maxResolution" | "getViewport" => vec![int(sw as i64), int(sh as i64)],
+            "setResolution" | "setViewport" => vec![OcValue::Bool(num(args, 0, 0) as usize == sw && num(args, 1, 0) as usize == sh)],
+            "getDepth" | "maxDepth" => vec![int(self.depth)],
+            "setDepth" => {
+                let old = self.depth;
+                self.depth = num(args, 0, 8);
+                vec![int(old)]
+            }
+            "getForeground" => vec![int(self.fg as i64), OcValue::Bool(false)],
+            "getBackground" => vec![int(self.bg as i64), OcValue::Bool(false)],
+            "setForeground" | "setBackground" => {
+                let value = num(args, 0, 0);
+                let palette = matches!(args.get(1), Some(OcValue::Bool(true)));
+                let colour = if palette {
+                    *self.palette.get(value as usize).ok_or("invalid palette index")?
+                } else {
+                    (value as u32) & 0xFFFFFF
+                };
+                let slot = if method == "setForeground" { &mut self.fg } else { &mut self.bg };
+                let old = std::mem::replace(slot, colour);
+                vec![int(old as i64), OcValue::Nil]
+            }
+            "getPaletteColor" => vec![int(*self.palette.get(num(args, 0, 0) as usize).ok_or("invalid palette index")? as i64)],
+            "setPaletteColor" => {
+                let i = num(args, 0, 0) as usize;
+                let slot = self.palette.get_mut(i).ok_or("invalid palette index")?;
+                let old = std::mem::replace(slot, num(args, 1, 0) as u32 & 0xFFFFFF);
+                vec![int(old as i64)]
+            }
+            "set" => {
+                let (x, y) = (num(args, 0, 1), num(args, 1, 1));
+                let vertical = matches!(args.get(3), Some(OcValue::Bool(true)));
+                let (fg, bg) = (self.fg, self.bg);
+                let text = String::from_utf8_lossy(&text(args, 2)).into_owned();
+                let buffer = self.active();
+                for (i, ch) in text.chars().enumerate() {
+                    let (cx, cy) = if vertical { (x, y + i as i64) } else { (x + i as i64, y) };
+                    buffer.put(cx, cy, Cell { ch, fg, bg });
+                }
+                vec![OcValue::Bool(true)]
+            }
+            "get" => {
+                let cell = self.buffers[&self.active].get(num(args, 0, 1), num(args, 1, 1)).ok_or("index out of bounds")?;
+                vec![OcValue::str(cell.ch.to_string().as_str()), int(cell.fg as i64), int(cell.bg as i64), OcValue::Nil, OcValue::Nil]
+            }
+            "fill" => {
+                let (x, y, w, h) = (num(args, 0, 1), num(args, 1, 1), num(args, 2, 0), num(args, 3, 0));
+                let ch = String::from_utf8_lossy(&text(args, 4)).chars().next().unwrap_or(' ');
+                let cell = Cell { ch, fg: self.fg, bg: self.bg };
+                let buffer = self.active();
+                for yy in y..y + h {
+                    for xx in x..x + w {
+                        buffer.put(xx, yy, cell);
+                    }
+                }
+                vec![OcValue::Bool(true)]
+            }
+            "copy" => {
+                let (x, y, w, h, tx, ty) =
+                    (num(args, 0, 1), num(args, 1, 1), num(args, 2, 0), num(args, 3, 0), num(args, 4, 0), num(args, 5, 0));
+                let snapshot = self.buffers[&self.active].clone();
+                let buffer = self.active();
+                for yy in y..y + h {
+                    for xx in x..x + w {
+                        if let Some(cell) = snapshot.get(xx, yy) {
+                            buffer.put(xx + tx, yy + ty, cell);
+                        }
+                    }
+                }
+                vec![OcValue::Bool(true)]
+            }
+            "allocateBuffer" => {
+                let (w, h) = (num(args, 0, sw as i64).max(1) as usize, num(args, 1, sh as i64).max(1) as usize);
+                if self.used_memory() + w * h > self.memory {
+                    return Ok(vec![OcValue::Nil, OcValue::str("not enough video memory")]);
+                }
+                let id = self.next_buffer;
+                self.next_buffer += 1;
+                self.buffers.insert(id, Buffer::new(w, h));
+                vec![int(id)]
+            }
+            "freeBuffer" => {
+                let id = num(args, 0, self.active);
+                let freed = id != 0 && self.buffers.remove(&id).is_some();
+                if freed && self.active == id {
+                    self.active = 0;
+                }
+                vec![OcValue::Bool(freed)]
+            }
+            "freeAllBuffers" => {
+                let count = self.buffers.len() - 1;
+                self.buffers.retain(|id, _| *id == 0);
+                self.active = 0;
+                vec![int(count as i64)]
+            }
+            "buffers" => vec![OcValue::Array(self.buffers.keys().filter(|id| **id != 0).map(|id| int(*id)).collect())],
+            "getActiveBuffer" => vec![int(self.active)],
+            "setActiveBuffer" => {
+                let id = num(args, 0, 0);
+                if !self.buffers.contains_key(&id) {
+                    return Ok(vec![OcValue::Nil, OcValue::str("invalid buffer index")]);
+                }
+                let old = std::mem::replace(&mut self.active, id);
+                vec![int(old)]
+            }
+            "getBufferSize" => {
+                let b = self.buffers.get(&num(args, 0, self.active)).ok_or("invalid buffer index")?;
+                vec![int(b.w as i64), int(b.h as i64)]
+            }
+            "totalMemory" => vec![int(self.memory as i64)],
+            "freeMemory" => vec![int((self.memory - self.used_memory()) as i64)],
+            // bitblt(dst=0, col=1, row=1, width, height, src=active, fromCol=1, fromRow=1)
+            "bitblt" => {
+                let dst = num(args, 0, 0);
+                let src = num(args, 5, self.active);
+                let source = self.buffers.get(&src).ok_or("invalid source buffer")?.clone();
+                let (col, row) = (num(args, 1, 1), num(args, 2, 1));
+                let (w, h) = (num(args, 3, source.w as i64), num(args, 4, source.h as i64));
+                let (from_col, from_row) = (num(args, 6, 1), num(args, 7, 1));
+                let target = self.buffers.get_mut(&dst).ok_or("invalid destination buffer")?;
+                for dy in 0..h {
+                    for dx in 0..w {
+                        if let Some(cell) = source.get(from_col + dx, from_row + dy) {
+                            target.put(col + dx, row + dy, cell);
+                        }
+                    }
+                }
+                vec![OcValue::Bool(true)]
+            }
+            other => return Err(format!("no such method: {other}")),
+        })
+    }
+
+    /// The screen as a PNG, 8x16 pixels per cell. Block elements, shades and
+    /// braille are drawn as their shapes; other characters as a bar in the
+    /// foreground colour (the text printout shows what they say).
+    fn png(&self) -> Vec<u8> {
+        const CW: usize = 8;
+        const CH: usize = 16;
+        let screen = &self.buffers[&0];
+        let (width, height) = (screen.w * CW, screen.h * CH);
+        let mut rgb = vec![0u8; width * height * 3];
+        for (i, cell) in screen.cells.iter().enumerate() {
+            let (cx, cy) = (i % screen.w, i / screen.w);
+            for py in 0..CH {
+                for px in 0..CW {
+                    let on = glyph_pixel(cell.ch, px, py, CW, CH);
+                    let c = if on { cell.fg } else { cell.bg };
+                    let at = ((cy * CH + py) * width + cx * CW + px) * 3;
+                    rgb[at..at + 3].copy_from_slice(&[(c >> 16) as u8, (c >> 8) as u8, c as u8]);
+                }
+            }
+        }
+        encode_png(width, height, &rgb)
+    }
+}
+
+/// Whether pixel (px, py) of a cw x ch cell is in `ch`'s foreground.
+fn glyph_pixel(ch: char, px: usize, py: usize, cw: usize, chh: usize) -> bool {
+    let (fx, fy) = ((px as f64 + 0.5) / cw as f64, (py as f64 + 0.5) / chh as f64);
+    let (left, top) = (fx < 0.5, fy < 0.5);
+    let code = ch as u32;
+    match code {
+        0x20 => false,
+        0x2580 => top,
+        0x2581..=0x2587 => fy >= 1.0 - (code - 0x2580) as f64 / 8.0,
+        0x2588 => true,
+        0x2589..=0x258F => fx < (0x2590 - code) as f64 / 8.0,
+        0x2590 => !left,
+        0x2591 => px % 2 == 0 && py % 2 == 0,
+        0x2592 => (px + py) % 2 == 0,
+        0x2593 => !(px % 2 == 1 && py % 2 == 1),
+        0x2594 => fy < 1.0 / 8.0,
+        0x2595 => fx >= 7.0 / 8.0,
+        0x2596..=0x259F => {
+            // Quadrants: upper-left, upper-right, lower-left, lower-right.
+            let quads: [bool; 4] = match code {
+                0x2596 => [false, false, true, false],
+                0x2597 => [false, false, false, true],
+                0x2598 => [true, false, false, false],
+                0x2599 => [true, false, true, true],
+                0x259A => [true, false, false, true],
+                0x259B => [true, true, true, false],
+                0x259C => [true, true, false, true],
+                0x259D => [false, true, false, false],
+                0x259E => [false, true, true, false],
+                _ => [false, true, true, true],
+            };
+            quads[match (top, left) {
+                (true, true) => 0,
+                (true, false) => 1,
+                (false, true) => 2,
+                (false, false) => 3,
+            }]
+        }
+        0x2800..=0x28FF => {
+            // Dots on a 2x4 grid, each a square in the middle of its sub-cell.
+            let bits = code - 0x2800;
+            const BITS: [[u32; 4]; 2] = [[0x01, 0x02, 0x04, 0x40], [0x08, 0x10, 0x20, 0x80]];
+            let (col, row) = ((fx * 2.0) as usize, (fy * 4.0) as usize);
+            let (sx, sy) = (fx * 2.0 - col as f64, fy * 4.0 - row as f64);
+            bits & BITS[col.min(1)][row.min(3)] != 0 && (0.2..0.8).contains(&sx) && (0.2..0.8).contains(&sy)
+        }
+        _ => (0.15..0.85).contains(&fx) && (0.3..0.75).contains(&fy),
+    }
+}
+
+/// An RGB PNG with stored (uncompressed) deflate blocks.
+fn encode_png(width: usize, height: usize, rgb: &[u8]) -> Vec<u8> {
+    fn crc32(bytes: &[u8]) -> u32 {
+        let mut crc = !0u32;
+        for &b in bytes {
+            crc ^= b as u32;
+            for _ in 0..8 {
+                crc = if crc & 1 != 0 { (crc >> 1) ^ 0xEDB8_8320 } else { crc >> 1 };
+            }
+        }
+        !crc
+    }
+    fn chunk(out: &mut Vec<u8>, kind: &[u8; 4], data: &[u8]) {
+        out.extend_from_slice(&(data.len() as u32).to_be_bytes());
+        let mut body = kind.to_vec();
+        body.extend_from_slice(data);
+        out.extend_from_slice(&body);
+        out.extend_from_slice(&crc32(&body).to_be_bytes());
+    }
+    let mut raw = Vec::with_capacity((width * 3 + 1) * height);
+    for row in rgb.chunks(width * 3) {
+        raw.push(0); // no filter
+        raw.extend_from_slice(row);
+    }
+    let mut zlib = vec![0x78, 0x01];
+    let blocks: Vec<&[u8]> = raw.chunks(65_535).collect();
+    for (i, block) in blocks.iter().enumerate() {
+        zlib.push((i + 1 == blocks.len()) as u8);
+        let len = block.len() as u16;
+        zlib.extend_from_slice(&len.to_le_bytes());
+        zlib.extend_from_slice(&(!len).to_le_bytes());
+        zlib.extend_from_slice(block);
+    }
+    let (mut a, mut b) = (1u32, 0u32);
+    for &byte in &raw {
+        a = (a + byte as u32) % 65_521;
+        b = (b + a) % 65_521;
+    }
+    zlib.extend_from_slice(&((b << 16) | a).to_be_bytes());
+
+    let mut out = b"\x89PNG\r\n\x1a\n".to_vec();
+    let mut ihdr = Vec::new();
+    ihdr.extend_from_slice(&(width as u32).to_be_bytes());
+    ihdr.extend_from_slice(&(height as u32).to_be_bytes());
+    ihdr.extend_from_slice(&[8, 2, 0, 0, 0]); // 8-bit RGB
+    chunk(&mut out, b"IHDR", &ihdr);
+    chunk(&mut out, b"IDAT", &zlib);
+    chunk(&mut out, b"IEND", &[]);
+    out
+}
+
 struct Sim {
-    grid: Vec<Vec<char>>,
+    gpu: GpuSim,
+    gpu_calls: std::collections::BTreeMap<String, usize>,
     keys: VecDeque<char>,
     beeps: usize,
     eeprom_code: Vec<u8>,
@@ -137,47 +482,9 @@ fn text(args: &[OcValue], i: usize) -> Vec<u8> {
 }
 
 impl Sim {
-    fn put(&mut self, x: i64, y: i64, c: char) {
-        if (1..=W as i64).contains(&x) && (1..=H as i64).contains(&y) {
-            self.grid[y as usize - 1][x as usize - 1] = c;
-        }
-    }
-
     fn gpu(&mut self, method: &str, args: &[OcValue]) -> Result<Vec<OcValue>, String> {
-        Ok(match method {
-            "bind" => vec![OcValue::Bool(true)],
-            "getResolution" => vec![OcValue::Int(W as i64), OcValue::Int(H as i64)],
-            "set" => {
-                let (x, y) = (int(args, 0), int(args, 1));
-                for (i, c) in String::from_utf8_lossy(&text(args, 2)).chars().enumerate() {
-                    self.put(x + i as i64, y, c);
-                }
-                vec![OcValue::Bool(true)]
-            }
-            "fill" => {
-                let (x, y, w, h) = (int(args, 0), int(args, 1), int(args, 2), int(args, 3));
-                let c = String::from_utf8_lossy(&text(args, 4)).chars().next().unwrap_or(' ');
-                for yy in y..y + h {
-                    for xx in x..x + w {
-                        self.put(xx, yy, c);
-                    }
-                }
-                vec![OcValue::Bool(true)]
-            }
-            "copy" => {
-                let (x, y, w, h, tx, ty) = (int(args, 0), int(args, 1), int(args, 2), int(args, 3), int(args, 4), int(args, 5));
-                let snapshot = self.grid.clone();
-                for yy in y..y + h {
-                    for xx in x..x + w {
-                        if (1..=W as i64).contains(&xx) && (1..=H as i64).contains(&yy) {
-                            self.put(xx + tx, yy + ty, snapshot[yy as usize - 1][xx as usize - 1]);
-                        }
-                    }
-                }
-                vec![OcValue::Bool(true)]
-            }
-            other => return Err(format!("no such method: {other}")),
-        })
+        *self.gpu_calls.entry(method.to_owned()).or_default() += 1;
+        self.gpu.call(method, args)
     }
 
     fn eeprom(&mut self, method: &str, args: &[OcValue]) -> Result<Vec<OcValue>, String> {
@@ -509,6 +816,7 @@ impl Sim {
 
 fn main() -> Result<()> {
     let (mut eeprom, mut disk, mut ram_kib, mut keys, mut internet) = (None, None, 192u64, None, false);
+    let (mut size, mut png) = ((50usize, 16usize), None::<PathBuf>);
     let mut args = std::env::args().skip(1);
     while let Some(arg) = args.next() {
         let mut value = || args.next().ok_or_else(|| anyhow!("{arg} needs a value"));
@@ -518,7 +826,13 @@ fn main() -> Result<()> {
             "--ram" => ram_kib = value()?.parse()?,
             "--keys" => keys = Some(value()?),
             "--internet" => internet = true,
-            other => bail!("unknown argument {other}; usage: headless --eeprom <bios.wasm> [--disk <dir>] [--ram <KiB>] [--keys <text>] [--internet]"),
+            "--size" => {
+                let v = value()?;
+                let (w, h) = v.split_once('x').ok_or_else(|| anyhow!("--size takes WxH, like 80x25"))?;
+                size = (w.parse()?, h.parse()?);
+            }
+            "--png" => png = Some(PathBuf::from(value()?)),
+            other => bail!("unknown argument {other}; usage: headless --eeprom <bios.wasm> [--disk <dir>] [--ram <KiB>] [--keys <text>] [--internet] [--size WxH] [--png <file>]"),
         }
     }
     let eeprom = eeprom.ok_or_else(|| anyhow!("--eeprom is required"))?;
@@ -537,7 +851,8 @@ fn main() -> Result<()> {
     };
     let mut machine = new_machine()?;
     let mut sim = Sim {
-        grid: vec![vec![' '; W]; H],
+        gpu: GpuSim::new(size.0, size.1),
+        gpu_calls: Default::default(),
         keys: keys.chars().collect(),
         beeps: 0,
         eeprom_code: std::fs::read(&eeprom)?,
@@ -556,9 +871,16 @@ fn main() -> Result<()> {
 
     let (mut slices, mut requests, mut reloads) = (0u64, 0u64, 0u64);
     let mut uptime = 0.0;
+    // Game time moves a tick (50 ms) when the machine would wait for one: at
+    // the end of a slice, or while waiting for a signal. Component calls are
+    // served within the tick, as direct calls are in OpenComputers.
+    let mut next_tick = true;
     let outcome = loop {
-        uptime += 0.05;
+        if std::mem::take(&mut next_tick) {
+            uptime += 0.05;
+        }
         let outcome = machine.run(uptime, 200_000)?;
+        next_tick = matches!(outcome, RunOutcome::Yield | RunOutcome::Request(Request::PullSignal { .. }));
         slices += 1;
         if slices % 7 == 0 {
             machine.save()?;
@@ -583,11 +905,12 @@ fn main() -> Result<()> {
         }
     };
 
-    println!("+{}+", "-".repeat(W));
-    for row in &sim.grid {
+    let screen = &sim.gpu.buffers[&0];
+    println!("+{}+", "-".repeat(screen.w));
+    for row in screen.cells.chunks(screen.w).map(|r| r.iter().map(|c| c.ch).collect::<Vec<char>>()) {
         println!("|{}|", row.iter().collect::<String>());
     }
-    println!("+{}+", "-".repeat(W));
+    println!("+{}+", "-".repeat(screen.w));
     println!("stopped with {outcome:?}");
     println!(
         "{slices} slices, {requests} requests served, {reloads} save/load cycles, {} beeps, {ram_kib} KiB RAM",
@@ -597,6 +920,14 @@ fn main() -> Result<()> {
     println!("eeprom: {:?}, {} bytes of code", sim.eeprom_label, sim.eeprom_code.len());
     let total: usize = sim.fs_calls.values().sum();
     println!("filesystem calls: {total} {:?}", sim.fs_calls);
+    if !sim.gpu_calls.is_empty() {
+        let total: usize = sim.gpu_calls.values().sum();
+        println!("gpu calls: {total} {:?}", sim.gpu_calls);
+    }
+    if let Some(path) = &png {
+        std::fs::write(path, sim.gpu.png())?;
+        println!("screenshot: {}", path.display());
+    }
     if sim.async_calls > 0 {
         println!("async calls served: {}", sim.async_calls);
     }

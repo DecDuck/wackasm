@@ -23,7 +23,8 @@ Requirements:
 * a Rust **nightly** toolchain (wackasm uses nightly features) with the
   `wasm32-unknown-unknown` and `wasm32-wasip1` targets
   (`rustup target add wasm32-unknown-unknown wasm32-wasip1`)
-* any JDK 17+ to run Gradle. Gradle downloads the Java 8 toolchain that
+* JDK 25+ to run Gradle (RetroFuturaGradle 2.x is compiled for Java 25).
+  Gradle downloads the Java 8 toolchain that
   Minecraft needs.
 
 ```powershell
@@ -98,7 +99,7 @@ doesn't link the crate starts in `/`.
 
 The floppy ships examples
 ([`crates/wackasm-oc-programs`](../crates/wackasm-oc-programs)): `echo`,
-`hello`, `cat FILE...`, `write FILE [TEXT...]` (without TEXT it saves what you
+`hello`, `gfx [SCENE]` (a graphics demo), `cat FILE...`, `write FILE [TEXT...]` (without TEXT it saves what you
 type until Ctrl+D), `dir [PATH]`, `pwd`, `demo`, `flash` (see below), two that
 need an internet card:
 `curl [-i] [-I] [-f] [-X METHOD] [-H "Name: value"] [-d DATA|@FILE] [-o FILE | -O] URL`

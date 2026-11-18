@@ -25,7 +25,14 @@ export default defineConfig({
         { label: 'Start here', items: [{ autogenerate: { directory: 'start' } }] },
         { label: 'Using a computer', items: [{ autogenerate: { directory: 'using' } }] },
         { label: 'Writing programs', items: [{ autogenerate: { directory: 'programs' } }] },
-        { label: 'Reference', items: [{ autogenerate: { directory: 'reference' } }] },
+        {
+          label: 'Reference',
+          items: [
+            { autogenerate: { directory: 'reference' } },
+            // Built by CI from the Rust sources (see contributing/building).
+            { label: 'Rust API (rustdoc)', link: '/rustdoc/wackasm_opencomputers/' },
+          ],
+        },
         { label: 'Contributing', items: [{ autogenerate: { directory: 'contributing' } }] },
       ],
     }),

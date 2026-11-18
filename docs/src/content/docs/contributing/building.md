@@ -13,7 +13,7 @@ sidebar:
 - [`patch-crate`](https://crates.io/crates/patch-crate), which provides
   `cargo patch-crate` (`cargo install patch-crate`). The interpreter builds against a
   patched `wasmparser` (`patches/`), applied with `cargo patch-crate`;
-- any JDK 17 or newer, to run Gradle. Gradle downloads the Java 8 toolchain
+- JDK 25 or newer, to run Gradle (RetroFuturaGradle 2.x needs it). Gradle downloads the Java 8 toolchain
   Minecraft needs;
 - Node.js 22 or newer, for these docs.
 
@@ -85,3 +85,14 @@ cd docs
 npm ci
 npm run dev       # http://localhost:4321/wackasm/
 ```
+
+The site links to the Rust API docs at `/wackasm/rustdoc/`, which CI builds
+and adds after the Starlight build. To preview them locally, build them and
+copy them into `docs/public/` (ignored by git):
+
+```sh
+RUSTDOCFLAGS="--enable-index-page -Zunstable-options" cargo doc --no-deps   -p wackasm-opencomputers -p wackasm -p wackasm-wasi -p wackasm-oc   --features wackasm-opencomputers/async
+cp -r target/doc docs/public/rustdoc
+```
+
+rustdoc's links are all relative, so its output works under any path.

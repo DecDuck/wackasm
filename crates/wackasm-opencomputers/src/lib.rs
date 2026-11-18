@@ -24,6 +24,8 @@
 //! * [`signal`]: typed events.
 //! * [`computer`]: this computer's address, uptime, memory and power.
 //! * [`process`]: running other programs, like `std::process`.
+//! * [`draw`]: a framebuffer with text, half-block pixels, braille and
+//!   shapes, sent to the GPU with as few calls as possible.
 //! * [`internet`]: HTTP requests and TCP connections through an internet card.
 //! * `task` (with the `async` feature): an async executor, so programs can
 //!   wait on several component calls, timers and signals at once. Every
@@ -39,6 +41,7 @@
 pub mod component;
 pub mod components;
 pub mod computer;
+pub mod draw;
 mod error;
 pub mod internet;
 pub mod process;

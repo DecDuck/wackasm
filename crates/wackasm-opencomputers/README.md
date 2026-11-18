@@ -62,6 +62,10 @@ has a worked example (`demo`).
   `internet::TcpStream::connect(host, port)` is `Read + Write`, with
   `try_read` for polling. Dropping either closes and releases it. Reads come
   in 2 KiB chunks, one per tick.
+* **`draw`**: a `Canvas` framebuffer with text, half-block pixels (two per
+  cell), braille dots (2x4 per cell), lines, rectangles, circles and plots.
+  `present()` sends only the cells that changed, merged into as few GPU calls
+  as possible, optionally double-buffered through GPU video memory.
 * **`process`**: running other programs, like `std::process`.
   `Command::new("cat").arg("notes.txt")`, with `env`, `envs`, `env_remove`,
   `env_clear`, `current_dir` and `disk`, then `status()` (this program's stdin and stdout),

@@ -10,7 +10,7 @@ sidebar:
 | when | what |
 |---|---|
 | every push and pull request | builds the native library for every platform, runs the tests, builds the mod jar and uploads it as a workflow artifact, and builds these docs |
-| a push to `master` | also publishes these docs to GitHub Pages |
+| a push to `master` | also publishes these docs to GitHub Pages, with the Rust API docs (rustdoc) under `/wackasm/rustdoc/` |
 | a tag `v*` | also creates a GitHub release with the jar, publishes `wackasm-opencomputers` to crates.io (unless that version is already there), and publishes the docs |
 
 The native library is built on each platform's own runner (Windows x86_64,

@@ -89,13 +89,14 @@ jobs:
         run: cargo patch-crate --force
       - name: Rust tests
         run: cargo test -p wackasm-oc -p wackasm-opencomputers -p wackasm-wasi
-      # Java 8 for Minecraft, 21 to run Gradle (the last one is the default).
+      # Java 8 for Minecraft, 25 to run Gradle (the last one is the default):
+      # RetroFuturaGradle 2.x is compiled for Java 25 (class file version 69).
       - uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: |
             8
-            21
+            25
       - uses: gradle/actions/setup-gradle@v6
       - uses: actions/download-artifact@v8
         with:
@@ -154,6 +155,27 @@ jobs:
         run: |
           npm ci
           npm run build
+      # The Rust API docs, served at /wackasm/rustdoc/. rustdoc's links are
+      # all relative, so the output works from any folder.
+      - uses: dtolnay/rust-toolchain@nightly
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: rustdoc
+      # The crate is `patch-crate`; its binary is `cargo-patch-crate`.
+      - name: Install cargo patch-crate
+        run: cargo install patch-crate --version 0.1.13 --locked
+      - name: Apply the wasmparser patch
+        run: cargo patch-crate
+      - name: Build the Rust API docs
+        env:
+          # An index page listing the crates (nightly only).
+          RUSTDOCFLAGS: --enable-index-page -Zunstable-options
+        run: >
+          cargo doc --no-deps
+          -p wackasm-opencomputers -p wackasm -p wackasm-wasi -p wackasm-oc
+          --features wackasm-opencomputers/async
+      - name: Add them to the site
+        run: cp -r target/doc docs/dist/rustdoc
       - if: github.event_name == 'push' && github.ref == 'refs/heads/master'
         uses: actions/upload-pages-artifact@v5
         with:

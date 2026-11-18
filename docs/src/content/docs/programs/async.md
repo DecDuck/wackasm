@@ -2,7 +2,7 @@
 title: Async programs
 description: Wait on several component calls, timers, signals and downloads at once with the async feature.
 sidebar:
-  order: 6
+  order: 7
 ---
 
 Every component call normally blocks: your program stops until the answer
@@ -115,6 +115,8 @@ Blocking calls still work inside tasks: the blocking component methods,
 `std::fs`, `println!`, reading stdin, and [running other
 programs](/wackasm/programs/processes/). While one runs, no other task does,
 so in code with other tasks to keep going, prefer the `_async` versions.
+
+The full API is in the [reference for `task`](/wackasm/rustdoc/wackasm_opencomputers/task/index.html).
 
 ## The ABI underneath
 

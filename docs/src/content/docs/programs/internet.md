@@ -2,7 +2,7 @@
 title: HTTP and TCP
 description: Use the internet card from your programs.
 sidebar:
-  order: 5
+  order: 6
 ---
 
 `wackasm_opencomputers::internet` uses the first internet card (or one you
