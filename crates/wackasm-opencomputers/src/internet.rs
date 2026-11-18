@@ -338,3 +338,180 @@ impl io::Write for TcpStream {
         Ok(())
     }
 }
+
+// ---------------------------------------------------------------- async
+
+#[cfg(feature = "async")]
+impl Connection {
+    async fn call_async(&self, method: &str, args: Vec<Value>) -> Result<Vec<Value>> {
+        component::invoke_value_async(self.handle, method, args).await
+    }
+
+    async fn finish_connect_async(&self) -> Result<()> {
+        loop {
+            let reply = self.call_async("finishConnect", Vec::new()).await?;
+            match reply.first() {
+                Some(Value::Bool(true)) => return Ok(()),
+                Some(Value::Bool(false)) => {}
+                _ => {
+                    let reason = reply.get(1).and_then(Value::as_str).unwrap_or("connection failed");
+                    return Err(Error::Failed(reason.to_owned()));
+                }
+            }
+        }
+    }
+
+    /// The next chunk, waiting for one without holding up other tasks; empty
+    /// at the end.
+    async fn read_chunk_async(&mut self, max: usize) -> io::Result<Vec<u8>> {
+        loop {
+            if self.eof {
+                return Ok(Vec::new());
+            }
+            let n = (max as i64).clamp(1, CHUNK);
+            let reply = self.call_async("read", vec![Value::from(n)]).await.map_err(io::Error::other)?;
+            match reply.first() {
+                Some(Value::String(bytes)) if !bytes.0.is_empty() => return Ok(bytes.0.clone()),
+                Some(Value::String(_)) => {}
+                None | Some(Value::Nil) => {
+                    self.eof = true;
+                    if let Some(reason) = reply.get(1).and_then(Value::as_str) {
+                        return Err(io::Error::other(reason.to_owned()));
+                    }
+                }
+                Some(other) => return Err(io::Error::other(format!("unexpected read result {other:?}"))),
+            }
+        }
+    }
+}
+
+#[cfg(feature = "async")]
+async fn read_buffered_async(conn: &mut Connection, pending: &mut Pending, buf: &mut [u8]) -> io::Result<usize> {
+    if buf.is_empty() {
+        return Ok(0);
+    }
+    if pending.pos >= pending.data.len() {
+        pending.data = conn.read_chunk_async(buf.len()).await?;
+        pending.pos = 0;
+    }
+    let n = (pending.data.len() - pending.pos).min(buf.len());
+    buf[..n].copy_from_slice(&pending.data[pending.pos..pending.pos + n]);
+    pending.pos += n;
+    Ok(n)
+}
+
+#[cfg(feature = "async")]
+impl Request {
+    /// [`Request::send`] without blocking: other tasks keep running while the
+    /// request connects. Requires the `async` feature; see [`crate::task`].
+    pub async fn send_async(&self) -> Result<Response> {
+        let card = card(self.card.as_ref())?;
+        let headers = (!self.headers.is_empty()).then(|| {
+            Value::Map(self.headers.iter().map(|(k, v)| (Value::from(k.as_str()), Value::from(v.as_str()))).collect())
+        });
+        let args = vec![
+            Value::from(self.url.as_str()),
+            self.body.as_deref().map_or(Value::Nil, Value::text),
+            headers.unwrap_or(Value::Nil),
+            self.method.as_deref().map_or(Value::Nil, Value::from),
+        ];
+        let reply = card.invoke_async("request", args).await?;
+        let handle = match reply.first() {
+            Some(Value::Handle(handle)) => *handle,
+            _ => {
+                let reason = reply.get(1).and_then(Value::as_str).unwrap_or("request failed");
+                return Err(Error::Failed(reason.to_owned()));
+            }
+        };
+        let conn = Connection { handle, eof: false };
+        conn.finish_connect_async().await?;
+        loop {
+            let reply = conn.call_async("response", Vec::new()).await?;
+            if let Some(status) = reply.first().and_then(Value::as_i64) {
+                let message = reply.get(1).and_then(Value::as_str).unwrap_or_default().to_owned();
+                let headers = reply.get(2).map(parse_headers).unwrap_or_default();
+                return Ok(Response { status: status as u16, message, headers, conn, pending: Pending::default() });
+            }
+            crate::task::yield_now().await;
+        }
+    }
+}
+
+/// `internet::get(url)` without blocking; see [`Request::send_async`].
+#[cfg(feature = "async")]
+pub async fn get_async(url: impl Into<String>) -> Result<Response> {
+    Request::new(url).send_async().await
+}
+
+#[cfg(feature = "async")]
+impl Response {
+    /// Reads some of the body, like `Read::read`, without holding up other
+    /// tasks while waiting for data. `Ok(0)` at the end.
+    pub async fn read_async(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        read_buffered_async(&mut self.conn, &mut self.pending, buf).await
+    }
+
+    /// Reads the rest of the body into `out`; returns how many bytes that was.
+    pub async fn read_to_end_async(&mut self, out: &mut Vec<u8>) -> io::Result<usize> {
+        let start = out.len();
+        let mut buf = [0u8; CHUNK as usize];
+        loop {
+            match self.read_async(&mut buf).await? {
+                0 => return Ok(out.len() - start),
+                n => out.extend_from_slice(&buf[..n]),
+            }
+        }
+    }
+}
+
+#[cfg(feature = "async")]
+impl TcpStream {
+    /// [`TcpStream::connect`] without blocking.
+    pub async fn connect_async(host: &str, port: u16) -> Result<TcpStream> {
+        let card = card(None)?;
+        let reply = card.invoke_async("connect", vec![Value::from(host), Value::from(i64::from(port))]).await?;
+        let handle = match reply.first() {
+            Some(Value::Handle(handle)) => *handle,
+            _ => {
+                let reason = reply.get(1).and_then(Value::as_str).unwrap_or("connection failed");
+                return Err(Error::Failed(reason.to_owned()));
+            }
+        };
+        let conn = Connection { handle, eof: false };
+        conn.finish_connect_async().await?;
+        Ok(TcpStream { conn, pending: Pending::default() })
+    }
+
+    /// Reads what arrives, waiting for something without holding up other
+    /// tasks. `Ok(0)` once the other side has closed.
+    pub async fn read_async(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        read_buffered_async(&mut self.conn, &mut self.pending, buf).await
+    }
+
+    /// Writes some of `buf`; returns how much.
+    pub async fn write_async(&mut self, buf: &[u8]) -> io::Result<usize> {
+        if buf.is_empty() {
+            return Ok(0);
+        }
+        loop {
+            let reply = self.conn.call_async("write", vec![Value::text(buf)]).await.map_err(io::Error::other)?;
+            match reply.first().and_then(Value::as_i64) {
+                Some(0) => {}
+                Some(n) => return Ok(n as usize),
+                None => {
+                    let reason = reply.get(1).and_then(Value::as_str).unwrap_or("write failed");
+                    return Err(io::Error::other(reason.to_owned()));
+                }
+            }
+        }
+    }
+
+    /// Writes all of `buf`.
+    pub async fn write_all_async(&mut self, mut buf: &[u8]) -> io::Result<()> {
+        while !buf.is_empty() {
+            let n = self.write_async(buf).await?;
+            buf = &buf[n..];
+        }
+        Ok(())
+    }
+}

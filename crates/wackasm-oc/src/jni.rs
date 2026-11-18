@@ -184,6 +184,20 @@ pub extern "system" fn Java_dev_wackasm_oc_WackasmNative_respond<'l>(
     })
 }
 
+/// `static native boolean nextAsync(long handle)`: makes the next queued
+/// async call the pending request without running the guest (see
+/// `RUN_INVOKE_ASYNC`). `false` if there is none.
+#[unsafe(no_mangle)]
+pub extern "system" fn Java_dev_wackasm_oc_WackasmNative_nextAsync<'l>(
+    mut env: JNIEnv<'l>,
+    _class: JClass<'l>,
+    handle: jlong,
+) -> jboolean {
+    guard(&mut env, JNI_FALSE, |_| {
+        with_machine(handle, |m| Ok(if m.next_async()? { JNI_TRUE } else { JNI_FALSE }))
+    })
+}
+
 /// `static native void save(long handle)`: writes the snapshot into the work dir.
 #[unsafe(no_mangle)]
 pub extern "system" fn Java_dev_wackasm_oc_WackasmNative_save<'l>(

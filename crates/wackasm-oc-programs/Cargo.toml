@@ -9,7 +9,7 @@ description = "Example WASI programs that the wackasm shell runs from /bin on it
 [workspace]
 
 [dependencies]
-wackasm-opencomputers = { path = "../wackasm-opencomputers" }
+wackasm-opencomputers = { path = "../wackasm-opencomputers", features = ["async"] }
 
 [profile.release]
 opt-level = "s"

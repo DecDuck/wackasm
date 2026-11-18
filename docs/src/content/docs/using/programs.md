@@ -26,7 +26,7 @@ and they double as examples for [writing your own](/wackasm/programs/first-progr
 | `env [NAME=VALUE...] [PROGRAM ARGS...]` | prints the environment, or runs a program with variables added |
 | `lines PROGRAM ARGS...` | runs a program and numbers the lines of its output |
 
-These nest: `time lines cat notes.txt` works.
+These nest: `time lines cat notes.txt` works.            
 
 ## Internet
 
@@ -36,6 +36,7 @@ These need an [internet card](/wackasm/using/internet/).
 |---|---|
 | `curl [OPTIONS] URL` | an HTTP or HTTPS request |
 | `nc [-C] [-w SECS] HOST PORT` | a TCP connection |
+| `fetch URL...` | downloads several URLs at once, showing each one's status and size; an example of [async programs](/wackasm/programs/async/) |
 
 ## EEPROM
 

@@ -2,7 +2,7 @@
 name = "wackasm-opencomputers"
 version = "0.1.0"
 edition = "2024"
-rust-version = "1.85"
+rust-version = "1.88"
 description = "Typed Rust bindings to OpenComputers components, for WASI programs running on the wackasm architecture"
 license = "MIT"
 repository = "https://github.com/DecDuck/wackasm"
@@ -13,5 +13,14 @@ keywords = ["opencomputers", "minecraft", "wasi", "webassembly", "wackasm"]
 categories = ["api-bindings", "wasm", "game-development"]
 # The generator and its OpenComputers callback dump aren't needed to build.
 exclude = ["tools/"]
+
+[features]
+# An async executor (`task`) and `_async` versions of every component method,
+# for programs that wait on several things at once. Everything else works
+# without it.
+async = []
+
+[package.metadata.docs.rs]
+all-features = true
 
 [dependencies]

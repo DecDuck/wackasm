@@ -103,7 +103,8 @@ type until Ctrl+D), `dir [PATH]`, `pwd`, `demo`, `flash` (see below), two that
 need an internet card:
 `curl [-i] [-I] [-f] [-X METHOD] [-H "Name: value"] [-d DATA|@FILE] [-o FILE | -O] URL`
 and `nc [-C] [-w SECS] HOST PORT` (sends the lines you type, then prints
-replies until the connection closes or goes quiet), and three that run other programs:
+replies until the connection closes or goes quiet), `fetch URL...` (downloads
+several URLs at once with the crate's `async` feature), and three that run other programs:
 `time PROGRAM ARGS...`, `env [NAME=VALUE...] [PROGRAM ARGS...]` and
 `lines PROGRAM ARGS...` (numbers a program's output). Programs start with
 `PATH=/bin` and can run others through `wackasm_opencomputers::process::Command`.
@@ -200,6 +201,7 @@ under `-Dwackasm.workdir`):
 |---|---|---|
 | `callBudgetMultiplier` | 1.0 | how much further the per-tick direct-call budget goes for wasm computers. OpenComputers charges each direct call `1/limit` of the budget (`filesystem.read` has limit 15). Wasm computers pay that divided by this, so 2.0 gives them twice the direct calls per tick of a Lua computer with the same parts. Lua computers are unaffected. Range 0.1 to 16 |
 | `memoryMultiplier` | 1.8 | memory for wasm computers, as a multiple of installed RAM. Lua computers are unaffected. Range 1.0 to 4.0 |
+| `asyncCallsPerTick` | 1 | indirect calls a wasm computer's async queue (`oc.invoke_async`) may run per tick. 1 matches Lua; raising it (16 is reasonable) lets async programs overlap several indirect calls per tick. Range 1 to 64 |
 | `fuelPerSlice` | 5,000,000 | wasm instructions per execution slice before the machine yields to the next tick |
 
 The budget itself is still OpenComputers' own `callBudgets` (by CPU and

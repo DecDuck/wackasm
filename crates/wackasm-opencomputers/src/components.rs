@@ -6,6 +6,8 @@
 //! One struct per component type, one method per callback. The docs on
 //! each method are OpenComputers' own, followed by the Lua signature.
 //! Find components with [`Component::first`] or [`Component::all`].
+//! With the `async` feature, each method also has an `_async` twin that
+//! doesn't block (see `crate::task`).
 
 #![allow(clippy::too_many_arguments)]
 
@@ -42,6 +44,15 @@ impl Assembler {
         single::<bool>(reply)
     }
 
+    /// [`Self::start`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn start_async(&self) -> Result<bool> {
+        let args = args(vec![]);
+        let reply = self.invoke_async("start", args).await?;
+        single::<bool>(reply)
+    }
+
     /// The current state of the assembler, `busy' or `idle', followed by the progress or template validity, respectively.
     ///
     /// Lua: `assembler.status(): string, number or boolean`
@@ -49,6 +60,15 @@ impl Assembler {
     pub fn status(&self) -> Result<(OcString, Value)> {
         let args = args(vec![]);
         let reply = self.invoke("status", args)?;
+        FromReply::from_reply(reply)
+    }
+
+    /// [`Self::status`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn status_async(&self) -> Result<(OcString, Value)> {
+        let args = args(vec![]);
+        let reply = self.invoke_async("status", args).await?;
         FromReply::from_reply(reply)
     }
 }
@@ -96,6 +116,15 @@ impl Beacon {
         single::<Number>(reply)
     }
 
+    /// [`Self::get_levels`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn get_levels_async(&self) -> Result<Number> {
+        let args = args(vec![]);
+        let reply = self.invoke_async("getLevels", args).await?;
+        single::<Number>(reply)
+    }
+
     /// Get the name of the active primary effect.
     ///
     /// Lua: `beacon.getPrimaryEffect():string`
@@ -106,6 +135,15 @@ impl Beacon {
         single::<OcString>(reply)
     }
 
+    /// [`Self::get_primary_effect`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn get_primary_effect_async(&self) -> Result<OcString> {
+        let args = args(vec![]);
+        let reply = self.invoke_async("getPrimaryEffect", args).await?;
+        single::<OcString>(reply)
+    }
+
     /// Get the name of the active secondary effect.
     ///
     /// Lua: `beacon.getSecondaryEffect():string`
@@ -113,6 +151,15 @@ impl Beacon {
     pub fn get_secondary_effect(&self) -> Result<OcString> {
         let args = args(vec![]);
         let reply = self.invoke("getSecondaryEffect", args)?;
+        single::<OcString>(reply)
+    }
+
+    /// [`Self::get_secondary_effect`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn get_secondary_effect_async(&self) -> Result<OcString> {
+        let args = args(vec![]);
+        let reply = self.invoke_async("getSecondaryEffect", args).await?;
         single::<OcString>(reply)
     }
 }
@@ -141,6 +188,15 @@ impl BrewingStand {
     pub fn get_brew_time(&self) -> Result<Number> {
         let args = args(vec![]);
         let reply = self.invoke("getBrewTime", args)?;
+        single::<Number>(reply)
+    }
+
+    /// [`Self::get_brew_time`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn get_brew_time_async(&self) -> Result<Number> {
+        let args = args(vec![]);
+        let reply = self.invoke_async("getBrewTime", args).await?;
         single::<Number>(reply)
     }
 }
@@ -172,6 +228,15 @@ impl Chunkloader {
         single::<bool>(reply)
     }
 
+    /// [`Self::is_active`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn is_active_async(&self) -> Result<bool> {
+        let args = args(vec![]);
+        let reply = self.invoke_async("isActive", args).await?;
+        single::<bool>(reply)
+    }
+
     /// Enables or disables the chunkloader, returns true if active changed
     ///
     /// Lua: `chunkloader.setActive(enabled:boolean):boolean`
@@ -179,6 +244,15 @@ impl Chunkloader {
     pub fn set_active(&self, enabled: bool) -> Result<bool> {
         let args = args(vec![Some(Value::Bool(enabled))]);
         let reply = self.invoke("setActive", args)?;
+        single::<bool>(reply)
+    }
+
+    /// [`Self::set_active`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn set_active_async(&self, enabled: bool) -> Result<bool> {
+        let args = args(vec![Some(Value::Bool(enabled))]);
+        let reply = self.invoke_async("setActive", args).await?;
         single::<bool>(reply)
     }
 }
@@ -210,6 +284,15 @@ impl CommandBlock {
         single::<Number>(reply)
     }
 
+    /// [`Self::execute_command`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn execute_command_async(&self) -> Result<Number> {
+        let args = args(vec![]);
+        let reply = self.invoke_async("executeCommand", args).await?;
+        single::<Number>(reply)
+    }
+
     /// Get the command currently set in this command block.
     ///
     /// Lua: `command_block.getCommand():string`
@@ -220,6 +303,15 @@ impl CommandBlock {
         single::<OcString>(reply)
     }
 
+    /// [`Self::get_command`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn get_command_async(&self) -> Result<OcString> {
+        let args = args(vec![]);
+        let reply = self.invoke_async("getCommand", args).await?;
+        single::<OcString>(reply)
+    }
+
     /// Set the specified command for the command block.
     ///
     /// Lua: `command_block.setCommand(value:string)`
@@ -227,6 +319,15 @@ impl CommandBlock {
     pub fn set_command(&self, value: impl AsRef<[u8]>) -> Result<()> {
         let args = args(vec![Some(Value::text(value.as_ref()))]);
         let reply = self.invoke("setCommand", args)?;
+        FromReply::from_reply(reply)
+    }
+
+    /// [`Self::set_command`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn set_command_async(&self, value: impl AsRef<[u8]>) -> Result<()> {
+        let args = args(vec![Some(Value::text(value.as_ref()))]);
+        let reply = self.invoke_async("setCommand", args).await?;
         FromReply::from_reply(reply)
     }
 }
@@ -255,6 +356,15 @@ impl Comparator {
     pub fn get_output_signal(&self) -> Result<Number> {
         let args = args(vec![]);
         let reply = self.invoke("getOutputSignal", args)?;
+        single::<Number>(reply)
+    }
+
+    /// [`Self::get_output_signal`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn get_output_signal_async(&self) -> Result<Number> {
+        let args = args(vec![]);
+        let reply = self.invoke_async("getOutputSignal", args).await?;
         single::<Number>(reply)
     }
 }
@@ -286,6 +396,15 @@ impl Computer {
         FromReply::from_reply(reply)
     }
 
+    /// [`Self::beep`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn beep_async(&self, frequency: Option<Value>, duration: Option<Number>) -> Result<()> {
+        let args = args(vec![frequency, duration.map(Value::Number)]);
+        let reply = self.invoke_async("beep", args).await?;
+        FromReply::from_reply(reply)
+    }
+
     /// Collect information on all connected devices.
     ///
     /// Lua: `computer.getDeviceInfo():table`
@@ -293,6 +412,15 @@ impl Computer {
     pub fn get_device_info(&self) -> Result<Value> {
         let args = args(vec![]);
         let reply = self.invoke("getDeviceInfo", args)?;
+        single::<Value>(reply)
+    }
+
+    /// [`Self::get_device_info`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn get_device_info_async(&self) -> Result<Value> {
+        let args = args(vec![]);
+        let reply = self.invoke_async("getDeviceInfo", args).await?;
         single::<Value>(reply)
     }
 
@@ -306,6 +434,15 @@ impl Computer {
         single::<Value>(reply)
     }
 
+    /// [`Self::get_program_locations`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn get_program_locations_async(&self) -> Result<Value> {
+        let args = args(vec![]);
+        let reply = self.invoke_async("getProgramLocations", args).await?;
+        single::<Value>(reply)
+    }
+
     /// Returns whether the computer is running.
     ///
     /// Lua: `computer.isRunning():boolean`
@@ -313,6 +450,15 @@ impl Computer {
     pub fn is_running(&self) -> Result<bool> {
         let args = args(vec![]);
         let reply = self.invoke("isRunning", args)?;
+        single::<bool>(reply)
+    }
+
+    /// [`Self::is_running`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn is_running_async(&self) -> Result<bool> {
+        let args = args(vec![]);
+        let reply = self.invoke_async("isRunning", args).await?;
         single::<bool>(reply)
     }
 
@@ -326,6 +472,15 @@ impl Computer {
         single::<bool>(reply)
     }
 
+    /// [`Self::start`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn start_async(&self) -> Result<bool> {
+        let args = args(vec![]);
+        let reply = self.invoke_async("start", args).await?;
+        single::<bool>(reply)
+    }
+
     /// Stops the computer. Returns true if the state changed.
     ///
     /// Lua: `computer.stop():boolean`
@@ -333,6 +488,15 @@ impl Computer {
     pub fn stop(&self) -> Result<bool> {
         let args = args(vec![]);
         let reply = self.invoke("stop", args)?;
+        single::<bool>(reply)
+    }
+
+    /// [`Self::stop`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn stop_async(&self) -> Result<bool> {
+        let args = args(vec![]);
+        let reply = self.invoke_async("stop", args).await?;
         single::<bool>(reply)
     }
 }
@@ -361,6 +525,15 @@ impl Crafting {
     pub fn craft(&self, count: Option<Number>) -> Result<Number> {
         let args = args(vec![count.map(Value::Number)]);
         let reply = self.invoke("craft", args)?;
+        single::<Number>(reply)
+    }
+
+    /// [`Self::craft`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn craft_async(&self, count: Option<Number>) -> Result<Number> {
+        let args = args(vec![count.map(Value::Number)]);
+        let reply = self.invoke_async("craft", args).await?;
         single::<Number>(reply)
     }
 }
@@ -392,6 +565,15 @@ impl Data {
         single::<OcString>(reply)
     }
 
+    /// [`Self::crc32`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn crc32_async(&self, data: impl AsRef<[u8]>) -> Result<OcString> {
+        let args = args(vec![Some(Value::text(data.as_ref()))]);
+        let reply = self.invoke_async("crc32", args).await?;
+        single::<OcString>(reply)
+    }
+
     /// Applies base64 decoding to the data.
     ///
     /// Lua: `data.decode64(data:string):string`
@@ -399,6 +581,15 @@ impl Data {
     pub fn decode64(&self, data: impl AsRef<[u8]>) -> Result<OcString> {
         let args = args(vec![Some(Value::text(data.as_ref()))]);
         let reply = self.invoke("decode64", args)?;
+        single::<OcString>(reply)
+    }
+
+    /// [`Self::decode64`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn decode64_async(&self, data: impl AsRef<[u8]>) -> Result<OcString> {
+        let args = args(vec![Some(Value::text(data.as_ref()))]);
+        let reply = self.invoke_async("decode64", args).await?;
         single::<OcString>(reply)
     }
 
@@ -412,6 +603,15 @@ impl Data {
         single::<OcString>(reply)
     }
 
+    /// [`Self::decrypt`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn decrypt_async(&self, data: impl AsRef<[u8]>, key: impl AsRef<[u8]>, iv: impl AsRef<[u8]>) -> Result<OcString> {
+        let args = args(vec![Some(Value::text(data.as_ref())), Some(Value::text(key.as_ref())), Some(Value::text(iv.as_ref()))]);
+        let reply = self.invoke_async("decrypt", args).await?;
+        single::<OcString>(reply)
+    }
+
     /// Applies deflate compression to the data.
     ///
     /// Lua: `data.deflate(data:string):string`
@@ -419,6 +619,15 @@ impl Data {
     pub fn deflate(&self, data: impl AsRef<[u8]>) -> Result<OcString> {
         let args = args(vec![Some(Value::text(data.as_ref()))]);
         let reply = self.invoke("deflate", args)?;
+        single::<OcString>(reply)
+    }
+
+    /// [`Self::deflate`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn deflate_async(&self, data: impl AsRef<[u8]>) -> Result<OcString> {
+        let args = args(vec![Some(Value::text(data.as_ref()))]);
+        let reply = self.invoke_async("deflate", args).await?;
         single::<OcString>(reply)
     }
 
@@ -432,6 +641,15 @@ impl Data {
         single::<Handle>(reply)
     }
 
+    /// [`Self::deserialize_key`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn deserialize_key_async(&self, data: impl AsRef<[u8]>, r#type: impl AsRef<[u8]>) -> Result<Handle> {
+        let args = args(vec![Some(Value::text(data.as_ref())), Some(Value::text(r#type.as_ref()))]);
+        let reply = self.invoke_async("deserializeKey", args).await?;
+        single::<Handle>(reply)
+    }
+
     /// Generates a shared key. ecdh(a.priv, b.pub) == ecdh(b.priv, a.pub)
     ///
     /// Lua: `data.ecdh(priv:userdata, pub:userdata):string`
@@ -439,6 +657,15 @@ impl Data {
     pub fn ecdh(&self, r#priv: Handle, r#pub: Handle) -> Result<OcString> {
         let args = args(vec![Some(Value::Handle(r#priv)), Some(Value::Handle(r#pub))]);
         let reply = self.invoke("ecdh", args)?;
+        single::<OcString>(reply)
+    }
+
+    /// [`Self::ecdh`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn ecdh_async(&self, r#priv: Handle, r#pub: Handle) -> Result<OcString> {
+        let args = args(vec![Some(Value::Handle(r#priv)), Some(Value::Handle(r#pub))]);
+        let reply = self.invoke_async("ecdh", args).await?;
         single::<OcString>(reply)
     }
 
@@ -452,6 +679,15 @@ impl Data {
         single::<Value>(reply)
     }
 
+    /// [`Self::ecdsa`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn ecdsa_async(&self, data: impl AsRef<[u8]>, key: Handle, sig: Option<&str>) -> Result<Value> {
+        let args = args(vec![Some(Value::text(data.as_ref())), Some(Value::Handle(key)), sig.map(Value::from)]);
+        let reply = self.invoke_async("ecdsa", args).await?;
+        single::<Value>(reply)
+    }
+
     /// Applies base64 encoding to the data.
     ///
     /// Lua: `data.encode64(data:string):string`
@@ -459,6 +695,15 @@ impl Data {
     pub fn encode64(&self, data: impl AsRef<[u8]>) -> Result<OcString> {
         let args = args(vec![Some(Value::text(data.as_ref()))]);
         let reply = self.invoke("encode64", args)?;
+        single::<OcString>(reply)
+    }
+
+    /// [`Self::encode64`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn encode64_async(&self, data: impl AsRef<[u8]>) -> Result<OcString> {
+        let args = args(vec![Some(Value::text(data.as_ref()))]);
+        let reply = self.invoke_async("encode64", args).await?;
         single::<OcString>(reply)
     }
 
@@ -472,6 +717,15 @@ impl Data {
         single::<OcString>(reply)
     }
 
+    /// [`Self::encrypt`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn encrypt_async(&self, data: impl AsRef<[u8]>, key: impl AsRef<[u8]>, iv: impl AsRef<[u8]>) -> Result<OcString> {
+        let args = args(vec![Some(Value::text(data.as_ref())), Some(Value::text(key.as_ref())), Some(Value::text(iv.as_ref()))]);
+        let reply = self.invoke_async("encrypt", args).await?;
+        single::<OcString>(reply)
+    }
+
     /// Generates key pair. Returns: public, private keys. Allowed key lengths: 256, 384 bits.
     ///
     /// Lua: `data.generateKeyPair([bitLen:number]):userdata, userdata`
@@ -479,6 +733,15 @@ impl Data {
     pub fn generate_key_pair(&self, bit_len: Option<Number>) -> Result<(Handle, Handle)> {
         let args = args(vec![bit_len.map(Value::Number)]);
         let reply = self.invoke("generateKeyPair", args)?;
+        FromReply::from_reply(reply)
+    }
+
+    /// [`Self::generate_key_pair`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn generate_key_pair_async(&self, bit_len: Option<Number>) -> Result<(Handle, Handle)> {
+        let args = args(vec![bit_len.map(Value::Number)]);
+        let reply = self.invoke_async("generateKeyPair", args).await?;
         FromReply::from_reply(reply)
     }
 
@@ -492,6 +755,15 @@ impl Data {
         single::<Number>(reply)
     }
 
+    /// [`Self::get_limit`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn get_limit_async(&self) -> Result<Number> {
+        let args = args(vec![]);
+        let reply = self.invoke_async("getLimit", args).await?;
+        single::<Number>(reply)
+    }
+
     /// Applies inflate decompression to the data.
     ///
     /// Lua: `data.inflate(data:string):string`
@@ -499,6 +771,15 @@ impl Data {
     pub fn inflate(&self, data: impl AsRef<[u8]>) -> Result<OcString> {
         let args = args(vec![Some(Value::text(data.as_ref()))]);
         let reply = self.invoke("inflate", args)?;
+        single::<OcString>(reply)
+    }
+
+    /// [`Self::inflate`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn inflate_async(&self, data: impl AsRef<[u8]>) -> Result<OcString> {
+        let args = args(vec![Some(Value::text(data.as_ref()))]);
+        let reply = self.invoke_async("inflate", args).await?;
         single::<OcString>(reply)
     }
 
@@ -512,6 +793,15 @@ impl Data {
         single::<OcString>(reply)
     }
 
+    /// [`Self::md5`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn md5_async(&self, data: impl AsRef<[u8]>) -> Result<OcString> {
+        let args = args(vec![Some(Value::text(data.as_ref()))]);
+        let reply = self.invoke_async("md5", args).await?;
+        single::<OcString>(reply)
+    }
+
     /// Generates secure random binary data.
     ///
     /// Lua: `data.random(len:number):string`
@@ -522,6 +812,15 @@ impl Data {
         single::<OcString>(reply)
     }
 
+    /// [`Self::random`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn random_async(&self, len: impl Into<Number>) -> Result<OcString> {
+        let args = args(vec![Some(Value::Number(len.into()))]);
+        let reply = self.invoke_async("random", args).await?;
+        single::<OcString>(reply)
+    }
+
     /// Computes SHA2-256 hash of the data. Result is binary data.
     ///
     /// Lua: `data.sha256(data:string):string`
@@ -529,6 +828,15 @@ impl Data {
     pub fn sha256(&self, data: impl AsRef<[u8]>) -> Result<OcString> {
         let args = args(vec![Some(Value::text(data.as_ref()))]);
         let reply = self.invoke("sha256", args)?;
+        single::<OcString>(reply)
+    }
+
+    /// [`Self::sha256`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn sha256_async(&self, data: impl AsRef<[u8]>) -> Result<OcString> {
+        let args = args(vec![Some(Value::text(data.as_ref()))]);
+        let reply = self.invoke_async("sha256", args).await?;
         single::<OcString>(reply)
     }
 }
@@ -560,6 +868,15 @@ impl Database {
         single::<bool>(reply)
     }
 
+    /// [`Self::clear`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn clear_async(&self, slot: impl Into<Number>) -> Result<bool> {
+        let args = args(vec![Some(Value::Number(slot.into()))]);
+        let reply = self.invoke_async("clear", args).await?;
+        single::<bool>(reply)
+    }
+
     /// Copies the data stored in this database to another database with the specified address.
     ///
     /// Lua: `database.clone(address:string):number`
@@ -567,6 +884,15 @@ impl Database {
     pub fn clone(&self, address: impl AsRef<[u8]>) -> Result<Number> {
         let args = args(vec![Some(Value::text(address.as_ref()))]);
         let reply = self.invoke("clone", args)?;
+        single::<Number>(reply)
+    }
+
+    /// [`Self::clone`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn clone_async(&self, address: impl AsRef<[u8]>) -> Result<Number> {
+        let args = args(vec![Some(Value::text(address.as_ref()))]);
+        let reply = self.invoke_async("clone", args).await?;
         single::<Number>(reply)
     }
 
@@ -580,6 +906,15 @@ impl Database {
         single::<OcString>(reply)
     }
 
+    /// [`Self::compute_hash`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn compute_hash_async(&self, slot: impl Into<Number>) -> Result<OcString> {
+        let args = args(vec![Some(Value::Number(slot.into()))]);
+        let reply = self.invoke_async("computeHash", args).await?;
+        single::<OcString>(reply)
+    }
+
     /// Copies an entry to another slot, optionally to another database. Returns true if something was overwritten.
     ///
     /// Lua: `database.copy(fromSlot:number, toSlot:number[, address:string]):boolean`
@@ -587,6 +922,15 @@ impl Database {
     pub fn copy(&self, from_slot: impl Into<Number>, to_slot: impl Into<Number>, address: Option<&str>) -> Result<bool> {
         let args = args(vec![Some(Value::Number(from_slot.into())), Some(Value::Number(to_slot.into())), address.map(Value::from)]);
         let reply = self.invoke("copy", args)?;
+        single::<bool>(reply)
+    }
+
+    /// [`Self::copy`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn copy_async(&self, from_slot: impl Into<Number>, to_slot: impl Into<Number>, address: Option<&str>) -> Result<bool> {
+        let args = args(vec![Some(Value::Number(from_slot.into())), Some(Value::Number(to_slot.into())), address.map(Value::from)]);
+        let reply = self.invoke_async("copy", args).await?;
         single::<bool>(reply)
     }
 
@@ -600,6 +944,15 @@ impl Database {
         single::<Value>(reply)
     }
 
+    /// [`Self::get`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn get_async(&self, slot: impl Into<Number>) -> Result<Value> {
+        let args = args(vec![Some(Value::Number(slot.into()))]);
+        let reply = self.invoke_async("get", args).await?;
+        single::<Value>(reply)
+    }
+
     /// Get the index of an item stack with the specified hash. Returns a negative value if no such stack was found.
     ///
     /// Lua: `database.indexOf(hash:string):number`
@@ -607,6 +960,15 @@ impl Database {
     pub fn index_of(&self, hash: impl AsRef<[u8]>) -> Result<Number> {
         let args = args(vec![Some(Value::text(hash.as_ref()))]);
         let reply = self.invoke("indexOf", args)?;
+        single::<Number>(reply)
+    }
+
+    /// [`Self::index_of`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn index_of_async(&self, hash: impl AsRef<[u8]>) -> Result<Number> {
+        let args = args(vec![Some(Value::text(hash.as_ref()))]);
+        let reply = self.invoke_async("indexOf", args).await?;
         single::<Number>(reply)
     }
 }
@@ -638,6 +1000,15 @@ impl Debug {
         single::<Number>(reply)
     }
 
+    /// [`Self::change_buffer`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn change_buffer_async(&self, value: impl Into<Number>) -> Result<Number> {
+        let args = args(vec![Some(Value::Number(value.into()))]);
+        let reply = self.invoke_async("changeBuffer", args).await?;
+        single::<Number>(reply)
+    }
+
     /// Add a component block at the specified coordinates to the computer network.
     ///
     /// Lua: `debug.connectToBlock(x:number, y:number, z:number):boolean`
@@ -645,6 +1016,15 @@ impl Debug {
     pub fn connect_to_block(&self, x: impl Into<Number>, y: impl Into<Number>, z: impl Into<Number>) -> Result<bool> {
         let args = args(vec![Some(Value::Number(x.into())), Some(Value::Number(y.into())), Some(Value::Number(z.into()))]);
         let reply = self.invoke("connectToBlock", args)?;
+        single::<bool>(reply)
+    }
+
+    /// [`Self::connect_to_block`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn connect_to_block_async(&self, x: impl Into<Number>, y: impl Into<Number>, z: impl Into<Number>) -> Result<bool> {
+        let args = args(vec![Some(Value::Number(x.into())), Some(Value::Number(y.into())), Some(Value::Number(z.into()))]);
+        let reply = self.invoke_async("connectToBlock", args).await?;
         single::<bool>(reply)
     }
 
@@ -658,6 +1038,15 @@ impl Debug {
         single::<Handle>(reply)
     }
 
+    /// [`Self::get_player`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn get_player_async(&self, name: impl AsRef<[u8]>) -> Result<Handle> {
+        let args = args(vec![Some(Value::text(name.as_ref()))]);
+        let reply = self.invoke_async("getPlayer", args).await?;
+        single::<Handle>(reply)
+    }
+
     /// Get a list of currently logged-in players.
     ///
     /// Lua: `debug.getPlayers():table`
@@ -665,6 +1054,15 @@ impl Debug {
     pub fn get_players(&self) -> Result<Value> {
         let args = args(vec![]);
         let reply = self.invoke("getPlayers", args)?;
+        single::<Value>(reply)
+    }
+
+    /// [`Self::get_players`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn get_players_async(&self) -> Result<Value> {
+        let args = args(vec![]);
+        let reply = self.invoke_async("getPlayers", args).await?;
         single::<Value>(reply)
     }
 
@@ -678,6 +1076,15 @@ impl Debug {
         single::<Handle>(reply)
     }
 
+    /// [`Self::get_scoreboard`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn get_scoreboard_async(&self) -> Result<Handle> {
+        let args = args(vec![]);
+        let reply = self.invoke_async("getScoreboard", args).await?;
+        single::<Handle>(reply)
+    }
+
     /// Get the world object for the specified dimension ID, or the container's.
     ///
     /// Lua: `debug.getWorld([id:number]):userdata`
@@ -685,6 +1092,15 @@ impl Debug {
     pub fn get_world(&self, id: Option<Number>) -> Result<Handle> {
         let args = args(vec![id.map(Value::Number)]);
         let reply = self.invoke("getWorld", args)?;
+        single::<Handle>(reply)
+    }
+
+    /// [`Self::get_world`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn get_world_async(&self, id: Option<Number>) -> Result<Handle> {
+        let args = args(vec![id.map(Value::Number)]);
+        let reply = self.invoke_async("getWorld", args).await?;
         single::<Handle>(reply)
     }
 
@@ -698,6 +1114,15 @@ impl Debug {
         single::<Value>(reply)
     }
 
+    /// [`Self::get_worlds`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn get_worlds_async(&self) -> Result<Value> {
+        let args = args(vec![]);
+        let reply = self.invoke_async("getWorlds", args).await?;
+        single::<Value>(reply)
+    }
+
     /// Get the container's X position in the world.
     ///
     /// Lua: `debug.getX():number`
@@ -705,6 +1130,15 @@ impl Debug {
     pub fn get_x(&self) -> Result<Number> {
         let args = args(vec![]);
         let reply = self.invoke("getX", args)?;
+        single::<Number>(reply)
+    }
+
+    /// [`Self::get_x`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn get_x_async(&self) -> Result<Number> {
+        let args = args(vec![]);
+        let reply = self.invoke_async("getX", args).await?;
         single::<Number>(reply)
     }
 
@@ -718,6 +1152,15 @@ impl Debug {
         single::<Number>(reply)
     }
 
+    /// [`Self::get_y`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn get_y_async(&self) -> Result<Number> {
+        let args = args(vec![]);
+        let reply = self.invoke_async("getY", args).await?;
+        single::<Number>(reply)
+    }
+
     /// Get the container's Z position in the world.
     ///
     /// Lua: `debug.getZ():number`
@@ -725,6 +1168,15 @@ impl Debug {
     pub fn get_z(&self) -> Result<Number> {
         let args = args(vec![]);
         let reply = self.invoke("getZ", args)?;
+        single::<Number>(reply)
+    }
+
+    /// [`Self::get_z`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn get_z_async(&self) -> Result<Number> {
+        let args = args(vec![]);
+        let reply = self.invoke_async("getZ", args).await?;
         single::<Number>(reply)
     }
 
@@ -738,6 +1190,15 @@ impl Debug {
         single::<bool>(reply)
     }
 
+    /// [`Self::is_mod_loaded`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn is_mod_loaded_async(&self, name: impl AsRef<[u8]>) -> Result<bool> {
+        let args = args(vec![Some(Value::text(name.as_ref()))]);
+        let reply = self.invoke_async("isModLoaded", args).await?;
+        single::<bool>(reply)
+    }
+
     /// Runs an arbitrary command using a fake player.
     ///
     /// Lua: `debug.runCommand(command:string):number`
@@ -745,6 +1206,15 @@ impl Debug {
     pub fn run_command(&self, command: impl AsRef<[u8]>) -> Result<Number> {
         let args = args(vec![Some(Value::text(command.as_ref()))]);
         let reply = self.invoke("runCommand", args)?;
+        single::<Number>(reply)
+    }
+
+    /// [`Self::run_command`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn run_command_async(&self, command: impl AsRef<[u8]>) -> Result<Number> {
+        let args = args(vec![Some(Value::text(command.as_ref()))]);
+        let reply = self.invoke_async("runCommand", args).await?;
         single::<Number>(reply)
     }
 
@@ -758,6 +1228,15 @@ impl Debug {
         FromReply::from_reply(reply)
     }
 
+    /// [`Self::scan_contents_at`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn scan_contents_at_async(&self, x: impl Into<Number>, y: impl Into<Number>, z: impl Into<Number>, world_id: Option<Number>) -> Result<(bool, OcString, Value)> {
+        let args = args(vec![Some(Value::Number(x.into())), Some(Value::Number(y.into())), Some(Value::Number(z.into())), world_id.map(Value::Number)]);
+        let reply = self.invoke_async("scanContentsAt", args).await?;
+        FromReply::from_reply(reply)
+    }
+
     /// Sends text to the specified player's clipboard if possible.
     ///
     /// Lua: `debug.sendToClipboard(player:string, text:string)`
@@ -765,6 +1244,15 @@ impl Debug {
     pub fn send_to_clipboard(&self, player: impl AsRef<[u8]>, text: impl AsRef<[u8]>) -> Result<()> {
         let args = args(vec![Some(Value::text(player.as_ref())), Some(Value::text(text.as_ref()))]);
         let reply = self.invoke("sendToClipboard", args)?;
+        FromReply::from_reply(reply)
+    }
+
+    /// [`Self::send_to_clipboard`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn send_to_clipboard_async(&self, player: impl AsRef<[u8]>, text: impl AsRef<[u8]>) -> Result<()> {
+        let args = args(vec![Some(Value::text(player.as_ref())), Some(Value::text(text.as_ref()))]);
+        let reply = self.invoke_async("sendToClipboard", args).await?;
         FromReply::from_reply(reply)
     }
 
@@ -779,6 +1267,16 @@ impl Debug {
         FromReply::from_reply(reply)
     }
 
+    /// [`Self::send_to_debug_card`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn send_to_debug_card_async(&self, address: impl AsRef<[u8]>, data: &[Value]) -> Result<()> {
+        let mut args: Vec<Value> = vec![Some(Value::text(address.as_ref()))].into_iter().map(Option::unwrap_or_default).collect();
+        args.extend_from_slice(data);
+        let reply = self.invoke_async("sendToDebugCard", args).await?;
+        FromReply::from_reply(reply)
+    }
+
     /// Test method for user-data and general value conversion.
     ///
     /// Lua: `debug.test():userdata`
@@ -786,6 +1284,15 @@ impl Debug {
     pub fn test(&self) -> Result<Handle> {
         let args = args(vec![]);
         let reply = self.invoke("test", args)?;
+        single::<Handle>(reply)
+    }
+
+    /// [`Self::test`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn test_async(&self) -> Result<Handle> {
+        let args = args(vec![]);
+        let reply = self.invoke_async("test", args).await?;
         single::<Handle>(reply)
     }
 }
@@ -817,6 +1324,15 @@ impl DiskDrive {
         single::<bool>(reply)
     }
 
+    /// [`Self::eject`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn eject_async(&self, velocity: Option<Number>) -> Result<bool> {
+        let args = args(vec![velocity.map(Value::Number)]);
+        let reply = self.invoke_async("eject", args).await?;
+        single::<bool>(reply)
+    }
+
     /// Checks whether some medium is currently in the drive.
     ///
     /// Lua: `disk_drive.isEmpty():boolean`
@@ -827,6 +1343,15 @@ impl DiskDrive {
         single::<bool>(reply)
     }
 
+    /// [`Self::is_empty`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn is_empty_async(&self) -> Result<bool> {
+        let args = args(vec![]);
+        let reply = self.invoke_async("isEmpty", args).await?;
+        single::<bool>(reply)
+    }
+
     /// Return the internal floppy disk address
     ///
     /// Lua: `disk_drive.media(): string`
@@ -834,6 +1359,15 @@ impl DiskDrive {
     pub fn media(&self) -> Result<OcString> {
         let args = args(vec![]);
         let reply = self.invoke("media", args)?;
+        single::<OcString>(reply)
+    }
+
+    /// [`Self::media`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn media_async(&self) -> Result<OcString> {
+        let args = args(vec![]);
+        let reply = self.invoke_async("media", args).await?;
         single::<OcString>(reply)
     }
 }
@@ -865,6 +1399,15 @@ impl Drive {
         single::<Number>(reply)
     }
 
+    /// [`Self::get_capacity`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn get_capacity_async(&self) -> Result<Number> {
+        let args = args(vec![]);
+        let reply = self.invoke_async("getCapacity", args).await?;
+        single::<Number>(reply)
+    }
+
     /// Get the current label of the drive.
     ///
     /// Lua: `drive.getLabel():string`
@@ -872,6 +1415,15 @@ impl Drive {
     pub fn get_label(&self) -> Result<OcString> {
         let args = args(vec![]);
         let reply = self.invoke("getLabel", args)?;
+        single::<OcString>(reply)
+    }
+
+    /// [`Self::get_label`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn get_label_async(&self) -> Result<OcString> {
+        let args = args(vec![]);
+        let reply = self.invoke_async("getLabel", args).await?;
         single::<OcString>(reply)
     }
 
@@ -885,6 +1437,15 @@ impl Drive {
         single::<Number>(reply)
     }
 
+    /// [`Self::get_platter_count`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn get_platter_count_async(&self) -> Result<Number> {
+        let args = args(vec![]);
+        let reply = self.invoke_async("getPlatterCount", args).await?;
+        single::<Number>(reply)
+    }
+
     /// Returns the size of a single sector on the drive, in bytes.
     ///
     /// Lua: `drive.getSectorSize():number`
@@ -892,6 +1453,15 @@ impl Drive {
     pub fn get_sector_size(&self) -> Result<Number> {
         let args = args(vec![]);
         let reply = self.invoke("getSectorSize", args)?;
+        single::<Number>(reply)
+    }
+
+    /// [`Self::get_sector_size`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn get_sector_size_async(&self) -> Result<Number> {
+        let args = args(vec![]);
+        let reply = self.invoke_async("getSectorSize", args).await?;
         single::<Number>(reply)
     }
 
@@ -905,6 +1475,15 @@ impl Drive {
         single::<Number>(reply)
     }
 
+    /// [`Self::read_byte`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn read_byte_async(&self, offset: impl Into<Number>) -> Result<Number> {
+        let args = args(vec![Some(Value::Number(offset.into()))]);
+        let reply = self.invoke_async("readByte", args).await?;
+        single::<Number>(reply)
+    }
+
     /// Read the current contents of the specified sector.
     ///
     /// Lua: `drive.readSector(sector:number):string`
@@ -912,6 +1491,15 @@ impl Drive {
     pub fn read_sector(&self, sector: impl Into<Number>) -> Result<OcString> {
         let args = args(vec![Some(Value::Number(sector.into()))]);
         let reply = self.invoke("readSector", args)?;
+        single::<OcString>(reply)
+    }
+
+    /// [`Self::read_sector`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn read_sector_async(&self, sector: impl Into<Number>) -> Result<OcString> {
+        let args = args(vec![Some(Value::Number(sector.into()))]);
+        let reply = self.invoke_async("readSector", args).await?;
         single::<OcString>(reply)
     }
 
@@ -925,6 +1513,15 @@ impl Drive {
         single::<OcString>(reply)
     }
 
+    /// [`Self::set_label`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn set_label_async(&self, value: impl AsRef<[u8]>) -> Result<OcString> {
+        let args = args(vec![Some(Value::text(value.as_ref()))]);
+        let reply = self.invoke_async("setLabel", args).await?;
+        single::<OcString>(reply)
+    }
+
     /// Write a single byte to the specified offset.
     ///
     /// Lua: `drive.writeByte(offset:number, value:number)`
@@ -935,6 +1532,15 @@ impl Drive {
         FromReply::from_reply(reply)
     }
 
+    /// [`Self::write_byte`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn write_byte_async(&self, offset: impl Into<Number>, value: impl Into<Number>) -> Result<()> {
+        let args = args(vec![Some(Value::Number(offset.into())), Some(Value::Number(value.into()))]);
+        let reply = self.invoke_async("writeByte", args).await?;
+        FromReply::from_reply(reply)
+    }
+
     /// Write the specified contents to the specified sector.
     ///
     /// Lua: `drive.writeSector(sector:number, value:string)`
@@ -942,6 +1548,15 @@ impl Drive {
     pub fn write_sector(&self, sector: impl Into<Number>, value: impl AsRef<[u8]>) -> Result<()> {
         let args = args(vec![Some(Value::Number(sector.into())), Some(Value::text(value.as_ref()))]);
         let reply = self.invoke("writeSector", args)?;
+        FromReply::from_reply(reply)
+    }
+
+    /// [`Self::write_sector`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn write_sector_async(&self, sector: impl Into<Number>, value: impl AsRef<[u8]>) -> Result<()> {
+        let args = args(vec![Some(Value::Number(sector.into())), Some(Value::text(value.as_ref()))]);
+        let reply = self.invoke_async("writeSector", args).await?;
         FromReply::from_reply(reply)
     }
 }
@@ -974,6 +1589,15 @@ impl Drone {
         single::<bool>(reply)
     }
 
+    /// [`Self::compare`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn compare_async(&self, side: impl Into<Number>, fuzzy: Option<bool>) -> Result<bool> {
+        let args = args(vec![Some(Value::Number(side.into())), fuzzy.map(Value::Bool)]);
+        let reply = self.invoke_async("compare", args).await?;
+        single::<bool>(reply)
+    }
+
     /// Compare the fluid in the selected tank with the fluid in the specified tank on the specified side. Returns true if equal.
     ///
     /// Lua: `drone.compareFluid(side:number [, tank:number]):boolean`
@@ -984,6 +1608,15 @@ impl Drone {
         single::<bool>(reply)
     }
 
+    /// [`Self::compare_fluid`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn compare_fluid_async(&self, side: impl Into<Number>, tank: Option<Number>) -> Result<bool> {
+        let args = args(vec![Some(Value::Number(side.into())), tank.map(Value::Number)]);
+        let reply = self.invoke_async("compareFluid", args).await?;
+        single::<bool>(reply)
+    }
+
     /// Compares the fluids in the selected and the specified tank. Returns true if equal.
     ///
     /// Lua: `drone.compareFluidTo(index:number):boolean`
@@ -991,6 +1624,15 @@ impl Drone {
     pub fn compare_fluid_to(&self, index: impl Into<Number>) -> Result<bool> {
         let args = args(vec![Some(Value::Number(index.into()))]);
         let reply = self.invoke("compareFluidTo", args)?;
+        single::<bool>(reply)
+    }
+
+    /// [`Self::compare_fluid_to`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn compare_fluid_to_async(&self, index: impl Into<Number>) -> Result<bool> {
+        let args = args(vec![Some(Value::Number(index.into()))]);
+        let reply = self.invoke_async("compareFluidTo", args).await?;
         single::<bool>(reply)
     }
 
@@ -1005,6 +1647,15 @@ impl Drone {
         single::<bool>(reply)
     }
 
+    /// [`Self::compare_to`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn compare_to_async(&self, other_slot: impl Into<Number>, check_nbt: Option<bool>) -> Result<bool> {
+        let args = args(vec![Some(Value::Number(other_slot.into())), check_nbt.map(Value::Bool)]);
+        let reply = self.invoke_async("compareTo", args).await?;
+        single::<bool>(reply)
+    }
+
     /// Get the number of items in the specified slot, otherwise in the selected slot.
     ///
     /// Lua: `drone.count([slot:number]):number`
@@ -1015,6 +1666,15 @@ impl Drone {
         single::<Number>(reply)
     }
 
+    /// [`Self::count`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn count_async(&self, slot: Option<Number>) -> Result<Number> {
+        let args = args(vec![slot.map(Value::Number)]);
+        let reply = self.invoke_async("count", args).await?;
+        single::<Number>(reply)
+    }
+
     /// Checks the contents of the block on the specified sides and returns the findings.
     ///
     /// Lua: `drone.detect(side:number):boolean, string`
@@ -1022,6 +1682,15 @@ impl Drone {
     pub fn detect(&self, side: impl Into<Number>) -> Result<(bool, OcString)> {
         let args = args(vec![Some(Value::Number(side.into()))]);
         let reply = self.invoke("detect", args)?;
+        FromReply::from_reply(reply)
+    }
+
+    /// [`Self::detect`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn detect_async(&self, side: impl Into<Number>) -> Result<(bool, OcString)> {
+        let args = args(vec![Some(Value::Number(side.into()))]);
+        let reply = self.invoke_async("detect", args).await?;
         FromReply::from_reply(reply)
     }
 
@@ -1036,6 +1705,15 @@ impl Drone {
         FromReply::from_reply(reply)
     }
 
+    /// [`Self::drain`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn drain_async(&self, side: bool, amount: Option<Number>) -> Result<(bool, Value)> {
+        let args = args(vec![Some(Value::Bool(side)), amount.map(Value::Number)]);
+        let reply = self.invoke_async("drain", args).await?;
+        FromReply::from_reply(reply)
+    }
+
     /// Drops items from the selected slot towards the specified side.
     ///
     /// Lua: `drone.drop(side:number[, count:number=64]):boolean`
@@ -1044,6 +1722,15 @@ impl Drone {
     pub fn drop(&self, side: impl Into<Number>, count: Option<Number>) -> Result<bool> {
         let args = args(vec![Some(Value::Number(side.into())), count.map(Value::Number)]);
         let reply = self.invoke("drop", args)?;
+        single::<bool>(reply)
+    }
+
+    /// [`Self::drop`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn drop_async(&self, side: impl Into<Number>, count: Option<Number>) -> Result<bool> {
+        let args = args(vec![Some(Value::Number(side.into())), count.map(Value::Number)]);
+        let reply = self.invoke_async("drop", args).await?;
         single::<bool>(reply)
     }
 
@@ -1058,6 +1745,15 @@ impl Drone {
         FromReply::from_reply(reply)
     }
 
+    /// [`Self::fill`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn fill_async(&self, side: impl Into<Number>, amount: Option<Number>) -> Result<(bool, Value)> {
+        let args = args(vec![Some(Value::Number(side.into())), amount.map(Value::Number)]);
+        let reply = self.invoke_async("fill", args).await?;
+        FromReply::from_reply(reply)
+    }
+
     /// Get the currently set acceleration.
     ///
     /// Lua: `drone.getAcceleration():number`
@@ -1065,6 +1761,15 @@ impl Drone {
     pub fn get_acceleration(&self) -> Result<Number> {
         let args = args(vec![]);
         let reply = self.invoke("getAcceleration", args)?;
+        single::<Number>(reply)
+    }
+
+    /// [`Self::get_acceleration`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn get_acceleration_async(&self) -> Result<Number> {
+        let args = args(vec![]);
+        let reply = self.invoke_async("getAcceleration", args).await?;
         single::<Number>(reply)
     }
 
@@ -1078,6 +1783,15 @@ impl Drone {
         single::<Number>(reply)
     }
 
+    /// [`Self::get_light_color`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn get_light_color_async(&self) -> Result<Number> {
+        let args = args(vec![]);
+        let reply = self.invoke_async("getLightColor", args).await?;
+        single::<Number>(reply)
+    }
+
     /// Get the maximum velocity, in m/s.
     ///
     /// Lua: `drone.getMaxVelocity():number`
@@ -1085,6 +1799,15 @@ impl Drone {
     pub fn get_max_velocity(&self) -> Result<Number> {
         let args = args(vec![]);
         let reply = self.invoke("getMaxVelocity", args)?;
+        single::<Number>(reply)
+    }
+
+    /// [`Self::get_max_velocity`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn get_max_velocity_async(&self) -> Result<Number> {
+        let args = args(vec![]);
+        let reply = self.invoke_async("getMaxVelocity", args).await?;
         single::<Number>(reply)
     }
 
@@ -1098,6 +1821,15 @@ impl Drone {
         single::<Number>(reply)
     }
 
+    /// [`Self::get_offset`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn get_offset_async(&self) -> Result<Number> {
+        let args = args(vec![]);
+        let reply = self.invoke_async("getOffset", args).await?;
+        single::<Number>(reply)
+    }
+
     /// Get the status text currently being displayed in the GUI.
     ///
     /// Lua: `drone.getStatusText():string`
@@ -1105,6 +1837,15 @@ impl Drone {
     pub fn get_status_text(&self) -> Result<OcString> {
         let args = args(vec![]);
         let reply = self.invoke("getStatusText", args)?;
+        single::<OcString>(reply)
+    }
+
+    /// [`Self::get_status_text`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn get_status_text_async(&self) -> Result<OcString> {
+        let args = args(vec![]);
+        let reply = self.invoke_async("getStatusText", args).await?;
         single::<OcString>(reply)
     }
 
@@ -1118,6 +1859,15 @@ impl Drone {
         single::<Number>(reply)
     }
 
+    /// [`Self::get_velocity`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn get_velocity_async(&self) -> Result<Number> {
+        let args = args(vec![]);
+        let reply = self.invoke_async("getVelocity", args).await?;
+        single::<Number>(reply)
+    }
+
     /// The size of this device's internal inventory.
     ///
     /// Lua: `drone.inventorySize():number`
@@ -1125,6 +1875,15 @@ impl Drone {
     pub fn inventory_size(&self) -> Result<Number> {
         let args = args(vec![]);
         let reply = self.invoke("inventorySize", args)?;
+        single::<Number>(reply)
+    }
+
+    /// [`Self::inventory_size`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn inventory_size_async(&self) -> Result<Number> {
+        let args = args(vec![]);
+        let reply = self.invoke_async("inventorySize", args).await?;
         single::<Number>(reply)
     }
 
@@ -1138,6 +1897,15 @@ impl Drone {
         FromReply::from_reply(reply)
     }
 
+    /// [`Self::move`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn move_async(&self, dx: impl Into<Number>, dy: impl Into<Number>, dz: impl Into<Number>) -> Result<()> {
+        let args = args(vec![Some(Value::Number(dx.into())), Some(Value::Number(dy.into())), Some(Value::Number(dz.into()))]);
+        let reply = self.invoke_async("move", args).await?;
+        FromReply::from_reply(reply)
+    }
+
     /// Get the name of the agent.
     ///
     /// Lua: `drone.name():string`
@@ -1145,6 +1913,15 @@ impl Drone {
     pub fn name(&self) -> Result<OcString> {
         let args = args(vec![]);
         let reply = self.invoke("name", args)?;
+        single::<OcString>(reply)
+    }
+
+    /// [`Self::name`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn name_async(&self) -> Result<OcString> {
+        let args = args(vec![]);
+        let reply = self.invoke_async("name", args).await?;
         single::<OcString>(reply)
     }
 
@@ -1160,6 +1937,15 @@ impl Drone {
         single::<bool>(reply)
     }
 
+    /// [`Self::place`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn place_async(&self, side: impl Into<Number>, face: Option<Number>, sneaky: Option<bool>) -> Result<bool> {
+        let args = args(vec![Some(Value::Number(side.into())), face.map(Value::Number), sneaky.map(Value::Bool)]);
+        let reply = self.invoke_async("place", args).await?;
+        single::<bool>(reply)
+    }
+
     /// Get the currently selected slot; set the selected slot if specified.
     ///
     /// Lua: `drone.select([slot:number]):number`
@@ -1167,6 +1953,15 @@ impl Drone {
     pub fn select(&self, slot: Option<Number>) -> Result<Number> {
         let args = args(vec![slot.map(Value::Number)]);
         let reply = self.invoke("select", args)?;
+        single::<Number>(reply)
+    }
+
+    /// [`Self::select`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn select_async(&self, slot: Option<Number>) -> Result<Number> {
+        let args = args(vec![slot.map(Value::Number)]);
+        let reply = self.invoke_async("select", args).await?;
         single::<Number>(reply)
     }
 
@@ -1180,6 +1975,15 @@ impl Drone {
         single::<Number>(reply)
     }
 
+    /// [`Self::select_tank`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn select_tank_async(&self, index: Option<Number>) -> Result<Number> {
+        let args = args(vec![index.map(Value::Number)]);
+        let reply = self.invoke_async("selectTank", args).await?;
+        single::<Number>(reply)
+    }
+
     /// Try to set the acceleration to the specified value and return the new acceleration.
     ///
     /// Lua: `drone.setAcceleration(value:number):number`
@@ -1187,6 +1991,15 @@ impl Drone {
     pub fn set_acceleration(&self, value: impl Into<Number>) -> Result<Number> {
         let args = args(vec![Some(Value::Number(value.into()))]);
         let reply = self.invoke("setAcceleration", args)?;
+        single::<Number>(reply)
+    }
+
+    /// [`Self::set_acceleration`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn set_acceleration_async(&self, value: impl Into<Number>) -> Result<Number> {
+        let args = args(vec![Some(Value::Number(value.into()))]);
+        let reply = self.invoke_async("setAcceleration", args).await?;
         single::<Number>(reply)
     }
 
@@ -1200,6 +2013,15 @@ impl Drone {
         single::<Number>(reply)
     }
 
+    /// [`Self::set_light_color`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn set_light_color_async(&self, value: impl Into<Number>) -> Result<Number> {
+        let args = args(vec![Some(Value::Number(value.into()))]);
+        let reply = self.invoke_async("setLightColor", args).await?;
+        single::<Number>(reply)
+    }
+
     /// Set the status text to display in the GUI, returns new value.
     ///
     /// Lua: `drone.setStatusText(value:string):string`
@@ -1207,6 +2029,15 @@ impl Drone {
     pub fn set_status_text(&self, value: impl AsRef<[u8]>) -> Result<OcString> {
         let args = args(vec![Some(Value::text(value.as_ref()))]);
         let reply = self.invoke("setStatusText", args)?;
+        single::<OcString>(reply)
+    }
+
+    /// [`Self::set_status_text`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn set_status_text_async(&self, value: impl AsRef<[u8]>) -> Result<OcString> {
+        let args = args(vec![Some(Value::text(value.as_ref()))]);
+        let reply = self.invoke_async("setStatusText", args).await?;
         single::<OcString>(reply)
     }
 
@@ -1220,6 +2051,15 @@ impl Drone {
         single::<Number>(reply)
     }
 
+    /// [`Self::space`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn space_async(&self, slot: Option<Number>) -> Result<Number> {
+        let args = args(vec![slot.map(Value::Number)]);
+        let reply = self.invoke_async("space", args).await?;
+        single::<Number>(reply)
+    }
+
     /// Suck up items from the specified side.
     ///
     /// Lua: `drone.suck(side:number[, count:number=64]):boolean`
@@ -1228,6 +2068,15 @@ impl Drone {
     pub fn suck(&self, side: impl Into<Number>, count: Option<Number>) -> Result<bool> {
         let args = args(vec![Some(Value::Number(side.into())), count.map(Value::Number)]);
         let reply = self.invoke("suck", args)?;
+        single::<bool>(reply)
+    }
+
+    /// [`Self::suck`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn suck_async(&self, side: impl Into<Number>, count: Option<Number>) -> Result<bool> {
+        let args = args(vec![Some(Value::Number(side.into())), count.map(Value::Number)]);
+        let reply = self.invoke_async("suck", args).await?;
         single::<bool>(reply)
     }
 
@@ -1243,6 +2092,15 @@ impl Drone {
         FromReply::from_reply(reply)
     }
 
+    /// [`Self::swing`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn swing_async(&self, side: impl Into<Number>, face: Option<Number>, sneaky: Option<bool>) -> Result<(bool, OcString)> {
+        let args = args(vec![Some(Value::Number(side.into())), face.map(Value::Number), sneaky.map(Value::Bool)]);
+        let reply = self.invoke_async("swing", args).await?;
+        FromReply::from_reply(reply)
+    }
+
     /// The number of tanks installed in the device.
     ///
     /// Lua: `drone.tankCount():number`
@@ -1250,6 +2108,15 @@ impl Drone {
     pub fn tank_count(&self) -> Result<Number> {
         let args = args(vec![]);
         let reply = self.invoke("tankCount", args)?;
+        single::<Number>(reply)
+    }
+
+    /// [`Self::tank_count`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn tank_count_async(&self) -> Result<Number> {
+        let args = args(vec![]);
+        let reply = self.invoke_async("tankCount", args).await?;
         single::<Number>(reply)
     }
 
@@ -1263,6 +2130,15 @@ impl Drone {
         single::<Number>(reply)
     }
 
+    /// [`Self::tank_level`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn tank_level_async(&self, index: Option<Number>) -> Result<Number> {
+        let args = args(vec![index.map(Value::Number)]);
+        let reply = self.invoke_async("tankLevel", args).await?;
+        single::<Number>(reply)
+    }
+
     /// Get the remaining fluid capacity in the specified or selected tank.
     ///
     /// Lua: `drone.tankSpace([index:number]):number`
@@ -1270,6 +2146,15 @@ impl Drone {
     pub fn tank_space(&self, index: Option<Number>) -> Result<Number> {
         let args = args(vec![index.map(Value::Number)]);
         let reply = self.invoke("tankSpace", args)?;
+        single::<Number>(reply)
+    }
+
+    /// [`Self::tank_space`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn tank_space_async(&self, index: Option<Number>) -> Result<Number> {
+        let args = args(vec![index.map(Value::Number)]);
+        let reply = self.invoke_async("tankSpace", args).await?;
         single::<Number>(reply)
     }
 
@@ -1284,6 +2169,15 @@ impl Drone {
         single::<bool>(reply)
     }
 
+    /// [`Self::transfer_fluid_to`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn transfer_fluid_to_async(&self, index: impl Into<Number>, count: Option<Number>) -> Result<bool> {
+        let args = args(vec![Some(Value::Number(index.into())), count.map(Value::Number)]);
+        let reply = self.invoke_async("transferFluidTo", args).await?;
+        single::<bool>(reply)
+    }
+
     /// Move up to the specified amount of items from the selected slot into the specified slot.
     ///
     /// Lua: `drone.transferTo(toSlot:number[, amount:number]):boolean`
@@ -1291,6 +2185,15 @@ impl Drone {
     pub fn transfer_to(&self, to_slot: impl Into<Number>, amount: Option<Number>) -> Result<bool> {
         let args = args(vec![Some(Value::Number(to_slot.into())), amount.map(Value::Number)]);
         let reply = self.invoke("transferTo", args)?;
+        single::<bool>(reply)
+    }
+
+    /// [`Self::transfer_to`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn transfer_to_async(&self, to_slot: impl Into<Number>, amount: Option<Number>) -> Result<bool> {
+        let args = args(vec![Some(Value::Number(to_slot.into())), amount.map(Value::Number)]);
+        let reply = self.invoke_async("transferTo", args).await?;
         single::<bool>(reply)
     }
 
@@ -1304,6 +2207,15 @@ impl Drone {
     pub fn r#use(&self, side: impl Into<Number>, face: Option<Number>, sneaky: Option<bool>, duration: Option<Number>) -> Result<(bool, OcString)> {
         let args = args(vec![Some(Value::Number(side.into())), face.map(Value::Number), sneaky.map(Value::Bool), duration.map(Value::Number)]);
         let reply = self.invoke("use", args)?;
+        FromReply::from_reply(reply)
+    }
+
+    /// [`Self::use`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn use_async(&self, side: impl Into<Number>, face: Option<Number>, sneaky: Option<bool>, duration: Option<Number>) -> Result<(bool, OcString)> {
+        let args = args(vec![Some(Value::Number(side.into())), face.map(Value::Number), sneaky.map(Value::Bool), duration.map(Value::Number)]);
+        let reply = self.invoke_async("use", args).await?;
         FromReply::from_reply(reply)
     }
 }
@@ -1335,6 +2247,15 @@ impl Eeprom {
         single::<OcString>(reply)
     }
 
+    /// [`Self::get`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn get_async(&self) -> Result<OcString> {
+        let args = args(vec![]);
+        let reply = self.invoke_async("get", args).await?;
+        single::<OcString>(reply)
+    }
+
     /// Get the checksum of the data on this EEPROM.
     ///
     /// Lua: `eeprom.getChecksum():string`
@@ -1342,6 +2263,15 @@ impl Eeprom {
     pub fn get_checksum(&self) -> Result<OcString> {
         let args = args(vec![]);
         let reply = self.invoke("getChecksum", args)?;
+        single::<OcString>(reply)
+    }
+
+    /// [`Self::get_checksum`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn get_checksum_async(&self) -> Result<OcString> {
+        let args = args(vec![]);
+        let reply = self.invoke_async("getChecksum", args).await?;
         single::<OcString>(reply)
     }
 
@@ -1355,6 +2285,15 @@ impl Eeprom {
         single::<OcString>(reply)
     }
 
+    /// [`Self::get_data`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn get_data_async(&self) -> Result<OcString> {
+        let args = args(vec![]);
+        let reply = self.invoke_async("getData", args).await?;
+        single::<OcString>(reply)
+    }
+
     /// Get the storage capacity of this EEPROM.
     ///
     /// Lua: `eeprom.getDataSize():number`
@@ -1362,6 +2301,15 @@ impl Eeprom {
     pub fn get_data_size(&self) -> Result<Number> {
         let args = args(vec![]);
         let reply = self.invoke("getDataSize", args)?;
+        single::<Number>(reply)
+    }
+
+    /// [`Self::get_data_size`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn get_data_size_async(&self) -> Result<Number> {
+        let args = args(vec![]);
+        let reply = self.invoke_async("getDataSize", args).await?;
         single::<Number>(reply)
     }
 
@@ -1375,6 +2323,15 @@ impl Eeprom {
         single::<OcString>(reply)
     }
 
+    /// [`Self::get_label`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn get_label_async(&self) -> Result<OcString> {
+        let args = args(vec![]);
+        let reply = self.invoke_async("getLabel", args).await?;
+        single::<OcString>(reply)
+    }
+
     /// Get the storage capacity of this EEPROM.
     ///
     /// Lua: `eeprom.getSize():number`
@@ -1382,6 +2339,15 @@ impl Eeprom {
     pub fn get_size(&self) -> Result<Number> {
         let args = args(vec![]);
         let reply = self.invoke("getSize", args)?;
+        single::<Number>(reply)
+    }
+
+    /// [`Self::get_size`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn get_size_async(&self) -> Result<Number> {
+        let args = args(vec![]);
+        let reply = self.invoke_async("getSize", args).await?;
         single::<Number>(reply)
     }
 
@@ -1395,6 +2361,15 @@ impl Eeprom {
         single::<bool>(reply)
     }
 
+    /// [`Self::make_readonly`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn make_readonly_async(&self, checksum: impl AsRef<[u8]>) -> Result<bool> {
+        let args = args(vec![Some(Value::text(checksum.as_ref()))]);
+        let reply = self.invoke_async("makeReadonly", args).await?;
+        single::<bool>(reply)
+    }
+
     /// Overwrite the currently stored byte array.
     ///
     /// Lua: `eeprom.set(data:string)`
@@ -1402,6 +2377,15 @@ impl Eeprom {
     pub fn set(&self, data: impl AsRef<[u8]>) -> Result<()> {
         let args = args(vec![Some(Value::text(data.as_ref()))]);
         let reply = self.invoke("set", args)?;
+        FromReply::from_reply(reply)
+    }
+
+    /// [`Self::set`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn set_async(&self, data: impl AsRef<[u8]>) -> Result<()> {
+        let args = args(vec![Some(Value::text(data.as_ref()))]);
+        let reply = self.invoke_async("set", args).await?;
         FromReply::from_reply(reply)
     }
 
@@ -1415,6 +2399,15 @@ impl Eeprom {
         FromReply::from_reply(reply)
     }
 
+    /// [`Self::set_data`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn set_data_async(&self, data: impl AsRef<[u8]>) -> Result<()> {
+        let args = args(vec![Some(Value::text(data.as_ref()))]);
+        let reply = self.invoke_async("setData", args).await?;
+        FromReply::from_reply(reply)
+    }
+
     /// Set the label of the EEPROM.
     ///
     /// Lua: `eeprom.setLabel(data:string):string`
@@ -1422,6 +2415,15 @@ impl Eeprom {
     pub fn set_label(&self, data: impl AsRef<[u8]>) -> Result<OcString> {
         let args = args(vec![Some(Value::text(data.as_ref()))]);
         let reply = self.invoke("setLabel", args)?;
+        single::<OcString>(reply)
+    }
+
+    /// [`Self::set_label`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn set_label_async(&self, data: impl AsRef<[u8]>) -> Result<OcString> {
+        let args = args(vec![Some(Value::text(data.as_ref()))]);
+        let reply = self.invoke_async("setLabel", args).await?;
         single::<OcString>(reply)
     }
 }
@@ -1453,6 +2455,15 @@ impl Experience {
         single::<bool>(reply)
     }
 
+    /// [`Self::consume`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn consume_async(&self) -> Result<bool> {
+        let args = args(vec![]);
+        let reply = self.invoke_async("consume", args).await?;
+        single::<bool>(reply)
+    }
+
     /// The current level of experience stored in this experience upgrade.
     ///
     /// Lua: `experience.level():number`
@@ -1460,6 +2471,15 @@ impl Experience {
     pub fn level(&self) -> Result<Number> {
         let args = args(vec![]);
         let reply = self.invoke("level", args)?;
+        single::<Number>(reply)
+    }
+
+    /// [`Self::level`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn level_async(&self) -> Result<Number> {
+        let args = args(vec![]);
+        let reply = self.invoke_async("level", args).await?;
         single::<Number>(reply)
     }
 }
@@ -1491,6 +2511,15 @@ impl Filesystem {
         FromReply::from_reply(reply)
     }
 
+    /// [`Self::close`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn close_async(&self, handle: Handle) -> Result<()> {
+        let args = args(vec![Some(Value::Handle(handle))]);
+        let reply = self.invoke_async("close", args).await?;
+        FromReply::from_reply(reply)
+    }
+
     /// Returns whether an object exists at the specified absolute path in the file system.
     ///
     /// Lua: `filesystem.exists(path:string):boolean`
@@ -1498,6 +2527,15 @@ impl Filesystem {
     pub fn exists(&self, path: impl AsRef<[u8]>) -> Result<bool> {
         let args = args(vec![Some(Value::text(path.as_ref()))]);
         let reply = self.invoke("exists", args)?;
+        single::<bool>(reply)
+    }
+
+    /// [`Self::exists`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn exists_async(&self, path: impl AsRef<[u8]>) -> Result<bool> {
+        let args = args(vec![Some(Value::text(path.as_ref()))]);
+        let reply = self.invoke_async("exists", args).await?;
         single::<bool>(reply)
     }
 
@@ -1511,6 +2549,15 @@ impl Filesystem {
         single::<OcString>(reply)
     }
 
+    /// [`Self::get_label`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn get_label_async(&self) -> Result<OcString> {
+        let args = args(vec![]);
+        let reply = self.invoke_async("getLabel", args).await?;
+        single::<OcString>(reply)
+    }
+
     /// Returns whether the object at the specified absolute path in the file system is a directory.
     ///
     /// Lua: `filesystem.isDirectory(path:string):boolean`
@@ -1518,6 +2565,15 @@ impl Filesystem {
     pub fn is_directory(&self, path: impl AsRef<[u8]>) -> Result<bool> {
         let args = args(vec![Some(Value::text(path.as_ref()))]);
         let reply = self.invoke("isDirectory", args)?;
+        single::<bool>(reply)
+    }
+
+    /// [`Self::is_directory`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn is_directory_async(&self, path: impl AsRef<[u8]>) -> Result<bool> {
+        let args = args(vec![Some(Value::text(path.as_ref()))]);
+        let reply = self.invoke_async("isDirectory", args).await?;
         single::<bool>(reply)
     }
 
@@ -1531,6 +2587,15 @@ impl Filesystem {
         single::<bool>(reply)
     }
 
+    /// [`Self::is_read_only`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn is_read_only_async(&self) -> Result<bool> {
+        let args = args(vec![]);
+        let reply = self.invoke_async("isReadOnly", args).await?;
+        single::<bool>(reply)
+    }
+
     /// Returns the (real world) timestamp of when the object at the specified absolute path in the file system was modified.
     ///
     /// Lua: `filesystem.lastModified(path:string):number`
@@ -1538,6 +2603,15 @@ impl Filesystem {
     pub fn last_modified(&self, path: impl AsRef<[u8]>) -> Result<Number> {
         let args = args(vec![Some(Value::text(path.as_ref()))]);
         let reply = self.invoke("lastModified", args)?;
+        single::<Number>(reply)
+    }
+
+    /// [`Self::last_modified`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn last_modified_async(&self, path: impl AsRef<[u8]>) -> Result<Number> {
+        let args = args(vec![Some(Value::text(path.as_ref()))]);
+        let reply = self.invoke_async("lastModified", args).await?;
         single::<Number>(reply)
     }
 
@@ -1551,6 +2625,15 @@ impl Filesystem {
         single::<Value>(reply)
     }
 
+    /// [`Self::list`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn list_async(&self, path: impl AsRef<[u8]>) -> Result<Value> {
+        let args = args(vec![Some(Value::text(path.as_ref()))]);
+        let reply = self.invoke_async("list", args).await?;
+        single::<Value>(reply)
+    }
+
     /// Creates a directory at the specified absolute path in the file system. Creates parent directories, if necessary.
     ///
     /// Lua: `filesystem.makeDirectory(path:string):boolean`
@@ -1558,6 +2641,15 @@ impl Filesystem {
     pub fn make_directory(&self, path: impl AsRef<[u8]>) -> Result<bool> {
         let args = args(vec![Some(Value::text(path.as_ref()))]);
         let reply = self.invoke("makeDirectory", args)?;
+        single::<bool>(reply)
+    }
+
+    /// [`Self::make_directory`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn make_directory_async(&self, path: impl AsRef<[u8]>) -> Result<bool> {
+        let args = args(vec![Some(Value::text(path.as_ref()))]);
+        let reply = self.invoke_async("makeDirectory", args).await?;
         single::<bool>(reply)
     }
 
@@ -1572,6 +2664,15 @@ impl Filesystem {
         single::<Handle>(reply)
     }
 
+    /// [`Self::open`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn open_async(&self, path: impl AsRef<[u8]>, mode: Option<&str>) -> Result<Handle> {
+        let args = args(vec![Some(Value::text(path.as_ref())), mode.map(Value::from)]);
+        let reply = self.invoke_async("open", args).await?;
+        single::<Handle>(reply)
+    }
+
     /// Reads up to the specified amount of data from an open file descriptor with the specified handle. Returns nil when EOF is reached.
     ///
     /// Lua: `filesystem.read(handle:userdata, count:number):string or nil`
@@ -1579,6 +2680,15 @@ impl Filesystem {
     pub fn read(&self, handle: Handle, count: impl Into<Number>) -> Result<Option<OcString>> {
         let args = args(vec![Some(Value::Handle(handle)), Some(Value::Number(count.into()))]);
         let reply = self.invoke("read", args)?;
+        single::<Option<OcString>>(reply)
+    }
+
+    /// [`Self::read`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn read_async(&self, handle: Handle, count: impl Into<Number>) -> Result<Option<OcString>> {
+        let args = args(vec![Some(Value::Handle(handle)), Some(Value::Number(count.into()))]);
+        let reply = self.invoke_async("read", args).await?;
         single::<Option<OcString>>(reply)
     }
 
@@ -1592,6 +2702,15 @@ impl Filesystem {
         single::<bool>(reply)
     }
 
+    /// [`Self::remove`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn remove_async(&self, path: impl AsRef<[u8]>) -> Result<bool> {
+        let args = args(vec![Some(Value::text(path.as_ref()))]);
+        let reply = self.invoke_async("remove", args).await?;
+        single::<bool>(reply)
+    }
+
     /// Renames/moves an object from the first specified absolute path in the file system to the second.
     ///
     /// Lua: `filesystem.rename(from:string, to:string):boolean`
@@ -1599,6 +2718,15 @@ impl Filesystem {
     pub fn rename(&self, from: impl AsRef<[u8]>, to: impl AsRef<[u8]>) -> Result<bool> {
         let args = args(vec![Some(Value::text(from.as_ref())), Some(Value::text(to.as_ref()))]);
         let reply = self.invoke("rename", args)?;
+        single::<bool>(reply)
+    }
+
+    /// [`Self::rename`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn rename_async(&self, from: impl AsRef<[u8]>, to: impl AsRef<[u8]>) -> Result<bool> {
+        let args = args(vec![Some(Value::text(from.as_ref())), Some(Value::text(to.as_ref()))]);
+        let reply = self.invoke_async("rename", args).await?;
         single::<bool>(reply)
     }
 
@@ -1612,6 +2740,15 @@ impl Filesystem {
         single::<Number>(reply)
     }
 
+    /// [`Self::seek`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn seek_async(&self, handle: Handle, whence: impl AsRef<[u8]>, offset: impl Into<Number>) -> Result<Number> {
+        let args = args(vec![Some(Value::Handle(handle)), Some(Value::text(whence.as_ref())), Some(Value::Number(offset.into()))]);
+        let reply = self.invoke_async("seek", args).await?;
+        single::<Number>(reply)
+    }
+
     /// Sets the label of the drive. Returns the new value, which may be truncated.
     ///
     /// Lua: `filesystem.setLabel(value:string):string`
@@ -1619,6 +2756,15 @@ impl Filesystem {
     pub fn set_label(&self, value: impl AsRef<[u8]>) -> Result<OcString> {
         let args = args(vec![Some(Value::text(value.as_ref()))]);
         let reply = self.invoke("setLabel", args)?;
+        single::<OcString>(reply)
+    }
+
+    /// [`Self::set_label`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn set_label_async(&self, value: impl AsRef<[u8]>) -> Result<OcString> {
+        let args = args(vec![Some(Value::text(value.as_ref()))]);
+        let reply = self.invoke_async("setLabel", args).await?;
         single::<OcString>(reply)
     }
 
@@ -1632,6 +2778,15 @@ impl Filesystem {
         single::<Number>(reply)
     }
 
+    /// [`Self::size`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn size_async(&self, path: impl AsRef<[u8]>) -> Result<Number> {
+        let args = args(vec![Some(Value::text(path.as_ref()))]);
+        let reply = self.invoke_async("size", args).await?;
+        single::<Number>(reply)
+    }
+
     /// The overall capacity of the file system, in bytes.
     ///
     /// Lua: `filesystem.spaceTotal():number`
@@ -1639,6 +2794,15 @@ impl Filesystem {
     pub fn space_total(&self) -> Result<Number> {
         let args = args(vec![]);
         let reply = self.invoke("spaceTotal", args)?;
+        single::<Number>(reply)
+    }
+
+    /// [`Self::space_total`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn space_total_async(&self) -> Result<Number> {
+        let args = args(vec![]);
+        let reply = self.invoke_async("spaceTotal", args).await?;
         single::<Number>(reply)
     }
 
@@ -1652,6 +2816,15 @@ impl Filesystem {
         single::<Number>(reply)
     }
 
+    /// [`Self::space_used`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn space_used_async(&self) -> Result<Number> {
+        let args = args(vec![]);
+        let reply = self.invoke_async("spaceUsed", args).await?;
+        single::<Number>(reply)
+    }
+
     /// Writes the specified data to an open file descriptor with the specified handle.
     ///
     /// Lua: `filesystem.write(handle:userdata, value:string):boolean`
@@ -1659,6 +2832,15 @@ impl Filesystem {
     pub fn write(&self, handle: Handle, value: impl AsRef<[u8]>) -> Result<bool> {
         let args = args(vec![Some(Value::Handle(handle)), Some(Value::text(value.as_ref()))]);
         let reply = self.invoke("write", args)?;
+        single::<bool>(reply)
+    }
+
+    /// [`Self::write`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn write_async(&self, handle: Handle, value: impl AsRef<[u8]>) -> Result<bool> {
+        let args = args(vec![Some(Value::Handle(handle)), Some(Value::text(value.as_ref()))]);
+        let reply = self.invoke_async("write", args).await?;
         single::<bool>(reply)
     }
 }
@@ -1689,6 +2871,15 @@ impl FluidHandler {
         let reply = self.invoke("getTankInfo", args)?;
         single::<Value>(reply)
     }
+
+    /// [`Self::get_tank_info`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn get_tank_info_async(&self) -> Result<Value> {
+        let args = args(vec![]);
+        let reply = self.invoke_async("getTankInfo", args).await?;
+        single::<Value>(reply)
+    }
 }
 
 /// The `fluid_tank` component (1 methods).
@@ -1715,6 +2906,15 @@ impl FluidTank {
     pub fn get_info(&self) -> Result<Value> {
         let args = args(vec![]);
         let reply = self.invoke("getInfo", args)?;
+        single::<Value>(reply)
+    }
+
+    /// [`Self::get_info`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn get_info_async(&self) -> Result<Value> {
+        let args = args(vec![]);
+        let reply = self.invoke_async("getInfo", args).await?;
         single::<Value>(reply)
     }
 }
@@ -1746,6 +2946,15 @@ impl Furnace {
         single::<Number>(reply)
     }
 
+    /// [`Self::get_burn_time`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn get_burn_time_async(&self) -> Result<Number> {
+        let args = args(vec![]);
+        let reply = self.invoke_async("getBurnTime", args).await?;
+        single::<Number>(reply)
+    }
+
     /// The number of ticks that the current item has been cooking for.
     ///
     /// Lua: `furnace.getCookTime():number`
@@ -1753,6 +2962,15 @@ impl Furnace {
     pub fn get_cook_time(&self) -> Result<Number> {
         let args = args(vec![]);
         let reply = self.invoke("getCookTime", args)?;
+        single::<Number>(reply)
+    }
+
+    /// [`Self::get_cook_time`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn get_cook_time_async(&self) -> Result<Number> {
+        let args = args(vec![]);
+        let reply = self.invoke_async("getCookTime", args).await?;
         single::<Number>(reply)
     }
 
@@ -1766,6 +2984,15 @@ impl Furnace {
         single::<Number>(reply)
     }
 
+    /// [`Self::get_current_item_burn_time`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn get_current_item_burn_time_async(&self) -> Result<Number> {
+        let args = args(vec![]);
+        let reply = self.invoke_async("getCurrentItemBurnTime", args).await?;
+        single::<Number>(reply)
+    }
+
     /// The number of ticks that the current item needs to cook.
     ///
     /// Lua: `furnace.getTotalCookTime():number`
@@ -1776,6 +3003,15 @@ impl Furnace {
         single::<Number>(reply)
     }
 
+    /// [`Self::get_total_cook_time`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn get_total_cook_time_async(&self) -> Result<Number> {
+        let args = args(vec![]);
+        let reply = self.invoke_async("getTotalCookTime", args).await?;
+        single::<Number>(reply)
+    }
+
     /// Get whether the furnace is currently active.
     ///
     /// Lua: `furnace.isBurning():boolean`
@@ -1783,6 +3019,15 @@ impl Furnace {
     pub fn is_burning(&self) -> Result<bool> {
         let args = args(vec![]);
         let reply = self.invoke("isBurning", args)?;
+        single::<bool>(reply)
+    }
+
+    /// [`Self::is_burning`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn is_burning_async(&self) -> Result<bool> {
+        let args = args(vec![]);
+        let reply = self.invoke_async("isBurning", args).await?;
         single::<bool>(reply)
     }
 }
@@ -1814,6 +3059,15 @@ impl Generator {
         single::<Number>(reply)
     }
 
+    /// [`Self::count`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn count_async(&self) -> Result<Number> {
+        let args = args(vec![]);
+        let reply = self.invoke_async("count", args).await?;
+        single::<Number>(reply)
+    }
+
     /// Tries to insert fuel from the selected slot into the generator's queue.
     ///
     /// Lua: `generator.insert([count:number]):boolean`
@@ -1824,6 +3078,15 @@ impl Generator {
         single::<bool>(reply)
     }
 
+    /// [`Self::insert`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn insert_async(&self, count: Option<Number>) -> Result<bool> {
+        let args = args(vec![count.map(Value::Number)]);
+        let reply = self.invoke_async("insert", args).await?;
+        single::<bool>(reply)
+    }
+
     /// Tries to remove items from the generator's queue.
     ///
     /// Lua: `generator.remove([count:number]):boolean`
@@ -1831,6 +3094,15 @@ impl Generator {
     pub fn remove(&self, count: Option<Number>) -> Result<bool> {
         let args = args(vec![count.map(Value::Number)]);
         let reply = self.invoke("remove", args)?;
+        single::<bool>(reply)
+    }
+
+    /// [`Self::remove`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn remove_async(&self, count: Option<Number>) -> Result<bool> {
+        let args = args(vec![count.map(Value::Number)]);
+        let reply = self.invoke_async("remove", args).await?;
         single::<bool>(reply)
     }
 }
@@ -1862,6 +3134,15 @@ impl Geolyzer {
         single::<Value>(reply)
     }
 
+    /// [`Self::analyze`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn analyze_async(&self, side: impl Into<Number>, options: Option<Value>) -> Result<Value> {
+        let args = args(vec![Some(Value::Number(side.into())), options]);
+        let reply = self.invoke_async("analyze", args).await?;
+        single::<Value>(reply)
+    }
+
     /// Returns whether there is a clear line of sight to the sky directly above.
     ///
     /// Lua: `geolyzer.canSeeSky():boolean`
@@ -1869,6 +3150,15 @@ impl Geolyzer {
     pub fn can_see_sky(&self) -> Result<bool> {
         let args = args(vec![]);
         let reply = self.invoke("canSeeSky", args)?;
+        single::<bool>(reply)
+    }
+
+    /// [`Self::can_see_sky`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn can_see_sky_async(&self) -> Result<bool> {
+        let args = args(vec![]);
+        let reply = self.invoke_async("canSeeSky", args).await?;
         single::<bool>(reply)
     }
 
@@ -1882,6 +3172,15 @@ impl Geolyzer {
         FromReply::from_reply(reply)
     }
 
+    /// [`Self::detect`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn detect_async(&self, side: impl Into<Number>) -> Result<(bool, OcString)> {
+        let args = args(vec![Some(Value::Number(side.into()))]);
+        let reply = self.invoke_async("detect", args).await?;
+        FromReply::from_reply(reply)
+    }
+
     /// Return whether the sun is currently visible directly above.
     ///
     /// Lua: `geolyzer.isSunVisible():boolean`
@@ -1889,6 +3188,15 @@ impl Geolyzer {
     pub fn is_sun_visible(&self) -> Result<bool> {
         let args = args(vec![]);
         let reply = self.invoke("isSunVisible", args)?;
+        single::<bool>(reply)
+    }
+
+    /// [`Self::is_sun_visible`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn is_sun_visible_async(&self) -> Result<bool> {
+        let args = args(vec![]);
+        let reply = self.invoke_async("isSunVisible", args).await?;
         single::<bool>(reply)
     }
 
@@ -1902,6 +3210,15 @@ impl Geolyzer {
         single::<Value>(reply)
     }
 
+    /// [`Self::scan`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn scan_async(&self, x: impl Into<Number>, z: impl Into<Number>, y: Option<Number>, w: Option<Number>, d: Option<Number>, h: Option<Number>, ignore_replaceable: Option<Value>) -> Result<Value> {
+        let args = args(vec![Some(Value::Number(x.into())), Some(Value::Number(z.into())), y.map(Value::Number), w.map(Value::Number), d.map(Value::Number), h.map(Value::Number), ignore_replaceable]);
+        let reply = self.invoke_async("scan", args).await?;
+        single::<Value>(reply)
+    }
+
     /// Store an item stack representation of the block on the specified side in a database component.
     ///
     /// Lua: `geolyzer.store(side:number, dbAddress:string, dbSlot:number):boolean`
@@ -1909,6 +3226,15 @@ impl Geolyzer {
     pub fn store(&self, side: impl Into<Number>, db_address: impl AsRef<[u8]>, db_slot: impl Into<Number>) -> Result<bool> {
         let args = args(vec![Some(Value::Number(side.into())), Some(Value::text(db_address.as_ref())), Some(Value::Number(db_slot.into()))]);
         let reply = self.invoke("store", args)?;
+        single::<bool>(reply)
+    }
+
+    /// [`Self::store`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn store_async(&self, side: impl Into<Number>, db_address: impl AsRef<[u8]>, db_slot: impl Into<Number>) -> Result<bool> {
+        let args = args(vec![Some(Value::Number(side.into())), Some(Value::text(db_address.as_ref())), Some(Value::Number(db_slot.into()))]);
+        let reply = self.invoke_async("store", args).await?;
         single::<bool>(reply)
     }
 }
@@ -1940,6 +3266,15 @@ impl Gpu {
         single::<Number>(reply)
     }
 
+    /// [`Self::allocate_buffer`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn allocate_buffer_async(&self, width: Option<Number>, height: Option<Number>) -> Result<Number> {
+        let args = args(vec![width.map(Value::Number), height.map(Value::Number)]);
+        let reply = self.invoke_async("allocateBuffer", args).await?;
+        single::<Number>(reply)
+    }
+
     /// Binds the GPU to the screen with the specified address and resets screen settings if `reset` is true.
     ///
     /// Lua: `gpu.bind(address:string[, reset:boolean=true]):boolean`
@@ -1948,6 +3283,15 @@ impl Gpu {
     pub fn bind(&self, address: impl AsRef<[u8]>, reset: Option<bool>) -> Result<bool> {
         let args = args(vec![Some(Value::text(address.as_ref())), reset.map(Value::Bool)]);
         let reply = self.invoke("bind", args)?;
+        single::<bool>(reply)
+    }
+
+    /// [`Self::bind`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn bind_async(&self, address: impl AsRef<[u8]>, reset: Option<bool>) -> Result<bool> {
+        let args = args(vec![Some(Value::text(address.as_ref())), reset.map(Value::Bool)]);
+        let reply = self.invoke_async("bind", args).await?;
         single::<bool>(reply)
     }
 
@@ -1961,6 +3305,15 @@ impl Gpu {
         single::<bool>(reply)
     }
 
+    /// [`Self::bitblt`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn bitblt_async(&self, dst: Option<Number>, col: Option<Number>, row: Option<Number>, width: Option<Number>, height: Option<Number>, src: Option<Number>, from_col: Option<Number>, from_row: Option<Number>) -> Result<bool> {
+        let args = args(vec![dst.map(Value::Number), col.map(Value::Number), row.map(Value::Number), width.map(Value::Number), height.map(Value::Number), src.map(Value::Number), from_col.map(Value::Number), from_row.map(Value::Number)]);
+        let reply = self.invoke_async("bitblt", args).await?;
+        single::<bool>(reply)
+    }
+
     /// Returns an array of indexes of the allocated buffers
     ///
     /// Lua: `gpu.buffers(): number`
@@ -1968,6 +3321,15 @@ impl Gpu {
     pub fn buffers(&self) -> Result<Number> {
         let args = args(vec![]);
         let reply = self.invoke("buffers", args)?;
+        single::<Number>(reply)
+    }
+
+    /// [`Self::buffers`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn buffers_async(&self) -> Result<Number> {
+        let args = args(vec![]);
+        let reply = self.invoke_async("buffers", args).await?;
         single::<Number>(reply)
     }
 
@@ -1981,6 +3343,15 @@ impl Gpu {
         single::<bool>(reply)
     }
 
+    /// [`Self::copy`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn copy_async(&self, x: impl Into<Number>, y: impl Into<Number>, width: impl Into<Number>, height: impl Into<Number>, tx: impl Into<Number>, ty: impl Into<Number>) -> Result<bool> {
+        let args = args(vec![Some(Value::Number(x.into())), Some(Value::Number(y.into())), Some(Value::Number(width.into())), Some(Value::Number(height.into())), Some(Value::Number(tx.into())), Some(Value::Number(ty.into()))]);
+        let reply = self.invoke_async("copy", args).await?;
+        single::<bool>(reply)
+    }
+
     /// Fills a portion of the screen at the specified position with the specified size with the specified character.
     ///
     /// Lua: `gpu.fill(x:number, y:number, width:number, height:number, char:string):boolean`
@@ -1988,6 +3359,15 @@ impl Gpu {
     pub fn fill(&self, x: impl Into<Number>, y: impl Into<Number>, width: impl Into<Number>, height: impl Into<Number>, char: impl AsRef<[u8]>) -> Result<bool> {
         let args = args(vec![Some(Value::Number(x.into())), Some(Value::Number(y.into())), Some(Value::Number(width.into())), Some(Value::Number(height.into())), Some(Value::text(char.as_ref()))]);
         let reply = self.invoke("fill", args)?;
+        single::<bool>(reply)
+    }
+
+    /// [`Self::fill`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn fill_async(&self, x: impl Into<Number>, y: impl Into<Number>, width: impl Into<Number>, height: impl Into<Number>, char: impl AsRef<[u8]>) -> Result<bool> {
+        let args = args(vec![Some(Value::Number(x.into())), Some(Value::Number(y.into())), Some(Value::Number(width.into())), Some(Value::Number(height.into())), Some(Value::text(char.as_ref()))]);
+        let reply = self.invoke_async("fill", args).await?;
         single::<bool>(reply)
     }
 
@@ -2001,6 +3381,15 @@ impl Gpu {
         single::<Number>(reply)
     }
 
+    /// [`Self::free_all_buffers`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn free_all_buffers_async(&self) -> Result<Number> {
+        let args = args(vec![]);
+        let reply = self.invoke_async("freeAllBuffers", args).await?;
+        single::<Number>(reply)
+    }
+
     /// Closes buffer at `index`. Returns true if a buffer closed. If the current buffer is closed, index moves to 0
     ///
     /// Lua: `gpu.freeBuffer(index: number): boolean`
@@ -2008,6 +3397,15 @@ impl Gpu {
     pub fn free_buffer(&self, index: impl Into<Number>) -> Result<bool> {
         let args = args(vec![Some(Value::Number(index.into()))]);
         let reply = self.invoke("freeBuffer", args)?;
+        single::<bool>(reply)
+    }
+
+    /// [`Self::free_buffer`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn free_buffer_async(&self, index: impl Into<Number>) -> Result<bool> {
+        let args = args(vec![Some(Value::Number(index.into()))]);
+        let reply = self.invoke_async("freeBuffer", args).await?;
         single::<bool>(reply)
     }
 
@@ -2021,6 +3419,15 @@ impl Gpu {
         single::<Number>(reply)
     }
 
+    /// [`Self::free_memory`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn free_memory_async(&self) -> Result<Number> {
+        let args = args(vec![]);
+        let reply = self.invoke_async("freeMemory", args).await?;
+        single::<Number>(reply)
+    }
+
     /// Get the value displayed on the screen at the specified index, as well as the foreground and background color. If the foreground or background is from the palette, returns the palette indices as fourth and fifth results, else nil, respectively.
     ///
     /// Lua: `gpu.get(x:number, y:number):string, number, number, number or nil, number or nil`
@@ -2028,6 +3435,15 @@ impl Gpu {
     pub fn get(&self, x: impl Into<Number>, y: impl Into<Number>) -> Result<(OcString, Number, Number, Option<Number>, Option<Number>)> {
         let args = args(vec![Some(Value::Number(x.into())), Some(Value::Number(y.into()))]);
         let reply = self.invoke("get", args)?;
+        FromReply::from_reply(reply)
+    }
+
+    /// [`Self::get`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn get_async(&self, x: impl Into<Number>, y: impl Into<Number>) -> Result<(OcString, Number, Number, Option<Number>, Option<Number>)> {
+        let args = args(vec![Some(Value::Number(x.into())), Some(Value::Number(y.into()))]);
+        let reply = self.invoke_async("get", args).await?;
         FromReply::from_reply(reply)
     }
 
@@ -2041,6 +3457,15 @@ impl Gpu {
         single::<Number>(reply)
     }
 
+    /// [`Self::get_active_buffer`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn get_active_buffer_async(&self) -> Result<Number> {
+        let args = args(vec![]);
+        let reply = self.invoke_async("getActiveBuffer", args).await?;
+        single::<Number>(reply)
+    }
+
     /// Get the current background color and whether it's from the palette or not.
     ///
     /// Lua: `gpu.getBackground():number, boolean`
@@ -2048,6 +3473,15 @@ impl Gpu {
     pub fn get_background(&self) -> Result<(Number, bool)> {
         let args = args(vec![]);
         let reply = self.invoke("getBackground", args)?;
+        FromReply::from_reply(reply)
+    }
+
+    /// [`Self::get_background`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn get_background_async(&self) -> Result<(Number, bool)> {
+        let args = args(vec![]);
+        let reply = self.invoke_async("getBackground", args).await?;
         FromReply::from_reply(reply)
     }
 
@@ -2061,6 +3495,15 @@ impl Gpu {
         FromReply::from_reply(reply)
     }
 
+    /// [`Self::get_buffer_size`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn get_buffer_size_async(&self, index: impl Into<Number>) -> Result<(Number, Number)> {
+        let args = args(vec![Some(Value::Number(index.into()))]);
+        let reply = self.invoke_async("getBufferSize", args).await?;
+        FromReply::from_reply(reply)
+    }
+
     /// Returns the currently set color depth.
     ///
     /// Lua: `gpu.getDepth():number`
@@ -2068,6 +3511,15 @@ impl Gpu {
     pub fn get_depth(&self) -> Result<Number> {
         let args = args(vec![]);
         let reply = self.invoke("getDepth", args)?;
+        single::<Number>(reply)
+    }
+
+    /// [`Self::get_depth`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn get_depth_async(&self) -> Result<Number> {
+        let args = args(vec![]);
+        let reply = self.invoke_async("getDepth", args).await?;
         single::<Number>(reply)
     }
 
@@ -2081,6 +3533,15 @@ impl Gpu {
         FromReply::from_reply(reply)
     }
 
+    /// [`Self::get_foreground`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn get_foreground_async(&self) -> Result<(Number, bool)> {
+        let args = args(vec![]);
+        let reply = self.invoke_async("getForeground", args).await?;
+        FromReply::from_reply(reply)
+    }
+
     /// Get the palette color at the specified palette index.
     ///
     /// Lua: `gpu.getPaletteColor(index:number):number`
@@ -2088,6 +3549,15 @@ impl Gpu {
     pub fn get_palette_color(&self, index: impl Into<Number>) -> Result<Number> {
         let args = args(vec![Some(Value::Number(index.into()))]);
         let reply = self.invoke("getPaletteColor", args)?;
+        single::<Number>(reply)
+    }
+
+    /// [`Self::get_palette_color`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn get_palette_color_async(&self, index: impl Into<Number>) -> Result<Number> {
+        let args = args(vec![Some(Value::Number(index.into()))]);
+        let reply = self.invoke_async("getPaletteColor", args).await?;
         single::<Number>(reply)
     }
 
@@ -2101,6 +3571,15 @@ impl Gpu {
         FromReply::from_reply(reply)
     }
 
+    /// [`Self::get_resolution`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn get_resolution_async(&self) -> Result<(Number, Number)> {
+        let args = args(vec![]);
+        let reply = self.invoke_async("getResolution", args).await?;
+        FromReply::from_reply(reply)
+    }
+
     /// Get the address of the screen the GPU is currently bound to.
     ///
     /// Lua: `gpu.getScreen():string`
@@ -2108,6 +3587,15 @@ impl Gpu {
     pub fn get_screen(&self) -> Result<OcString> {
         let args = args(vec![]);
         let reply = self.invoke("getScreen", args)?;
+        single::<OcString>(reply)
+    }
+
+    /// [`Self::get_screen`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn get_screen_async(&self) -> Result<OcString> {
+        let args = args(vec![]);
+        let reply = self.invoke_async("getScreen", args).await?;
         single::<OcString>(reply)
     }
 
@@ -2121,6 +3609,15 @@ impl Gpu {
         FromReply::from_reply(reply)
     }
 
+    /// [`Self::get_viewport`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn get_viewport_async(&self) -> Result<(Number, Number)> {
+        let args = args(vec![]);
+        let reply = self.invoke_async("getViewport", args).await?;
+        FromReply::from_reply(reply)
+    }
+
     /// Get the maximum supported color depth.
     ///
     /// Lua: `gpu.maxDepth():number`
@@ -2128,6 +3625,15 @@ impl Gpu {
     pub fn max_depth(&self) -> Result<Number> {
         let args = args(vec![]);
         let reply = self.invoke("maxDepth", args)?;
+        single::<Number>(reply)
+    }
+
+    /// [`Self::max_depth`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn max_depth_async(&self) -> Result<Number> {
+        let args = args(vec![]);
+        let reply = self.invoke_async("maxDepth", args).await?;
         single::<Number>(reply)
     }
 
@@ -2141,6 +3647,15 @@ impl Gpu {
         FromReply::from_reply(reply)
     }
 
+    /// [`Self::max_resolution`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn max_resolution_async(&self) -> Result<(Number, Number)> {
+        let args = args(vec![]);
+        let reply = self.invoke_async("maxResolution", args).await?;
+        FromReply::from_reply(reply)
+    }
+
     /// Plots a string value to the screen at the specified position. Optionally writes the string vertically.
     ///
     /// Lua: `gpu.set(x:number, y:number, value:string[, vertical:boolean]):boolean`
@@ -2148,6 +3663,15 @@ impl Gpu {
     pub fn set(&self, x: impl Into<Number>, y: impl Into<Number>, value: impl AsRef<[u8]>, vertical: Option<bool>) -> Result<bool> {
         let args = args(vec![Some(Value::Number(x.into())), Some(Value::Number(y.into())), Some(Value::text(value.as_ref())), vertical.map(Value::Bool)]);
         let reply = self.invoke("set", args)?;
+        single::<bool>(reply)
+    }
+
+    /// [`Self::set`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn set_async(&self, x: impl Into<Number>, y: impl Into<Number>, value: impl AsRef<[u8]>, vertical: Option<bool>) -> Result<bool> {
+        let args = args(vec![Some(Value::Number(x.into())), Some(Value::Number(y.into())), Some(Value::text(value.as_ref())), vertical.map(Value::Bool)]);
+        let reply = self.invoke_async("set", args).await?;
         single::<bool>(reply)
     }
 
@@ -2161,6 +3685,15 @@ impl Gpu {
         single::<Number>(reply)
     }
 
+    /// [`Self::set_active_buffer`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn set_active_buffer_async(&self, index: impl Into<Number>) -> Result<Number> {
+        let args = args(vec![Some(Value::Number(index.into()))]);
+        let reply = self.invoke_async("setActiveBuffer", args).await?;
+        single::<Number>(reply)
+    }
+
     /// Sets the background color to the specified value. Optionally takes an explicit palette index. Returns the old value and if it was from the palette its palette index.
     ///
     /// Lua: `gpu.setBackground(value:number[, palette:boolean]):number, number or nil`
@@ -2168,6 +3701,15 @@ impl Gpu {
     pub fn set_background(&self, value: impl Into<Number>, palette: Option<bool>) -> Result<(Number, Option<Number>)> {
         let args = args(vec![Some(Value::Number(value.into())), palette.map(Value::Bool)]);
         let reply = self.invoke("setBackground", args)?;
+        FromReply::from_reply(reply)
+    }
+
+    /// [`Self::set_background`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn set_background_async(&self, value: impl Into<Number>, palette: Option<bool>) -> Result<(Number, Option<Number>)> {
+        let args = args(vec![Some(Value::Number(value.into())), palette.map(Value::Bool)]);
+        let reply = self.invoke_async("setBackground", args).await?;
         FromReply::from_reply(reply)
     }
 
@@ -2181,6 +3723,15 @@ impl Gpu {
         single::<Number>(reply)
     }
 
+    /// [`Self::set_depth`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn set_depth_async(&self, depth: impl Into<Number>) -> Result<Number> {
+        let args = args(vec![Some(Value::Number(depth.into()))]);
+        let reply = self.invoke_async("setDepth", args).await?;
+        single::<Number>(reply)
+    }
+
     /// Sets the foreground color to the specified value. Optionally takes an explicit palette index. Returns the old value and if it was from the palette its palette index.
     ///
     /// Lua: `gpu.setForeground(value:number[, palette:boolean]):number, number or nil`
@@ -2188,6 +3739,15 @@ impl Gpu {
     pub fn set_foreground(&self, value: impl Into<Number>, palette: Option<bool>) -> Result<(Number, Option<Number>)> {
         let args = args(vec![Some(Value::Number(value.into())), palette.map(Value::Bool)]);
         let reply = self.invoke("setForeground", args)?;
+        FromReply::from_reply(reply)
+    }
+
+    /// [`Self::set_foreground`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn set_foreground_async(&self, value: impl Into<Number>, palette: Option<bool>) -> Result<(Number, Option<Number>)> {
+        let args = args(vec![Some(Value::Number(value.into())), palette.map(Value::Bool)]);
+        let reply = self.invoke_async("setForeground", args).await?;
         FromReply::from_reply(reply)
     }
 
@@ -2201,6 +3761,15 @@ impl Gpu {
         single::<Number>(reply)
     }
 
+    /// [`Self::set_palette_color`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn set_palette_color_async(&self, index: impl Into<Number>, color: impl Into<Number>) -> Result<Number> {
+        let args = args(vec![Some(Value::Number(index.into())), Some(Value::Number(color.into()))]);
+        let reply = self.invoke_async("setPaletteColor", args).await?;
+        single::<Number>(reply)
+    }
+
     /// Set the screen resolution. Returns true if the resolution changed.
     ///
     /// Lua: `gpu.setResolution(width:number, height:number):boolean`
@@ -2208,6 +3777,15 @@ impl Gpu {
     pub fn set_resolution(&self, width: impl Into<Number>, height: impl Into<Number>) -> Result<bool> {
         let args = args(vec![Some(Value::Number(width.into())), Some(Value::Number(height.into()))]);
         let reply = self.invoke("setResolution", args)?;
+        single::<bool>(reply)
+    }
+
+    /// [`Self::set_resolution`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn set_resolution_async(&self, width: impl Into<Number>, height: impl Into<Number>) -> Result<bool> {
+        let args = args(vec![Some(Value::Number(width.into())), Some(Value::Number(height.into()))]);
+        let reply = self.invoke_async("setResolution", args).await?;
         single::<bool>(reply)
     }
 
@@ -2221,6 +3799,15 @@ impl Gpu {
         single::<bool>(reply)
     }
 
+    /// [`Self::set_viewport`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn set_viewport_async(&self, width: impl Into<Number>, height: impl Into<Number>) -> Result<bool> {
+        let args = args(vec![Some(Value::Number(width.into())), Some(Value::Number(height.into()))]);
+        let reply = self.invoke_async("setViewport", args).await?;
+        single::<bool>(reply)
+    }
+
     /// returns the total memory size of the gpu vram. This does not include the screen.
     ///
     /// Lua: `gpu.totalMemory(): number`
@@ -2228,6 +3815,15 @@ impl Gpu {
     pub fn total_memory(&self) -> Result<Number> {
         let args = args(vec![]);
         let reply = self.invoke("totalMemory", args)?;
+        single::<Number>(reply)
+    }
+
+    /// [`Self::total_memory`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn total_memory_async(&self) -> Result<Number> {
+        let args = args(vec![]);
+        let reply = self.invoke_async("totalMemory", args).await?;
         single::<Number>(reply)
     }
 }
@@ -2259,6 +3855,15 @@ impl Hologram {
         FromReply::from_reply(reply)
     }
 
+    /// [`Self::clear`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn clear_async(&self) -> Result<()> {
+        let args = args(vec![]);
+        let reply = self.invoke_async("clear", args).await?;
+        FromReply::from_reply(reply)
+    }
+
     /// Copies an area of columns by the specified translation.
     ///
     /// Lua: `hologram.copy(x:number, z:number, sx:number, sz:number, tx:number, tz:number)`
@@ -2266,6 +3871,15 @@ impl Hologram {
     pub fn copy(&self, x: impl Into<Number>, z: impl Into<Number>, sx: impl Into<Number>, sz: impl Into<Number>, tx: impl Into<Number>, tz: impl Into<Number>) -> Result<()> {
         let args = args(vec![Some(Value::Number(x.into())), Some(Value::Number(z.into())), Some(Value::Number(sx.into())), Some(Value::Number(sz.into())), Some(Value::Number(tx.into())), Some(Value::Number(tz.into()))]);
         let reply = self.invoke("copy", args)?;
+        FromReply::from_reply(reply)
+    }
+
+    /// [`Self::copy`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn copy_async(&self, x: impl Into<Number>, z: impl Into<Number>, sx: impl Into<Number>, sz: impl Into<Number>, tx: impl Into<Number>, tz: impl Into<Number>) -> Result<()> {
+        let args = args(vec![Some(Value::Number(x.into())), Some(Value::Number(z.into())), Some(Value::Number(sx.into())), Some(Value::Number(sz.into())), Some(Value::Number(tx.into())), Some(Value::Number(tz.into()))]);
+        let reply = self.invoke_async("copy", args).await?;
         FromReply::from_reply(reply)
     }
 
@@ -2279,6 +3893,15 @@ impl Hologram {
         FromReply::from_reply(reply)
     }
 
+    /// [`Self::fill`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn fill_async(&self, x: impl Into<Number>, z: impl Into<Number>, min_y: Option<Number>, max_y: Option<Number>, value: Option<Value>) -> Result<()> {
+        let args = args(vec![Some(Value::Number(x.into())), Some(Value::Number(z.into())), min_y.map(Value::Number), max_y.map(Value::Number), value]);
+        let reply = self.invoke_async("fill", args).await?;
+        FromReply::from_reply(reply)
+    }
+
     /// Returns the value for the specified voxel.
     ///
     /// Lua: `hologram.get(x:number, y:number, z:number):number`
@@ -2286,6 +3909,15 @@ impl Hologram {
     pub fn get(&self, x: impl Into<Number>, y: impl Into<Number>, z: impl Into<Number>) -> Result<Number> {
         let args = args(vec![Some(Value::Number(x.into())), Some(Value::Number(y.into())), Some(Value::Number(z.into()))]);
         let reply = self.invoke("get", args)?;
+        single::<Number>(reply)
+    }
+
+    /// [`Self::get`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn get_async(&self, x: impl Into<Number>, y: impl Into<Number>, z: impl Into<Number>) -> Result<Number> {
+        let args = args(vec![Some(Value::Number(x.into())), Some(Value::Number(y.into())), Some(Value::Number(z.into()))]);
+        let reply = self.invoke_async("get", args).await?;
         single::<Number>(reply)
     }
 
@@ -2299,6 +3931,15 @@ impl Hologram {
         FromReply::from_reply(reply)
     }
 
+    /// [`Self::get_dimensions`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn get_dimensions_async(&self) -> Result<(Number, Number, Number)> {
+        let args = args(vec![]);
+        let reply = self.invoke_async("getDimensions", args).await?;
+        FromReply::from_reply(reply)
+    }
+
     /// Get the color defined for the specified value.
     ///
     /// Lua: `hologram.getPaletteColor(index:number):number`
@@ -2306,6 +3947,15 @@ impl Hologram {
     pub fn get_palette_color(&self, index: impl Into<Number>) -> Result<Number> {
         let args = args(vec![Some(Value::Number(index.into()))]);
         let reply = self.invoke("getPaletteColor", args)?;
+        single::<Number>(reply)
+    }
+
+    /// [`Self::get_palette_color`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn get_palette_color_async(&self, index: impl Into<Number>) -> Result<Number> {
+        let args = args(vec![Some(Value::Number(index.into()))]);
+        let reply = self.invoke_async("getPaletteColor", args).await?;
         single::<Number>(reply)
     }
 
@@ -2319,6 +3969,15 @@ impl Hologram {
         single::<Number>(reply)
     }
 
+    /// [`Self::get_scale`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn get_scale_async(&self) -> Result<Number> {
+        let args = args(vec![]);
+        let reply = self.invoke_async("getScale", args).await?;
+        single::<Number>(reply)
+    }
+
     /// Returns the relative render projection offsets of the hologram.
     ///
     /// Lua: `hologram.getTranslation():number, number, number`
@@ -2326,6 +3985,15 @@ impl Hologram {
     pub fn get_translation(&self) -> Result<(Number, Number, Number)> {
         let args = args(vec![]);
         let reply = self.invoke("getTranslation", args)?;
+        FromReply::from_reply(reply)
+    }
+
+    /// [`Self::get_translation`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn get_translation_async(&self) -> Result<(Number, Number, Number)> {
+        let args = args(vec![]);
+        let reply = self.invoke_async("getTranslation", args).await?;
         FromReply::from_reply(reply)
     }
 
@@ -2339,6 +4007,15 @@ impl Hologram {
         single::<Number>(reply)
     }
 
+    /// [`Self::max_depth`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn max_depth_async(&self) -> Result<Number> {
+        let args = args(vec![]);
+        let reply = self.invoke_async("maxDepth", args).await?;
+        single::<Number>(reply)
+    }
+
     /// Set the value for the specified voxel.
     ///
     /// Lua: `hologram.set(x:number, y:number, z:number, value:number or boolean)`
@@ -2346,6 +4023,15 @@ impl Hologram {
     pub fn set(&self, x: impl Into<Number>, y: impl Into<Number>, z: impl Into<Number>, value: impl Into<Value>) -> Result<()> {
         let args = args(vec![Some(Value::Number(x.into())), Some(Value::Number(y.into())), Some(Value::Number(z.into())), Some(value.into())]);
         let reply = self.invoke("set", args)?;
+        FromReply::from_reply(reply)
+    }
+
+    /// [`Self::set`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn set_async(&self, x: impl Into<Number>, y: impl Into<Number>, z: impl Into<Number>, value: impl Into<Value>) -> Result<()> {
+        let args = args(vec![Some(Value::Number(x.into())), Some(Value::Number(y.into())), Some(Value::Number(z.into())), Some(value.into())]);
+        let reply = self.invoke_async("set", args).await?;
         FromReply::from_reply(reply)
     }
 
@@ -2359,6 +4045,15 @@ impl Hologram {
         single::<Number>(reply)
     }
 
+    /// [`Self::set_palette_color`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn set_palette_color_async(&self, index: impl Into<Number>, value: impl Into<Number>) -> Result<Number> {
+        let args = args(vec![Some(Value::Number(index.into())), Some(Value::Number(value.into()))]);
+        let reply = self.invoke_async("setPaletteColor", args).await?;
+        single::<Number>(reply)
+    }
+
     /// Set the raw buffer to the specified byte array, where each byte represents a voxel color. Nesting is x,z,y.
     ///
     /// Lua: `hologram.setRaw(data:string)`
@@ -2366,6 +4061,15 @@ impl Hologram {
     pub fn set_raw(&self, data: impl AsRef<[u8]>) -> Result<()> {
         let args = args(vec![Some(Value::text(data.as_ref()))]);
         let reply = self.invoke("setRaw", args)?;
+        FromReply::from_reply(reply)
+    }
+
+    /// [`Self::set_raw`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn set_raw_async(&self, data: impl AsRef<[u8]>) -> Result<()> {
+        let args = args(vec![Some(Value::text(data.as_ref()))]);
+        let reply = self.invoke_async("setRaw", args).await?;
         FromReply::from_reply(reply)
     }
 
@@ -2379,6 +4083,15 @@ impl Hologram {
         single::<bool>(reply)
     }
 
+    /// [`Self::set_rotation`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn set_rotation_async(&self, angle: impl Into<Number>, x: impl Into<Number>, y: impl Into<Number>, z: impl Into<Number>) -> Result<bool> {
+        let args = args(vec![Some(Value::Number(angle.into())), Some(Value::Number(x.into())), Some(Value::Number(y.into())), Some(Value::Number(z.into()))]);
+        let reply = self.invoke_async("setRotation", args).await?;
+        single::<bool>(reply)
+    }
+
     /// Set the rotation speed of the displayed hologram.
     ///
     /// Lua: `hologram.setRotationSpeed(speed:number, x:number, y:number, z:number):boolean`
@@ -2386,6 +4099,15 @@ impl Hologram {
     pub fn set_rotation_speed(&self, speed: impl Into<Number>, x: impl Into<Number>, y: impl Into<Number>, z: impl Into<Number>) -> Result<bool> {
         let args = args(vec![Some(Value::Number(speed.into())), Some(Value::Number(x.into())), Some(Value::Number(y.into())), Some(Value::Number(z.into()))]);
         let reply = self.invoke("setRotationSpeed", args)?;
+        single::<bool>(reply)
+    }
+
+    /// [`Self::set_rotation_speed`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn set_rotation_speed_async(&self, speed: impl Into<Number>, x: impl Into<Number>, y: impl Into<Number>, z: impl Into<Number>) -> Result<bool> {
+        let args = args(vec![Some(Value::Number(speed.into())), Some(Value::Number(x.into())), Some(Value::Number(y.into())), Some(Value::Number(z.into()))]);
+        let reply = self.invoke_async("setRotationSpeed", args).await?;
         single::<bool>(reply)
     }
 
@@ -2399,6 +4121,15 @@ impl Hologram {
         FromReply::from_reply(reply)
     }
 
+    /// [`Self::set_scale`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn set_scale_async(&self, value: impl Into<Number>) -> Result<()> {
+        let args = args(vec![Some(Value::Number(value.into()))]);
+        let reply = self.invoke_async("setScale", args).await?;
+        FromReply::from_reply(reply)
+    }
+
     /// Sets the relative render projection offsets of the hologram.
     ///
     /// Lua: `hologram.setTranslation(tx:number, ty:number, tz:number)`
@@ -2406,6 +4137,15 @@ impl Hologram {
     pub fn set_translation(&self, tx: impl Into<Number>, ty: impl Into<Number>, tz: impl Into<Number>) -> Result<()> {
         let args = args(vec![Some(Value::Number(tx.into())), Some(Value::Number(ty.into())), Some(Value::Number(tz.into()))]);
         let reply = self.invoke("setTranslation", args)?;
+        FromReply::from_reply(reply)
+    }
+
+    /// [`Self::set_translation`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn set_translation_async(&self, tx: impl Into<Number>, ty: impl Into<Number>, tz: impl Into<Number>) -> Result<()> {
+        let args = args(vec![Some(Value::Number(tx.into())), Some(Value::Number(ty.into())), Some(Value::Number(tz.into()))]);
+        let reply = self.invoke_async("setTranslation", args).await?;
         FromReply::from_reply(reply)
     }
 }
@@ -2437,6 +4177,15 @@ impl Internet {
         single::<Handle>(reply)
     }
 
+    /// [`Self::connect`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn connect_async(&self, address: impl AsRef<[u8]>, port: Option<Number>) -> Result<Handle> {
+        let args = args(vec![Some(Value::text(address.as_ref())), port.map(Value::Number)]);
+        let reply = self.invoke_async("connect", args).await?;
+        single::<Handle>(reply)
+    }
+
     /// Returns whether HTTP requests can be made (config setting).
     ///
     /// Lua: `internet.isHttpEnabled():boolean`
@@ -2444,6 +4193,15 @@ impl Internet {
     pub fn is_http_enabled(&self) -> Result<bool> {
         let args = args(vec![]);
         let reply = self.invoke("isHttpEnabled", args)?;
+        single::<bool>(reply)
+    }
+
+    /// [`Self::is_http_enabled`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn is_http_enabled_async(&self) -> Result<bool> {
+        let args = args(vec![]);
+        let reply = self.invoke_async("isHttpEnabled", args).await?;
         single::<bool>(reply)
     }
 
@@ -2457,6 +4215,15 @@ impl Internet {
         single::<bool>(reply)
     }
 
+    /// [`Self::is_tcp_enabled`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn is_tcp_enabled_async(&self) -> Result<bool> {
+        let args = args(vec![]);
+        let reply = self.invoke_async("isTcpEnabled", args).await?;
+        single::<bool>(reply)
+    }
+
     /// Starts an HTTP request. If this returns true, further results will be pushed using `http_response` signals.
     ///
     /// Lua: `internet.request(url:string[, postData:string[, headers:table[, method:string]]]):userdata`
@@ -2464,6 +4231,15 @@ impl Internet {
     pub fn request(&self, url: impl AsRef<[u8]>, post_data: Option<&str>, headers: Option<Value>, method: Option<&str>) -> Result<Handle> {
         let args = args(vec![Some(Value::text(url.as_ref())), post_data.map(Value::from), headers, method.map(Value::from)]);
         let reply = self.invoke("request", args)?;
+        single::<Handle>(reply)
+    }
+
+    /// [`Self::request`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn request_async(&self, url: impl AsRef<[u8]>, post_data: Option<&str>, headers: Option<Value>, method: Option<&str>) -> Result<Handle> {
+        let args = args(vec![Some(Value::text(url.as_ref())), post_data.map(Value::from), headers, method.map(Value::from)]);
+        let reply = self.invoke_async("request", args).await?;
         single::<Handle>(reply)
     }
 }
@@ -2495,6 +4271,15 @@ impl Inventory {
         single::<bool>(reply)
     }
 
+    /// [`Self::compare_stacks`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn compare_stacks_async(&self, slot_a: impl Into<Number>, slot_b: impl Into<Number>) -> Result<bool> {
+        let args = args(vec![Some(Value::Number(slot_a.into())), Some(Value::Number(slot_b.into()))]);
+        let reply = self.invoke_async("compareStacks", args).await?;
+        single::<bool>(reply)
+    }
+
     /// Get a list of descriptions for all item stacks in this inventory.
     ///
     /// Lua: `inventory.getAllStacks():table`
@@ -2502,6 +4287,15 @@ impl Inventory {
     pub fn get_all_stacks(&self) -> Result<Value> {
         let args = args(vec![]);
         let reply = self.invoke("getAllStacks", args)?;
+        single::<Value>(reply)
+    }
+
+    /// [`Self::get_all_stacks`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn get_all_stacks_async(&self) -> Result<Value> {
+        let args = args(vec![]);
+        let reply = self.invoke_async("getAllStacks", args).await?;
         single::<Value>(reply)
     }
 
@@ -2515,6 +4309,15 @@ impl Inventory {
         single::<OcString>(reply)
     }
 
+    /// [`Self::get_inventory_name`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn get_inventory_name_async(&self) -> Result<OcString> {
+        let args = args(vec![]);
+        let reply = self.invoke_async("getInventoryName", args).await?;
+        single::<OcString>(reply)
+    }
+
     /// Get the number of slots in this inventory.
     ///
     /// Lua: `inventory.getInventorySize():number`
@@ -2522,6 +4325,15 @@ impl Inventory {
     pub fn get_inventory_size(&self) -> Result<Number> {
         let args = args(vec![]);
         let reply = self.invoke("getInventorySize", args)?;
+        single::<Number>(reply)
+    }
+
+    /// [`Self::get_inventory_size`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn get_inventory_size_async(&self) -> Result<Number> {
+        let args = args(vec![]);
+        let reply = self.invoke_async("getInventorySize", args).await?;
         single::<Number>(reply)
     }
 
@@ -2535,6 +4347,15 @@ impl Inventory {
         single::<Number>(reply)
     }
 
+    /// [`Self::get_slot_max_stack_size`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn get_slot_max_stack_size_async(&self, slot: impl Into<Number>) -> Result<Number> {
+        let args = args(vec![Some(Value::Number(slot.into()))]);
+        let reply = self.invoke_async("getSlotMaxStackSize", args).await?;
+        single::<Number>(reply)
+    }
+
     /// Get the stack size of the item stack in the specified slot.
     ///
     /// Lua: `inventory.getSlotStackSize(slot:number):number`
@@ -2542,6 +4363,15 @@ impl Inventory {
     pub fn get_slot_stack_size(&self, slot: impl Into<Number>) -> Result<Number> {
         let args = args(vec![Some(Value::Number(slot.into()))]);
         let reply = self.invoke("getSlotStackSize", args)?;
+        single::<Number>(reply)
+    }
+
+    /// [`Self::get_slot_stack_size`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn get_slot_stack_size_async(&self, slot: impl Into<Number>) -> Result<Number> {
+        let args = args(vec![Some(Value::Number(slot.into()))]);
+        let reply = self.invoke_async("getSlotStackSize", args).await?;
         single::<Number>(reply)
     }
 
@@ -2555,6 +4385,15 @@ impl Inventory {
         single::<Value>(reply)
     }
 
+    /// [`Self::get_stack_in_slot`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn get_stack_in_slot_async(&self, slot: impl Into<Number>) -> Result<Value> {
+        let args = args(vec![Some(Value::Number(slot.into()))]);
+        let reply = self.invoke_async("getStackInSlot", args).await?;
+        single::<Value>(reply)
+    }
+
     /// Move up to the specified number of items from the first specified slot to the second.
     ///
     /// Lua: `inventory.transferStack(slotA:number, slotB:number[, count:number=math.huge]):boolean`
@@ -2563,6 +4402,15 @@ impl Inventory {
     pub fn transfer_stack(&self, slot_a: impl Into<Number>, slot_b: impl Into<Number>, count: Option<Number>) -> Result<bool> {
         let args = args(vec![Some(Value::Number(slot_a.into())), Some(Value::Number(slot_b.into())), count.map(Value::Number)]);
         let reply = self.invoke("transferStack", args)?;
+        single::<bool>(reply)
+    }
+
+    /// [`Self::transfer_stack`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn transfer_stack_async(&self, slot_a: impl Into<Number>, slot_b: impl Into<Number>, count: Option<Number>) -> Result<bool> {
+        let args = args(vec![Some(Value::Number(slot_a.into())), Some(Value::Number(slot_b.into())), count.map(Value::Number)]);
+        let reply = self.invoke_async("transferStack", args).await?;
         single::<bool>(reply)
     }
 }
@@ -2594,6 +4442,15 @@ impl InventoryController {
         single::<bool>(reply)
     }
 
+    /// [`Self::are_stacks_equivalent`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn are_stacks_equivalent_async(&self, side: impl Into<Number>, slot_a: impl Into<Number>, slot_b: impl Into<Number>) -> Result<bool> {
+        let args = args(vec![Some(Value::Number(side.into())), Some(Value::Number(slot_a.into())), Some(Value::Number(slot_b.into()))]);
+        let reply = self.invoke_async("areStacksEquivalent", args).await?;
+        single::<bool>(reply)
+    }
+
     /// Compare an item in the specified slot in the inventory on the specified side with one in the database with the specified address.
     ///
     /// Lua: `inventory_controller.compareStackToDatabase(side:number, slot:number, dbAddress:string, dbSlot:number[, checkNBT:boolean=false]):boolean`
@@ -2602,6 +4459,15 @@ impl InventoryController {
     pub fn compare_stack_to_database(&self, side: impl Into<Number>, slot: impl Into<Number>, db_address: impl AsRef<[u8]>, db_slot: impl Into<Number>, check_nbt: Option<bool>) -> Result<bool> {
         let args = args(vec![Some(Value::Number(side.into())), Some(Value::Number(slot.into())), Some(Value::text(db_address.as_ref())), Some(Value::Number(db_slot.into())), check_nbt.map(Value::Bool)]);
         let reply = self.invoke("compareStackToDatabase", args)?;
+        single::<bool>(reply)
+    }
+
+    /// [`Self::compare_stack_to_database`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn compare_stack_to_database_async(&self, side: impl Into<Number>, slot: impl Into<Number>, db_address: impl AsRef<[u8]>, db_slot: impl Into<Number>, check_nbt: Option<bool>) -> Result<bool> {
+        let args = args(vec![Some(Value::Number(side.into())), Some(Value::Number(slot.into())), Some(Value::text(db_address.as_ref())), Some(Value::Number(db_slot.into())), check_nbt.map(Value::Bool)]);
+        let reply = self.invoke_async("compareStackToDatabase", args).await?;
         single::<bool>(reply)
     }
 
@@ -2616,6 +4482,15 @@ impl InventoryController {
         single::<bool>(reply)
     }
 
+    /// [`Self::compare_stacks`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn compare_stacks_async(&self, side: impl Into<Number>, slot_a: impl Into<Number>, slot_b: impl Into<Number>, check_nbt: Option<bool>) -> Result<bool> {
+        let args = args(vec![Some(Value::Number(side.into())), Some(Value::Number(slot_a.into())), Some(Value::Number(slot_b.into())), check_nbt.map(Value::Bool)]);
+        let reply = self.invoke_async("compareStacks", args).await?;
+        single::<bool>(reply)
+    }
+
     /// Compare an item in the specified slot with one in the database with the specified address.
     ///
     /// Lua: `inventory_controller.compareToDatabase(slot:number, dbAddress:string, dbSlot:number[, checkNBT:boolean=false]):boolean`
@@ -2624,6 +4499,15 @@ impl InventoryController {
     pub fn compare_to_database(&self, slot: impl Into<Number>, db_address: impl AsRef<[u8]>, db_slot: impl Into<Number>, check_nbt: Option<bool>) -> Result<bool> {
         let args = args(vec![Some(Value::Number(slot.into())), Some(Value::text(db_address.as_ref())), Some(Value::Number(db_slot.into())), check_nbt.map(Value::Bool)]);
         let reply = self.invoke("compareToDatabase", args)?;
+        single::<bool>(reply)
+    }
+
+    /// [`Self::compare_to_database`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn compare_to_database_async(&self, slot: impl Into<Number>, db_address: impl AsRef<[u8]>, db_slot: impl Into<Number>, check_nbt: Option<bool>) -> Result<bool> {
+        let args = args(vec![Some(Value::Number(slot.into())), Some(Value::text(db_address.as_ref())), Some(Value::Number(db_slot.into())), check_nbt.map(Value::Bool)]);
+        let reply = self.invoke_async("compareToDatabase", args).await?;
         single::<bool>(reply)
     }
 
@@ -2638,6 +4522,15 @@ impl InventoryController {
         single::<Number>(reply)
     }
 
+    /// [`Self::drop_into_item_inventory`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn drop_into_item_inventory_async(&self, inventory_slot: impl Into<Number>, slot: impl Into<Number>, count: Option<Number>) -> Result<Number> {
+        let args = args(vec![Some(Value::Number(inventory_slot.into())), Some(Value::Number(slot.into())), count.map(Value::Number)]);
+        let reply = self.invoke_async("dropIntoItemInventory", args).await?;
+        single::<Number>(reply)
+    }
+
     /// Drops the selected item stack into the specified slot of an inventory.
     ///
     /// Lua: `inventory_controller.dropIntoSlot(facing:number, slot:number[, count:number[, fromSide:number]]):boolean`
@@ -2645,6 +4538,15 @@ impl InventoryController {
     pub fn drop_into_slot(&self, facing: impl Into<Number>, slot: impl Into<Number>, count: Option<Number>, from_side: Option<Number>) -> Result<bool> {
         let args = args(vec![Some(Value::Number(facing.into())), Some(Value::Number(slot.into())), count.map(Value::Number), from_side.map(Value::Number)]);
         let reply = self.invoke("dropIntoSlot", args)?;
+        single::<bool>(reply)
+    }
+
+    /// [`Self::drop_into_slot`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn drop_into_slot_async(&self, facing: impl Into<Number>, slot: impl Into<Number>, count: Option<Number>, from_side: Option<Number>) -> Result<bool> {
+        let args = args(vec![Some(Value::Number(facing.into())), Some(Value::Number(slot.into())), count.map(Value::Number), from_side.map(Value::Number)]);
+        let reply = self.invoke_async("dropIntoSlot", args).await?;
         single::<bool>(reply)
     }
 
@@ -2658,6 +4560,15 @@ impl InventoryController {
         single::<bool>(reply)
     }
 
+    /// [`Self::equip`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn equip_async(&self) -> Result<bool> {
+        let args = args(vec![]);
+        let reply = self.invoke_async("equip", args).await?;
+        single::<bool>(reply)
+    }
+
     /// Get a description of all stacks in the inventory on the specified side of the device.
     ///
     /// Lua: `inventory_controller.getAllStacks(side:number):userdata`
@@ -2665,6 +4576,15 @@ impl InventoryController {
     pub fn get_all_stacks(&self, side: impl Into<Number>) -> Result<Handle> {
         let args = args(vec![Some(Value::Number(side.into()))]);
         let reply = self.invoke("getAllStacks", args)?;
+        single::<Handle>(reply)
+    }
+
+    /// [`Self::get_all_stacks`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn get_all_stacks_async(&self, side: impl Into<Number>) -> Result<Handle> {
+        let args = args(vec![Some(Value::Number(side.into()))]);
+        let reply = self.invoke_async("getAllStacks", args).await?;
         single::<Handle>(reply)
     }
 
@@ -2678,6 +4598,15 @@ impl InventoryController {
         single::<OcString>(reply)
     }
 
+    /// [`Self::get_inventory_name`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn get_inventory_name_async(&self, side: impl Into<Number>) -> Result<OcString> {
+        let args = args(vec![Some(Value::Number(side.into()))]);
+        let reply = self.invoke_async("getInventoryName", args).await?;
+        single::<OcString>(reply)
+    }
+
     /// Get the number of slots in the inventory on the specified side of the device.
     ///
     /// Lua: `inventory_controller.getInventorySize(side:number):number`
@@ -2685,6 +4614,15 @@ impl InventoryController {
     pub fn get_inventory_size(&self, side: impl Into<Number>) -> Result<Number> {
         let args = args(vec![Some(Value::Number(side.into()))]);
         let reply = self.invoke("getInventorySize", args)?;
+        single::<Number>(reply)
+    }
+
+    /// [`Self::get_inventory_size`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn get_inventory_size_async(&self, side: impl Into<Number>) -> Result<Number> {
+        let args = args(vec![Some(Value::Number(side.into()))]);
+        let reply = self.invoke_async("getInventorySize", args).await?;
         single::<Number>(reply)
     }
 
@@ -2698,6 +4636,15 @@ impl InventoryController {
         single::<Number>(reply)
     }
 
+    /// [`Self::get_item_inventory_size`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn get_item_inventory_size_async(&self, slot: impl Into<Number>) -> Result<Number> {
+        let args = args(vec![Some(Value::Number(slot.into()))]);
+        let reply = self.invoke_async("getItemInventorySize", args).await?;
+        single::<Number>(reply)
+    }
+
     /// Get the maximum number of items in the specified slot of the inventory on the specified side of the device.
     ///
     /// Lua: `inventory_controller.getSlotMaxStackSize(side:number, slot:number):number`
@@ -2705,6 +4652,15 @@ impl InventoryController {
     pub fn get_slot_max_stack_size(&self, side: impl Into<Number>, slot: impl Into<Number>) -> Result<Number> {
         let args = args(vec![Some(Value::Number(side.into())), Some(Value::Number(slot.into()))]);
         let reply = self.invoke("getSlotMaxStackSize", args)?;
+        single::<Number>(reply)
+    }
+
+    /// [`Self::get_slot_max_stack_size`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn get_slot_max_stack_size_async(&self, side: impl Into<Number>, slot: impl Into<Number>) -> Result<Number> {
+        let args = args(vec![Some(Value::Number(side.into())), Some(Value::Number(slot.into()))]);
+        let reply = self.invoke_async("getSlotMaxStackSize", args).await?;
         single::<Number>(reply)
     }
 
@@ -2718,6 +4674,15 @@ impl InventoryController {
         single::<Number>(reply)
     }
 
+    /// [`Self::get_slot_stack_size`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn get_slot_stack_size_async(&self, side: impl Into<Number>, slot: impl Into<Number>) -> Result<Number> {
+        let args = args(vec![Some(Value::Number(side.into())), Some(Value::Number(slot.into()))]);
+        let reply = self.invoke_async("getSlotStackSize", args).await?;
+        single::<Number>(reply)
+    }
+
     /// Get a description of the stack in the specified slot or the selected slot.
     ///
     /// Lua: `inventory_controller.getStackInInternalSlot([slot:number]):table`
@@ -2725,6 +4690,15 @@ impl InventoryController {
     pub fn get_stack_in_internal_slot(&self, slot: Option<Number>) -> Result<Value> {
         let args = args(vec![slot.map(Value::Number)]);
         let reply = self.invoke("getStackInInternalSlot", args)?;
+        single::<Value>(reply)
+    }
+
+    /// [`Self::get_stack_in_internal_slot`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn get_stack_in_internal_slot_async(&self, slot: Option<Number>) -> Result<Value> {
+        let args = args(vec![slot.map(Value::Number)]);
+        let reply = self.invoke_async("getStackInInternalSlot", args).await?;
         single::<Value>(reply)
     }
 
@@ -2738,6 +4712,15 @@ impl InventoryController {
         single::<Value>(reply)
     }
 
+    /// [`Self::get_stack_in_slot`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn get_stack_in_slot_async(&self, side: impl Into<Number>, slot: impl Into<Number>) -> Result<Value> {
+        let args = args(vec![Some(Value::Number(side.into())), Some(Value::Number(slot.into()))]);
+        let reply = self.invoke_async("getStackInSlot", args).await?;
+        single::<Value>(reply)
+    }
+
     /// Get whether the stack in the selected slot is equivalent to the item in the specified slot (have shared OreDictionary IDs).
     ///
     /// Lua: `inventory_controller.isEquivalentTo(otherSlot:number):boolean`
@@ -2745,6 +4728,15 @@ impl InventoryController {
     pub fn is_equivalent_to(&self, other_slot: impl Into<Number>) -> Result<bool> {
         let args = args(vec![Some(Value::Number(other_slot.into()))]);
         let reply = self.invoke("isEquivalentTo", args)?;
+        single::<bool>(reply)
+    }
+
+    /// [`Self::is_equivalent_to`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn is_equivalent_to_async(&self, other_slot: impl Into<Number>) -> Result<bool> {
+        let args = args(vec![Some(Value::Number(other_slot.into()))]);
+        let reply = self.invoke_async("isEquivalentTo", args).await?;
         single::<bool>(reply)
     }
 
@@ -2758,6 +4750,15 @@ impl InventoryController {
         single::<bool>(reply)
     }
 
+    /// [`Self::store`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn store_async(&self, side: impl Into<Number>, slot: impl Into<Number>, db_address: impl AsRef<[u8]>, db_slot: impl Into<Number>) -> Result<bool> {
+        let args = args(vec![Some(Value::Number(side.into())), Some(Value::Number(slot.into())), Some(Value::text(db_address.as_ref())), Some(Value::Number(db_slot.into()))]);
+        let reply = self.invoke_async("store", args).await?;
+        single::<bool>(reply)
+    }
+
     /// Store an item stack description in the specified slot of the database with the specified address.
     ///
     /// Lua: `inventory_controller.storeInternal(slot:number, dbAddress:string, dbSlot:number):boolean`
@@ -2765,6 +4766,15 @@ impl InventoryController {
     pub fn store_internal(&self, slot: impl Into<Number>, db_address: impl AsRef<[u8]>, db_slot: impl Into<Number>) -> Result<bool> {
         let args = args(vec![Some(Value::Number(slot.into())), Some(Value::text(db_address.as_ref())), Some(Value::Number(db_slot.into()))]);
         let reply = self.invoke("storeInternal", args)?;
+        single::<bool>(reply)
+    }
+
+    /// [`Self::store_internal`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn store_internal_async(&self, slot: impl Into<Number>, db_address: impl AsRef<[u8]>, db_slot: impl Into<Number>) -> Result<bool> {
+        let args = args(vec![Some(Value::Number(slot.into())), Some(Value::text(db_address.as_ref())), Some(Value::Number(db_slot.into()))]);
+        let reply = self.invoke_async("storeInternal", args).await?;
         single::<bool>(reply)
     }
 
@@ -2779,6 +4789,15 @@ impl InventoryController {
         single::<Number>(reply)
     }
 
+    /// [`Self::suck_from_item_inventory`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn suck_from_item_inventory_async(&self, inventory_slot: impl Into<Number>, slot: impl Into<Number>, count: Option<Number>) -> Result<Number> {
+        let args = args(vec![Some(Value::Number(inventory_slot.into())), Some(Value::Number(slot.into())), count.map(Value::Number)]);
+        let reply = self.invoke_async("suckFromItemInventory", args).await?;
+        single::<Number>(reply)
+    }
+
     /// Sucks items from the specified slot of an inventory.
     ///
     /// Lua: `inventory_controller.suckFromSlot(facing:number, slot:number[, count:number[, fromSide:number]]):boolean`
@@ -2786,6 +4805,15 @@ impl InventoryController {
     pub fn suck_from_slot(&self, facing: impl Into<Number>, slot: impl Into<Number>, count: Option<Number>, from_side: Option<Number>) -> Result<bool> {
         let args = args(vec![Some(Value::Number(facing.into())), Some(Value::Number(slot.into())), count.map(Value::Number), from_side.map(Value::Number)]);
         let reply = self.invoke("suckFromSlot", args)?;
+        single::<bool>(reply)
+    }
+
+    /// [`Self::suck_from_slot`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn suck_from_slot_async(&self, facing: impl Into<Number>, slot: impl Into<Number>, count: Option<Number>, from_side: Option<Number>) -> Result<bool> {
+        let args = args(vec![Some(Value::Number(facing.into())), Some(Value::Number(slot.into())), count.map(Value::Number), from_side.map(Value::Number)]);
+        let reply = self.invoke_async("suckFromSlot", args).await?;
         single::<bool>(reply)
     }
 }
@@ -2817,6 +4845,15 @@ impl Jukebox {
         single::<OcString>(reply)
     }
 
+    /// [`Self::get_record`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn get_record_async(&self) -> Result<OcString> {
+        let args = args(vec![]);
+        let reply = self.invoke_async("getRecord", args).await?;
+        single::<OcString>(reply)
+    }
+
     /// Start playing the record currently in the jukebox.
     ///
     /// Lua: `jukebox.play()`
@@ -2827,6 +4864,15 @@ impl Jukebox {
         FromReply::from_reply(reply)
     }
 
+    /// [`Self::play`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn play_async(&self) -> Result<()> {
+        let args = args(vec![]);
+        let reply = self.invoke_async("play", args).await?;
+        FromReply::from_reply(reply)
+    }
+
     /// Stop playing the record currently in the jukebox.
     ///
     /// Lua: `jukebox.stop()`
@@ -2834,6 +4880,15 @@ impl Jukebox {
     pub fn stop(&self) -> Result<()> {
         let args = args(vec![]);
         let reply = self.invoke("stop", args)?;
+        FromReply::from_reply(reply)
+    }
+
+    /// [`Self::stop`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn stop_async(&self) -> Result<()> {
+        let args = args(vec![]);
+        let reply = self.invoke_async("stop", args).await?;
         FromReply::from_reply(reply)
     }
 }
@@ -2881,6 +4936,15 @@ impl Leash {
         single::<bool>(reply)
     }
 
+    /// [`Self::leash`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn leash_async(&self, side: impl Into<Number>) -> Result<bool> {
+        let args = args(vec![Some(Value::Number(side.into()))]);
+        let reply = self.invoke_async("leash", args).await?;
+        single::<bool>(reply)
+    }
+
     /// Unleashes all currently leashed entities.
     ///
     /// Lua: `leash.unleash()`
@@ -2888,6 +4952,15 @@ impl Leash {
     pub fn unleash(&self) -> Result<()> {
         let args = args(vec![]);
         let reply = self.invoke("unleash", args)?;
+        FromReply::from_reply(reply)
+    }
+
+    /// [`Self::unleash`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn unleash_async(&self) -> Result<()> {
+        let args = args(vec![]);
+        let reply = self.invoke_async("unleash", args).await?;
         FromReply::from_reply(reply)
     }
 }
@@ -2919,6 +4992,15 @@ impl Microcontroller {
         single::<bool>(reply)
     }
 
+    /// [`Self::is_running`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn is_running_async(&self) -> Result<bool> {
+        let args = args(vec![]);
+        let reply = self.invoke_async("isRunning", args).await?;
+        single::<bool>(reply)
+    }
+
     /// Get whether network messages are sent via the specified side.
     ///
     /// Lua: `microcontroller.isSideOpen(side:number):boolean`
@@ -2926,6 +5008,15 @@ impl Microcontroller {
     pub fn is_side_open(&self, side: impl Into<Number>) -> Result<bool> {
         let args = args(vec![Some(Value::Number(side.into()))]);
         let reply = self.invoke("isSideOpen", args)?;
+        single::<bool>(reply)
+    }
+
+    /// [`Self::is_side_open`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn is_side_open_async(&self, side: impl Into<Number>) -> Result<bool> {
+        let args = args(vec![Some(Value::Number(side.into()))]);
+        let reply = self.invoke_async("isSideOpen", args).await?;
         single::<bool>(reply)
     }
 
@@ -2939,6 +5030,15 @@ impl Microcontroller {
         single::<OcString>(reply)
     }
 
+    /// [`Self::last_error`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn last_error_async(&self) -> Result<OcString> {
+        let args = args(vec![]);
+        let reply = self.invoke_async("lastError", args).await?;
+        single::<OcString>(reply)
+    }
+
     /// Set whether network messages are sent via the specified side.
     ///
     /// Lua: `microcontroller.setSideOpen(side:number, open:boolean):boolean`
@@ -2946,6 +5046,15 @@ impl Microcontroller {
     pub fn set_side_open(&self, side: impl Into<Number>, open: bool) -> Result<bool> {
         let args = args(vec![Some(Value::Number(side.into())), Some(Value::Bool(open))]);
         let reply = self.invoke("setSideOpen", args)?;
+        single::<bool>(reply)
+    }
+
+    /// [`Self::set_side_open`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn set_side_open_async(&self, side: impl Into<Number>, open: bool) -> Result<bool> {
+        let args = args(vec![Some(Value::Number(side.into())), Some(Value::Bool(open))]);
+        let reply = self.invoke_async("setSideOpen", args).await?;
         single::<bool>(reply)
     }
 
@@ -2959,6 +5068,15 @@ impl Microcontroller {
         single::<bool>(reply)
     }
 
+    /// [`Self::start`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn start_async(&self) -> Result<bool> {
+        let args = args(vec![]);
+        let reply = self.invoke_async("start", args).await?;
+        single::<bool>(reply)
+    }
+
     /// Stops the microcontroller. Returns true if the state changed.
     ///
     /// Lua: `microcontroller.stop():boolean`
@@ -2966,6 +5084,15 @@ impl Microcontroller {
     pub fn stop(&self) -> Result<bool> {
         let args = args(vec![]);
         let reply = self.invoke("stop", args)?;
+        single::<bool>(reply)
+    }
+
+    /// [`Self::stop`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn stop_async(&self) -> Result<bool> {
+        let args = args(vec![]);
+        let reply = self.invoke_async("stop", args).await?;
         single::<bool>(reply)
     }
 }
@@ -2994,6 +5121,15 @@ impl MobSpawner {
     pub fn get_spawning_mob_name(&self) -> Result<OcString> {
         let args = args(vec![]);
         let reply = self.invoke("getSpawningMobName", args)?;
+        single::<OcString>(reply)
+    }
+
+    /// [`Self::get_spawning_mob_name`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn get_spawning_mob_name_async(&self) -> Result<OcString> {
+        let args = args(vec![]);
+        let reply = self.invoke_async("getSpawningMobName", args).await?;
         single::<OcString>(reply)
     }
 }
@@ -3026,6 +5162,16 @@ impl Modem {
         FromReply::from_reply(reply)
     }
 
+    /// [`Self::broadcast`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn broadcast_async(&self, port: impl Into<Number>, data: &[Value]) -> Result<()> {
+        let mut args: Vec<Value> = vec![Some(Value::Number(port.into()))].into_iter().map(Option::unwrap_or_default).collect();
+        args.extend_from_slice(data);
+        let reply = self.invoke_async("broadcast", args).await?;
+        FromReply::from_reply(reply)
+    }
+
     /// Closes the specified port (default: all ports). Returns true if ports were closed.
     ///
     /// Lua: `modem.close([port:number]):boolean`
@@ -3033,6 +5179,15 @@ impl Modem {
     pub fn close(&self, port: Option<Number>) -> Result<bool> {
         let args = args(vec![port.map(Value::Number)]);
         let reply = self.invoke("close", args)?;
+        single::<bool>(reply)
+    }
+
+    /// [`Self::close`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn close_async(&self, port: Option<Number>) -> Result<bool> {
+        let args = args(vec![port.map(Value::Number)]);
+        let reply = self.invoke_async("close", args).await?;
         single::<bool>(reply)
     }
 
@@ -3046,6 +5201,15 @@ impl Modem {
         single::<Number>(reply)
     }
 
+    /// [`Self::get_strength`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn get_strength_async(&self) -> Result<Number> {
+        let args = args(vec![]);
+        let reply = self.invoke_async("getStrength", args).await?;
+        single::<Number>(reply)
+    }
+
     /// Get the current wake-up message.
     ///
     /// Lua: `modem.getWakeMessage():string, boolean`
@@ -3053,6 +5217,15 @@ impl Modem {
     pub fn get_wake_message(&self) -> Result<(OcString, bool)> {
         let args = args(vec![]);
         let reply = self.invoke("getWakeMessage", args)?;
+        FromReply::from_reply(reply)
+    }
+
+    /// [`Self::get_wake_message`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn get_wake_message_async(&self) -> Result<(OcString, bool)> {
+        let args = args(vec![]);
+        let reply = self.invoke_async("getWakeMessage", args).await?;
         FromReply::from_reply(reply)
     }
 
@@ -3066,6 +5239,15 @@ impl Modem {
         single::<bool>(reply)
     }
 
+    /// [`Self::is_open`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn is_open_async(&self, port: impl Into<Number>) -> Result<bool> {
+        let args = args(vec![Some(Value::Number(port.into()))]);
+        let reply = self.invoke_async("isOpen", args).await?;
+        single::<bool>(reply)
+    }
+
     /// Whether this card has wired networking capability.
     ///
     /// Lua: `modem.isWired():boolean`
@@ -3073,6 +5255,15 @@ impl Modem {
     pub fn is_wired(&self) -> Result<bool> {
         let args = args(vec![]);
         let reply = self.invoke("isWired", args)?;
+        single::<bool>(reply)
+    }
+
+    /// [`Self::is_wired`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn is_wired_async(&self) -> Result<bool> {
+        let args = args(vec![]);
+        let reply = self.invoke_async("isWired", args).await?;
         single::<bool>(reply)
     }
 
@@ -3086,6 +5277,15 @@ impl Modem {
         single::<bool>(reply)
     }
 
+    /// [`Self::is_wireless`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn is_wireless_async(&self) -> Result<bool> {
+        let args = args(vec![]);
+        let reply = self.invoke_async("isWireless", args).await?;
+        single::<bool>(reply)
+    }
+
     /// Opens the specified port. Returns true if the port was opened.
     ///
     /// Lua: `modem.open(port:number):boolean`
@@ -3093,6 +5293,15 @@ impl Modem {
     pub fn open(&self, port: impl Into<Number>) -> Result<bool> {
         let args = args(vec![Some(Value::Number(port.into()))]);
         let reply = self.invoke("open", args)?;
+        single::<bool>(reply)
+    }
+
+    /// [`Self::open`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn open_async(&self, port: impl Into<Number>) -> Result<bool> {
+        let args = args(vec![Some(Value::Number(port.into()))]);
+        let reply = self.invoke_async("open", args).await?;
         single::<bool>(reply)
     }
 
@@ -3107,6 +5316,16 @@ impl Modem {
         FromReply::from_reply(reply)
     }
 
+    /// [`Self::send`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn send_async(&self, address: impl AsRef<[u8]>, port: impl Into<Number>, data: &[Value]) -> Result<()> {
+        let mut args: Vec<Value> = vec![Some(Value::text(address.as_ref())), Some(Value::Number(port.into()))].into_iter().map(Option::unwrap_or_default).collect();
+        args.extend_from_slice(data);
+        let reply = self.invoke_async("send", args).await?;
+        FromReply::from_reply(reply)
+    }
+
     /// Set the signal strength (range) used when sending messages.
     ///
     /// Lua: `modem.setStrength(strength:number):number`
@@ -3117,6 +5336,15 @@ impl Modem {
         single::<Number>(reply)
     }
 
+    /// [`Self::set_strength`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn set_strength_async(&self, strength: impl Into<Number>) -> Result<Number> {
+        let args = args(vec![Some(Value::Number(strength.into()))]);
+        let reply = self.invoke_async("setStrength", args).await?;
+        single::<Number>(reply)
+    }
+
     /// Set the wake-up message and whether to ignore additional data/parameters.
     ///
     /// Lua: `modem.setWakeMessage(message:string[, fuzzy:boolean]):string`
@@ -3124,6 +5352,15 @@ impl Modem {
     pub fn set_wake_message(&self, message: impl AsRef<[u8]>, fuzzy: Option<bool>) -> Result<OcString> {
         let args = args(vec![Some(Value::text(message.as_ref())), fuzzy.map(Value::Bool)]);
         let reply = self.invoke("setWakeMessage", args)?;
+        single::<OcString>(reply)
+    }
+
+    /// [`Self::set_wake_message`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn set_wake_message_async(&self, message: impl AsRef<[u8]>, fuzzy: Option<bool>) -> Result<OcString> {
+        let args = args(vec![Some(Value::text(message.as_ref())), fuzzy.map(Value::Bool)]);
+        let reply = self.invoke_async("setWakeMessage", args).await?;
         single::<OcString>(reply)
     }
 }
@@ -3155,6 +5392,15 @@ impl MotionSensor {
         single::<Number>(reply)
     }
 
+    /// [`Self::get_sensitivity`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn get_sensitivity_async(&self) -> Result<Number> {
+        let args = args(vec![]);
+        let reply = self.invoke_async("getSensitivity", args).await?;
+        single::<Number>(reply)
+    }
+
     /// Sets the sensor's sensitivity. Returns the old value.
     ///
     /// Lua: `motion_sensor.setSensitivity(value:number):number`
@@ -3162,6 +5408,15 @@ impl MotionSensor {
     pub fn set_sensitivity(&self, value: impl Into<Number>) -> Result<Number> {
         let args = args(vec![Some(Value::Number(value.into()))]);
         let reply = self.invoke("setSensitivity", args)?;
+        single::<Number>(reply)
+    }
+
+    /// [`Self::set_sensitivity`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn set_sensitivity_async(&self, value: impl Into<Number>) -> Result<Number> {
+        let args = args(vec![Some(Value::Number(value.into()))]);
+        let reply = self.invoke_async("setSensitivity", args).await?;
         single::<Number>(reply)
     }
 }
@@ -3193,6 +5448,15 @@ impl Navigation {
         single::<Value>(reply)
     }
 
+    /// [`Self::find_waypoints`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn find_waypoints_async(&self, range: impl Into<Number>) -> Result<Value> {
+        let args = args(vec![Some(Value::Number(range.into()))]);
+        let reply = self.invoke_async("findWaypoints", args).await?;
+        single::<Value>(reply)
+    }
+
     /// Get the current orientation of the robot.
     ///
     /// Lua: `navigation.getFacing():number`
@@ -3200,6 +5464,15 @@ impl Navigation {
     pub fn get_facing(&self) -> Result<Number> {
         let args = args(vec![]);
         let reply = self.invoke("getFacing", args)?;
+        single::<Number>(reply)
+    }
+
+    /// [`Self::get_facing`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn get_facing_async(&self) -> Result<Number> {
+        let args = args(vec![]);
+        let reply = self.invoke_async("getFacing", args).await?;
         single::<Number>(reply)
     }
 
@@ -3213,6 +5486,15 @@ impl Navigation {
         FromReply::from_reply(reply)
     }
 
+    /// [`Self::get_position`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn get_position_async(&self) -> Result<(Number, Number, Number)> {
+        let args = args(vec![]);
+        let reply = self.invoke_async("getPosition", args).await?;
+        FromReply::from_reply(reply)
+    }
+
     /// Get the operational range of the navigation upgrade.
     ///
     /// Lua: `navigation.getRange():number`
@@ -3220,6 +5502,15 @@ impl Navigation {
     pub fn get_range(&self) -> Result<Number> {
         let args = args(vec![]);
         let reply = self.invoke("getRange", args)?;
+        single::<Number>(reply)
+    }
+
+    /// [`Self::get_range`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn get_range_async(&self) -> Result<Number> {
+        let args = args(vec![]);
+        let reply = self.invoke_async("getRange", args).await?;
         single::<Number>(reply)
     }
 }
@@ -3251,6 +5542,15 @@ impl NetSplitter {
         single::<bool>(reply)
     }
 
+    /// [`Self::close`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn close_async(&self, side: impl Into<Number>) -> Result<bool> {
+        let args = args(vec![Some(Value::Number(side.into()))]);
+        let reply = self.invoke_async("close", args).await?;
+        single::<bool>(reply)
+    }
+
     /// Returns current open/close state of all sides in an array, indexed by direction.
     ///
     /// Lua: `net_splitter.getSides():table`
@@ -3258,6 +5558,15 @@ impl NetSplitter {
     pub fn get_sides(&self) -> Result<Value> {
         let args = args(vec![]);
         let reply = self.invoke("getSides", args)?;
+        single::<Value>(reply)
+    }
+
+    /// [`Self::get_sides`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn get_sides_async(&self) -> Result<Value> {
+        let args = args(vec![]);
+        let reply = self.invoke_async("getSides", args).await?;
         single::<Value>(reply)
     }
 
@@ -3271,6 +5580,15 @@ impl NetSplitter {
         single::<bool>(reply)
     }
 
+    /// [`Self::open`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn open_async(&self, side: impl Into<Number>) -> Result<bool> {
+        let args = args(vec![Some(Value::Number(side.into()))]);
+        let reply = self.invoke_async("open", args).await?;
+        single::<bool>(reply)
+    }
+
     /// set open state (true/false) of all sides in an array; index by direction. Returns previous states
     ///
     /// Lua: `net_splitter.setSides(settings:table):table`
@@ -3278,6 +5596,15 @@ impl NetSplitter {
     pub fn set_sides(&self, settings: impl Into<Value>) -> Result<Value> {
         let args = args(vec![Some(settings.into())]);
         let reply = self.invoke("setSides", args)?;
+        single::<Value>(reply)
+    }
+
+    /// [`Self::set_sides`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn set_sides_async(&self, settings: impl Into<Value>) -> Result<Value> {
+        let args = args(vec![Some(settings.into())]);
+        let reply = self.invoke_async("setSides", args).await?;
         single::<Value>(reply)
     }
 }
@@ -3309,6 +5636,15 @@ impl NoteBlock {
         single::<Number>(reply)
     }
 
+    /// [`Self::get_pitch`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn get_pitch_async(&self) -> Result<Number> {
+        let args = args(vec![]);
+        let reply = self.invoke_async("getPitch", args).await?;
+        single::<Number>(reply)
+    }
+
     /// Set the pitch for this note block. Must be in the interval \[1, 25\].
     ///
     /// Lua: `note_block.setPitch(value:number)`
@@ -3319,6 +5655,15 @@ impl NoteBlock {
         FromReply::from_reply(reply)
     }
 
+    /// [`Self::set_pitch`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn set_pitch_async(&self, value: impl Into<Number>) -> Result<()> {
+        let args = args(vec![Some(Value::Number(value.into()))]);
+        let reply = self.invoke_async("setPitch", args).await?;
+        FromReply::from_reply(reply)
+    }
+
     /// Triggers the note block if possible. Allows setting the pitch for to save a tick.
     ///
     /// Lua: `note_block.trigger([pitch:number]):boolean`
@@ -3326,6 +5671,15 @@ impl NoteBlock {
     pub fn trigger(&self, pitch: Option<Number>) -> Result<bool> {
         let args = args(vec![pitch.map(Value::Number)]);
         let reply = self.invoke("trigger", args)?;
+        single::<bool>(reply)
+    }
+
+    /// [`Self::trigger`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn trigger_async(&self, pitch: Option<Number>) -> Result<bool> {
+        let args = args(vec![pitch.map(Value::Number)]);
+        let reply = self.invoke_async("trigger", args).await?;
         single::<bool>(reply)
     }
 }
@@ -3357,6 +5711,15 @@ impl Piston {
         single::<bool>(reply)
     }
 
+    /// [`Self::is_sticky`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn is_sticky_async(&self) -> Result<bool> {
+        let args = args(vec![]);
+        let reply = self.invoke_async("isSticky", args).await?;
+        single::<bool>(reply)
+    }
+
     /// Tries to reach out to the side given (default front) and pull a block similar to a vanilla sticky piston.
     ///
     /// Lua: `piston.pull([side:number]):boolean`
@@ -3367,6 +5730,15 @@ impl Piston {
         single::<bool>(reply)
     }
 
+    /// [`Self::pull`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn pull_async(&self, side: Option<Number>) -> Result<bool> {
+        let args = args(vec![side.map(Value::Number)]);
+        let reply = self.invoke_async("pull", args).await?;
+        single::<bool>(reply)
+    }
+
     /// Tries to push the block on the specified side of the container of the upgrade. Defaults to front.
     ///
     /// Lua: `piston.push([side:number]):boolean`
@@ -3374,6 +5746,15 @@ impl Piston {
     pub fn push(&self, side: Option<Number>) -> Result<bool> {
         let args = args(vec![side.map(Value::Number)]);
         let reply = self.invoke("push", args)?;
+        single::<bool>(reply)
+    }
+
+    /// [`Self::push`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn push_async(&self, side: Option<Number>) -> Result<bool> {
+        let args = args(vec![side.map(Value::Number)]);
+        let reply = self.invoke_async("push", args).await?;
         single::<bool>(reply)
     }
 }
@@ -3406,6 +5787,15 @@ impl Printer3d {
         FromReply::from_reply(reply)
     }
 
+    /// [`Self::add_shape`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn add_shape_async(&self, min_x: impl Into<Number>, min_y: impl Into<Number>, min_z: impl Into<Number>, max_x: impl Into<Number>, max_y: impl Into<Number>, max_z: impl Into<Number>, texture: impl AsRef<[u8]>, state: Option<bool>, tint: Option<Number>) -> Result<()> {
+        let args = args(vec![Some(Value::Number(min_x.into())), Some(Value::Number(min_y.into())), Some(Value::Number(min_z.into())), Some(Value::Number(max_x.into())), Some(Value::Number(max_y.into())), Some(Value::Number(max_z.into())), Some(Value::text(texture.as_ref())), state.map(Value::Bool), tint.map(Value::Number)]);
+        let reply = self.invoke_async("addShape", args).await?;
+        FromReply::from_reply(reply)
+    }
+
     /// Commit and begin printing the current configuration.
     ///
     /// Lua: `printer3d.commit([count:number]):boolean`
@@ -3413,6 +5803,15 @@ impl Printer3d {
     pub fn commit(&self, count: Option<Number>) -> Result<bool> {
         let args = args(vec![count.map(Value::Number)]);
         let reply = self.invoke("commit", args)?;
+        single::<bool>(reply)
+    }
+
+    /// [`Self::commit`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn commit_async(&self, count: Option<Number>) -> Result<bool> {
+        let args = args(vec![count.map(Value::Number)]);
+        let reply = self.invoke_async("commit", args).await?;
         single::<bool>(reply)
     }
 
@@ -3426,6 +5825,15 @@ impl Printer3d {
         single::<OcString>(reply)
     }
 
+    /// [`Self::get_label`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn get_label_async(&self) -> Result<OcString> {
+        let args = args(vec![]);
+        let reply = self.invoke_async("getLabel", args).await?;
+        single::<OcString>(reply)
+    }
+
     /// Get which light level the printed block should have.
     ///
     /// Lua: `printer3d.getLightLevel():number`
@@ -3433,6 +5841,15 @@ impl Printer3d {
     pub fn get_light_level(&self) -> Result<Number> {
         let args = args(vec![]);
         let reply = self.invoke("getLightLevel", args)?;
+        single::<Number>(reply)
+    }
+
+    /// [`Self::get_light_level`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn get_light_level_async(&self) -> Result<Number> {
+        let args = args(vec![]);
+        let reply = self.invoke_async("getLightLevel", args).await?;
         single::<Number>(reply)
     }
 
@@ -3446,6 +5863,15 @@ impl Printer3d {
         single::<Number>(reply)
     }
 
+    /// [`Self::get_max_shape_count`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn get_max_shape_count_async(&self) -> Result<Number> {
+        let args = args(vec![]);
+        let reply = self.invoke_async("getMaxShapeCount", args).await?;
+        single::<Number>(reply)
+    }
+
     /// Get the number of shapes in the current configuration.
     ///
     /// Lua: `printer3d.getShapeCount():number`
@@ -3453,6 +5879,15 @@ impl Printer3d {
     pub fn get_shape_count(&self) -> Result<Number> {
         let args = args(vec![]);
         let reply = self.invoke("getShapeCount", args)?;
+        single::<Number>(reply)
+    }
+
+    /// [`Self::get_shape_count`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn get_shape_count_async(&self) -> Result<Number> {
+        let args = args(vec![]);
+        let reply = self.invoke_async("getShapeCount", args).await?;
         single::<Number>(reply)
     }
 
@@ -3466,6 +5901,15 @@ impl Printer3d {
         single::<OcString>(reply)
     }
 
+    /// [`Self::get_tooltip`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn get_tooltip_async(&self) -> Result<OcString> {
+        let args = args(vec![]);
+        let reply = self.invoke_async("getTooltip", args).await?;
+        single::<OcString>(reply)
+    }
+
     /// Get whether the printed block should automatically return to its off state.
     ///
     /// Lua: `printer3d.isButtonMode():boolean`
@@ -3473,6 +5917,15 @@ impl Printer3d {
     pub fn is_button_mode(&self) -> Result<bool> {
         let args = args(vec![]);
         let reply = self.invoke("isButtonMode", args)?;
+        single::<bool>(reply)
+    }
+
+    /// [`Self::is_button_mode`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn is_button_mode_async(&self) -> Result<bool> {
+        let args = args(vec![]);
+        let reply = self.invoke_async("isButtonMode", args).await?;
         single::<bool>(reply)
     }
 
@@ -3486,6 +5939,15 @@ impl Printer3d {
         FromReply::from_reply(reply)
     }
 
+    /// [`Self::is_collidable`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn is_collidable_async(&self) -> Result<(bool, bool)> {
+        let args = args(vec![]);
+        let reply = self.invoke_async("isCollidable", args).await?;
+        FromReply::from_reply(reply)
+    }
+
     /// Get whether the printed block should emit redstone when in its active state.
     ///
     /// Lua: `printer3d.isRedstoneEmitter():boolean, number`
@@ -3493,6 +5955,15 @@ impl Printer3d {
     pub fn is_redstone_emitter(&self) -> Result<(bool, Number)> {
         let args = args(vec![]);
         let reply = self.invoke("isRedstoneEmitter", args)?;
+        FromReply::from_reply(reply)
+    }
+
+    /// [`Self::is_redstone_emitter`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn is_redstone_emitter_async(&self) -> Result<(bool, Number)> {
+        let args = args(vec![]);
+        let reply = self.invoke_async("isRedstoneEmitter", args).await?;
         FromReply::from_reply(reply)
     }
 
@@ -3506,6 +5977,15 @@ impl Printer3d {
         FromReply::from_reply(reply)
     }
 
+    /// [`Self::reset`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn reset_async(&self) -> Result<()> {
+        let args = args(vec![]);
+        let reply = self.invoke_async("reset", args).await?;
+        FromReply::from_reply(reply)
+    }
+
     /// Set whether the printed block should automatically return to its off state.
     ///
     /// Lua: `printer3d.setButtonMode(value:boolean)`
@@ -3513,6 +5993,15 @@ impl Printer3d {
     pub fn set_button_mode(&self, value: bool) -> Result<()> {
         let args = args(vec![Some(Value::Bool(value))]);
         let reply = self.invoke("setButtonMode", args)?;
+        FromReply::from_reply(reply)
+    }
+
+    /// [`Self::set_button_mode`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn set_button_mode_async(&self, value: bool) -> Result<()> {
+        let args = args(vec![Some(Value::Bool(value))]);
+        let reply = self.invoke_async("setButtonMode", args).await?;
         FromReply::from_reply(reply)
     }
 
@@ -3526,6 +6015,15 @@ impl Printer3d {
         FromReply::from_reply(reply)
     }
 
+    /// [`Self::set_collidable`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn set_collidable_async(&self, collide_off: bool, collide_on: bool) -> Result<()> {
+        let args = args(vec![Some(Value::Bool(collide_off)), Some(Value::Bool(collide_on))]);
+        let reply = self.invoke_async("setCollidable", args).await?;
+        FromReply::from_reply(reply)
+    }
+
     /// Set a label for the block being printed.
     ///
     /// Lua: `printer3d.setLabel(value:string)`
@@ -3533,6 +6031,15 @@ impl Printer3d {
     pub fn set_label(&self, value: impl AsRef<[u8]>) -> Result<()> {
         let args = args(vec![Some(Value::text(value.as_ref()))]);
         let reply = self.invoke("setLabel", args)?;
+        FromReply::from_reply(reply)
+    }
+
+    /// [`Self::set_label`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn set_label_async(&self, value: impl AsRef<[u8]>) -> Result<()> {
+        let args = args(vec![Some(Value::text(value.as_ref()))]);
+        let reply = self.invoke_async("setLabel", args).await?;
         FromReply::from_reply(reply)
     }
 
@@ -3546,6 +6053,15 @@ impl Printer3d {
         FromReply::from_reply(reply)
     }
 
+    /// [`Self::set_light_level`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn set_light_level_async(&self, value: impl Into<Number>) -> Result<()> {
+        let args = args(vec![Some(Value::Number(value.into()))]);
+        let reply = self.invoke_async("setLightLevel", args).await?;
+        FromReply::from_reply(reply)
+    }
+
     /// Set whether the printed block should emit redstone when in its active state.
     ///
     /// Lua: `printer3d.setRedstoneEmitter(value:boolean or number)`
@@ -3553,6 +6069,15 @@ impl Printer3d {
     pub fn set_redstone_emitter(&self, value: impl Into<Value>) -> Result<()> {
         let args = args(vec![Some(value.into())]);
         let reply = self.invoke("setRedstoneEmitter", args)?;
+        FromReply::from_reply(reply)
+    }
+
+    /// [`Self::set_redstone_emitter`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn set_redstone_emitter_async(&self, value: impl Into<Value>) -> Result<()> {
+        let args = args(vec![Some(value.into())]);
+        let reply = self.invoke_async("setRedstoneEmitter", args).await?;
         FromReply::from_reply(reply)
     }
 
@@ -3566,6 +6091,15 @@ impl Printer3d {
         FromReply::from_reply(reply)
     }
 
+    /// [`Self::set_tooltip`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn set_tooltip_async(&self, value: impl AsRef<[u8]>) -> Result<()> {
+        let args = args(vec![Some(Value::text(value.as_ref()))]);
+        let reply = self.invoke_async("setTooltip", args).await?;
+        FromReply::from_reply(reply)
+    }
+
     /// The current state of the printer, `busy' or `idle', followed by the progress or model validity, respectively.
     ///
     /// Lua: `printer3d.status(): string, number or boolean`
@@ -3573,6 +6107,15 @@ impl Printer3d {
     pub fn status(&self) -> Result<(OcString, Value)> {
         let args = args(vec![]);
         let reply = self.invoke("status", args)?;
+        FromReply::from_reply(reply)
+    }
+
+    /// [`Self::status`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn status_async(&self) -> Result<(OcString, Value)> {
+        let args = args(vec![]);
+        let reply = self.invoke_async("status", args).await?;
         FromReply::from_reply(reply)
     }
 }
@@ -3604,6 +6147,15 @@ impl Redstone {
         single::<Value>(reply)
     }
 
+    /// [`Self::get_bundled_input`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn get_bundled_input_async(&self, side: Option<Number>, color: Option<Number>) -> Result<Value> {
+        let args = args(vec![side.map(Value::Number), color.map(Value::Number)]);
+        let reply = self.invoke_async("getBundledInput", args).await?;
+        single::<Value>(reply)
+    }
+
     /// Fewer params returns set of outputs
     ///
     /// Lua: `redstone.getBundledOutput([side:number[, color:number]]):number or table`
@@ -3611,6 +6163,15 @@ impl Redstone {
     pub fn get_bundled_output(&self, side: Option<Number>, color: Option<Number>) -> Result<Value> {
         let args = args(vec![side.map(Value::Number), color.map(Value::Number)]);
         let reply = self.invoke("getBundledOutput", args)?;
+        single::<Value>(reply)
+    }
+
+    /// [`Self::get_bundled_output`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn get_bundled_output_async(&self, side: Option<Number>, color: Option<Number>) -> Result<Value> {
+        let args = args(vec![side.map(Value::Number), color.map(Value::Number)]);
+        let reply = self.invoke_async("getBundledOutput", args).await?;
         single::<Value>(reply)
     }
 
@@ -3624,6 +6185,15 @@ impl Redstone {
         single::<Number>(reply)
     }
 
+    /// [`Self::get_comparator_input`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn get_comparator_input_async(&self, side: impl Into<Number>) -> Result<Number> {
+        let args = args(vec![Some(Value::Number(side.into()))]);
+        let reply = self.invoke_async("getComparatorInput", args).await?;
+        single::<Number>(reply)
+    }
+
     /// Get the redstone input (all sides, or optionally on the specified side)
     ///
     /// Lua: `redstone.getInput([side:number]):number or table`
@@ -3631,6 +6201,15 @@ impl Redstone {
     pub fn get_input(&self, side: Option<Number>) -> Result<Value> {
         let args = args(vec![side.map(Value::Number)]);
         let reply = self.invoke("getInput", args)?;
+        single::<Value>(reply)
+    }
+
+    /// [`Self::get_input`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn get_input_async(&self, side: Option<Number>) -> Result<Value> {
+        let args = args(vec![side.map(Value::Number)]);
+        let reply = self.invoke_async("getInput", args).await?;
         single::<Value>(reply)
     }
 
@@ -3644,6 +6223,15 @@ impl Redstone {
         single::<Value>(reply)
     }
 
+    /// [`Self::get_output`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn get_output_async(&self, side: Option<Number>) -> Result<Value> {
+        let args = args(vec![side.map(Value::Number)]);
+        let reply = self.invoke_async("getOutput", args).await?;
+        single::<Value>(reply)
+    }
+
     /// Get the current wake-up threshold.
     ///
     /// Lua: `redstone.getWakeThreshold():number`
@@ -3651,6 +6239,15 @@ impl Redstone {
     pub fn get_wake_threshold(&self) -> Result<Number> {
         let args = args(vec![]);
         let reply = self.invoke("getWakeThreshold", args)?;
+        single::<Number>(reply)
+    }
+
+    /// [`Self::get_wake_threshold`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn get_wake_threshold_async(&self) -> Result<Number> {
+        let args = args(vec![]);
+        let reply = self.invoke_async("getWakeThreshold", args).await?;
         single::<Number>(reply)
     }
 
@@ -3664,6 +6261,15 @@ impl Redstone {
         single::<Number>(reply)
     }
 
+    /// [`Self::get_wireless_frequency`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn get_wireless_frequency_async(&self) -> Result<Number> {
+        let args = args(vec![]);
+        let reply = self.invoke_async("getWirelessFrequency", args).await?;
+        single::<Number>(reply)
+    }
+
     /// Get the wireless redstone input.
     ///
     /// Lua: `redstone.getWirelessInput():number`
@@ -3671,6 +6277,15 @@ impl Redstone {
     pub fn get_wireless_input(&self) -> Result<Number> {
         let args = args(vec![]);
         let reply = self.invoke("getWirelessInput", args)?;
+        single::<Number>(reply)
+    }
+
+    /// [`Self::get_wireless_input`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn get_wireless_input_async(&self) -> Result<Number> {
+        let args = args(vec![]);
+        let reply = self.invoke_async("getWirelessInput", args).await?;
         single::<Number>(reply)
     }
 
@@ -3684,6 +6299,15 @@ impl Redstone {
         single::<bool>(reply)
     }
 
+    /// [`Self::get_wireless_output`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn get_wireless_output_async(&self) -> Result<bool> {
+        let args = args(vec![]);
+        let reply = self.invoke_async("getWirelessOutput", args).await?;
+        single::<bool>(reply)
+    }
+
     /// Fewer params to assign set of outputs. Returns previous values
     ///
     /// Lua: `redstone.setBundledOutput([side:number[, color:number,]] value:number or table):number or table`
@@ -3691,6 +6315,15 @@ impl Redstone {
     pub fn set_bundled_output(&self, side: Option<Number>, color: Option<Number>, value: Option<Value>) -> Result<Value> {
         let args = args(vec![side.map(Value::Number), color.map(Value::Number), value]);
         let reply = self.invoke("setBundledOutput", args)?;
+        single::<Value>(reply)
+    }
+
+    /// [`Self::set_bundled_output`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn set_bundled_output_async(&self, side: Option<Number>, color: Option<Number>, value: Option<Value>) -> Result<Value> {
+        let args = args(vec![side.map(Value::Number), color.map(Value::Number), value]);
+        let reply = self.invoke_async("setBundledOutput", args).await?;
         single::<Value>(reply)
     }
 
@@ -3704,6 +6337,15 @@ impl Redstone {
         single::<Value>(reply)
     }
 
+    /// [`Self::set_output`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn set_output_async(&self, side: Option<Number>, value: Option<Value>) -> Result<Value> {
+        let args = args(vec![side.map(Value::Number), value]);
+        let reply = self.invoke_async("setOutput", args).await?;
+        single::<Value>(reply)
+    }
+
     /// Set the wake-up threshold.
     ///
     /// Lua: `redstone.setWakeThreshold(threshold:number):number`
@@ -3711,6 +6353,15 @@ impl Redstone {
     pub fn set_wake_threshold(&self, threshold: impl Into<Number>) -> Result<Number> {
         let args = args(vec![Some(Value::Number(threshold.into()))]);
         let reply = self.invoke("setWakeThreshold", args)?;
+        single::<Number>(reply)
+    }
+
+    /// [`Self::set_wake_threshold`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn set_wake_threshold_async(&self, threshold: impl Into<Number>) -> Result<Number> {
+        let args = args(vec![Some(Value::Number(threshold.into()))]);
+        let reply = self.invoke_async("setWakeThreshold", args).await?;
         single::<Number>(reply)
     }
 
@@ -3724,6 +6375,15 @@ impl Redstone {
         single::<Number>(reply)
     }
 
+    /// [`Self::set_wireless_frequency`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn set_wireless_frequency_async(&self, frequency: impl Into<Number>) -> Result<Number> {
+        let args = args(vec![Some(Value::Number(frequency.into()))]);
+        let reply = self.invoke_async("setWirelessFrequency", args).await?;
+        single::<Number>(reply)
+    }
+
     /// Set the wireless redstone output.
     ///
     /// Lua: `redstone.setWirelessOutput(value:boolean):boolean`
@@ -3731,6 +6391,15 @@ impl Redstone {
     pub fn set_wireless_output(&self, value: bool) -> Result<bool> {
         let args = args(vec![Some(Value::Bool(value))]);
         let reply = self.invoke("setWirelessOutput", args)?;
+        single::<bool>(reply)
+    }
+
+    /// [`Self::set_wireless_output`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn set_wireless_output_async(&self, value: bool) -> Result<bool> {
+        let args = args(vec![Some(Value::Bool(value))]);
+        let reply = self.invoke_async("setWirelessOutput", args).await?;
         single::<bool>(reply)
     }
 }
@@ -3779,6 +6448,15 @@ impl Robot {
         single::<bool>(reply)
     }
 
+    /// [`Self::compare`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn compare_async(&self, side: impl Into<Number>, fuzzy: Option<bool>) -> Result<bool> {
+        let args = args(vec![Some(Value::Number(side.into())), fuzzy.map(Value::Bool)]);
+        let reply = self.invoke_async("compare", args).await?;
+        single::<bool>(reply)
+    }
+
     /// Compare the fluid in the selected tank with the fluid in the specified tank on the specified side. Returns true if equal.
     ///
     /// Lua: `robot.compareFluid(side:number [, tank:number]):boolean`
@@ -3789,6 +6467,15 @@ impl Robot {
         single::<bool>(reply)
     }
 
+    /// [`Self::compare_fluid`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn compare_fluid_async(&self, side: impl Into<Number>, tank: Option<Number>) -> Result<bool> {
+        let args = args(vec![Some(Value::Number(side.into())), tank.map(Value::Number)]);
+        let reply = self.invoke_async("compareFluid", args).await?;
+        single::<bool>(reply)
+    }
+
     /// Compares the fluids in the selected and the specified tank. Returns true if equal.
     ///
     /// Lua: `robot.compareFluidTo(index:number):boolean`
@@ -3796,6 +6483,15 @@ impl Robot {
     pub fn compare_fluid_to(&self, index: impl Into<Number>) -> Result<bool> {
         let args = args(vec![Some(Value::Number(index.into()))]);
         let reply = self.invoke("compareFluidTo", args)?;
+        single::<bool>(reply)
+    }
+
+    /// [`Self::compare_fluid_to`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn compare_fluid_to_async(&self, index: impl Into<Number>) -> Result<bool> {
+        let args = args(vec![Some(Value::Number(index.into()))]);
+        let reply = self.invoke_async("compareFluidTo", args).await?;
         single::<bool>(reply)
     }
 
@@ -3810,6 +6506,15 @@ impl Robot {
         single::<bool>(reply)
     }
 
+    /// [`Self::compare_to`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn compare_to_async(&self, other_slot: impl Into<Number>, check_nbt: Option<bool>) -> Result<bool> {
+        let args = args(vec![Some(Value::Number(other_slot.into())), check_nbt.map(Value::Bool)]);
+        let reply = self.invoke_async("compareTo", args).await?;
+        single::<bool>(reply)
+    }
+
     /// Get the number of items in the specified slot, otherwise in the selected slot.
     ///
     /// Lua: `robot.count([slot:number]):number`
@@ -3820,6 +6525,15 @@ impl Robot {
         single::<Number>(reply)
     }
 
+    /// [`Self::count`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn count_async(&self, slot: Option<Number>) -> Result<Number> {
+        let args = args(vec![slot.map(Value::Number)]);
+        let reply = self.invoke_async("count", args).await?;
+        single::<Number>(reply)
+    }
+
     /// Checks the contents of the block on the specified sides and returns the findings.
     ///
     /// Lua: `robot.detect(side:number):boolean, string`
@@ -3827,6 +6541,15 @@ impl Robot {
     pub fn detect(&self, side: impl Into<Number>) -> Result<(bool, OcString)> {
         let args = args(vec![Some(Value::Number(side.into()))]);
         let reply = self.invoke("detect", args)?;
+        FromReply::from_reply(reply)
+    }
+
+    /// [`Self::detect`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn detect_async(&self, side: impl Into<Number>) -> Result<(bool, OcString)> {
+        let args = args(vec![Some(Value::Number(side.into()))]);
+        let reply = self.invoke_async("detect", args).await?;
         FromReply::from_reply(reply)
     }
 
@@ -3841,6 +6564,15 @@ impl Robot {
         FromReply::from_reply(reply)
     }
 
+    /// [`Self::drain`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn drain_async(&self, side: bool, amount: Option<Number>) -> Result<(bool, Value)> {
+        let args = args(vec![Some(Value::Bool(side)), amount.map(Value::Number)]);
+        let reply = self.invoke_async("drain", args).await?;
+        FromReply::from_reply(reply)
+    }
+
     /// Drops items from the selected slot towards the specified side.
     ///
     /// Lua: `robot.drop(side:number[, count:number=64]):boolean`
@@ -3852,6 +6584,15 @@ impl Robot {
         single::<bool>(reply)
     }
 
+    /// [`Self::drop`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn drop_async(&self, side: impl Into<Number>, count: Option<Number>) -> Result<bool> {
+        let args = args(vec![Some(Value::Number(side.into())), count.map(Value::Number)]);
+        let reply = self.invoke_async("drop", args).await?;
+        single::<bool>(reply)
+    }
+
     /// Get the durability of the currently equipped tool.
     ///
     /// Lua: `robot.durability():number`
@@ -3859,6 +6600,15 @@ impl Robot {
     pub fn durability(&self) -> Result<Number> {
         let args = args(vec![]);
         let reply = self.invoke("durability", args)?;
+        single::<Number>(reply)
+    }
+
+    /// [`Self::durability`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn durability_async(&self) -> Result<Number> {
+        let args = args(vec![]);
+        let reply = self.invoke_async("durability", args).await?;
         single::<Number>(reply)
     }
 
@@ -3873,6 +6623,15 @@ impl Robot {
         FromReply::from_reply(reply)
     }
 
+    /// [`Self::fill`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn fill_async(&self, side: impl Into<Number>, amount: Option<Number>) -> Result<(bool, Value)> {
+        let args = args(vec![Some(Value::Number(side.into())), amount.map(Value::Number)]);
+        let reply = self.invoke_async("fill", args).await?;
+        FromReply::from_reply(reply)
+    }
+
     /// Get the current color of the activity light as an integer encoded RGB value (0xRRGGBB).
     ///
     /// Lua: `robot.getLightColor():number`
@@ -3880,6 +6639,15 @@ impl Robot {
     pub fn get_light_color(&self) -> Result<Number> {
         let args = args(vec![]);
         let reply = self.invoke("getLightColor", args)?;
+        single::<Number>(reply)
+    }
+
+    /// [`Self::get_light_color`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn get_light_color_async(&self) -> Result<Number> {
+        let args = args(vec![]);
+        let reply = self.invoke_async("getLightColor", args).await?;
         single::<Number>(reply)
     }
 
@@ -3893,6 +6661,15 @@ impl Robot {
         single::<OcString>(reply)
     }
 
+    /// [`Self::get_name`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn get_name_async(&self) -> Result<OcString> {
+        let args = args(vec![]);
+        let reply = self.invoke_async("getName", args).await?;
+        single::<OcString>(reply)
+    }
+
     /// The size of this device's internal inventory.
     ///
     /// Lua: `robot.inventorySize():number`
@@ -3900,6 +6677,15 @@ impl Robot {
     pub fn inventory_size(&self) -> Result<Number> {
         let args = args(vec![]);
         let reply = self.invoke("inventorySize", args)?;
+        single::<Number>(reply)
+    }
+
+    /// [`Self::inventory_size`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn inventory_size_async(&self) -> Result<Number> {
+        let args = args(vec![]);
+        let reply = self.invoke_async("inventorySize", args).await?;
         single::<Number>(reply)
     }
 
@@ -3913,6 +6699,15 @@ impl Robot {
         single::<bool>(reply)
     }
 
+    /// [`Self::is_running`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn is_running_async(&self) -> Result<bool> {
+        let args = args(vec![]);
+        let reply = self.invoke_async("isRunning", args).await?;
+        single::<bool>(reply)
+    }
+
     /// Move in the specified direction.
     ///
     /// Lua: `robot.move(direction:number):boolean`
@@ -3923,6 +6718,15 @@ impl Robot {
         single::<bool>(reply)
     }
 
+    /// [`Self::move`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn move_async(&self, direction: impl Into<Number>) -> Result<bool> {
+        let args = args(vec![Some(Value::Number(direction.into()))]);
+        let reply = self.invoke_async("move", args).await?;
+        single::<bool>(reply)
+    }
+
     /// Get the name of the agent.
     ///
     /// Lua: `robot.name():string`
@@ -3930,6 +6734,15 @@ impl Robot {
     pub fn name(&self) -> Result<OcString> {
         let args = args(vec![]);
         let reply = self.invoke("name", args)?;
+        single::<OcString>(reply)
+    }
+
+    /// [`Self::name`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn name_async(&self) -> Result<OcString> {
+        let args = args(vec![]);
+        let reply = self.invoke_async("name", args).await?;
         single::<OcString>(reply)
     }
 
@@ -3945,6 +6758,15 @@ impl Robot {
         single::<bool>(reply)
     }
 
+    /// [`Self::place`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn place_async(&self, side: impl Into<Number>, face: Option<Number>, sneaky: Option<bool>) -> Result<bool> {
+        let args = args(vec![Some(Value::Number(side.into())), face.map(Value::Number), sneaky.map(Value::Bool)]);
+        let reply = self.invoke_async("place", args).await?;
+        single::<bool>(reply)
+    }
+
     /// Get the currently selected slot; set the selected slot if specified.
     ///
     /// Lua: `robot.select([slot:number]):number`
@@ -3952,6 +6774,15 @@ impl Robot {
     pub fn select(&self, slot: Option<Number>) -> Result<Number> {
         let args = args(vec![slot.map(Value::Number)]);
         let reply = self.invoke("select", args)?;
+        single::<Number>(reply)
+    }
+
+    /// [`Self::select`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn select_async(&self, slot: Option<Number>) -> Result<Number> {
+        let args = args(vec![slot.map(Value::Number)]);
+        let reply = self.invoke_async("select", args).await?;
         single::<Number>(reply)
     }
 
@@ -3965,6 +6796,15 @@ impl Robot {
         single::<Number>(reply)
     }
 
+    /// [`Self::select_tank`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn select_tank_async(&self, index: Option<Number>) -> Result<Number> {
+        let args = args(vec![index.map(Value::Number)]);
+        let reply = self.invoke_async("selectTank", args).await?;
+        single::<Number>(reply)
+    }
+
     /// Set the color of the activity light to the specified integer encoded RGB value (0xRRGGBB).
     ///
     /// Lua: `robot.setLightColor(value:number):number`
@@ -3972,6 +6812,15 @@ impl Robot {
     pub fn set_light_color(&self, value: impl Into<Number>) -> Result<Number> {
         let args = args(vec![Some(Value::Number(value.into()))]);
         let reply = self.invoke("setLightColor", args)?;
+        single::<Number>(reply)
+    }
+
+    /// [`Self::set_light_color`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn set_light_color_async(&self, value: impl Into<Number>) -> Result<Number> {
+        let args = args(vec![Some(Value::Number(value.into()))]);
+        let reply = self.invoke_async("setLightColor", args).await?;
         single::<Number>(reply)
     }
 
@@ -3985,6 +6834,15 @@ impl Robot {
         single::<OcString>(reply)
     }
 
+    /// [`Self::set_name`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn set_name_async(&self, name: impl AsRef<[u8]>) -> Result<OcString> {
+        let args = args(vec![Some(Value::text(name.as_ref()))]);
+        let reply = self.invoke_async("setName", args).await?;
+        single::<OcString>(reply)
+    }
+
     /// Get the remaining space in the specified slot, otherwise in the selected slot.
     ///
     /// Lua: `robot.space([slot:number]):number`
@@ -3992,6 +6850,15 @@ impl Robot {
     pub fn space(&self, slot: Option<Number>) -> Result<Number> {
         let args = args(vec![slot.map(Value::Number)]);
         let reply = self.invoke("space", args)?;
+        single::<Number>(reply)
+    }
+
+    /// [`Self::space`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn space_async(&self, slot: Option<Number>) -> Result<Number> {
+        let args = args(vec![slot.map(Value::Number)]);
+        let reply = self.invoke_async("space", args).await?;
         single::<Number>(reply)
     }
 
@@ -4005,6 +6872,15 @@ impl Robot {
         single::<bool>(reply)
     }
 
+    /// [`Self::start`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn start_async(&self) -> Result<bool> {
+        let args = args(vec![]);
+        let reply = self.invoke_async("start", args).await?;
+        single::<bool>(reply)
+    }
+
     /// Stops the robot. Returns true if the state changed.
     ///
     /// Lua: `robot.stop():boolean`
@@ -4012,6 +6888,15 @@ impl Robot {
     pub fn stop(&self) -> Result<bool> {
         let args = args(vec![]);
         let reply = self.invoke("stop", args)?;
+        single::<bool>(reply)
+    }
+
+    /// [`Self::stop`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn stop_async(&self) -> Result<bool> {
+        let args = args(vec![]);
+        let reply = self.invoke_async("stop", args).await?;
         single::<bool>(reply)
     }
 
@@ -4023,6 +6908,15 @@ impl Robot {
     pub fn suck(&self, side: impl Into<Number>, count: Option<Number>) -> Result<bool> {
         let args = args(vec![Some(Value::Number(side.into())), count.map(Value::Number)]);
         let reply = self.invoke("suck", args)?;
+        single::<bool>(reply)
+    }
+
+    /// [`Self::suck`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn suck_async(&self, side: impl Into<Number>, count: Option<Number>) -> Result<bool> {
+        let args = args(vec![Some(Value::Number(side.into())), count.map(Value::Number)]);
+        let reply = self.invoke_async("suck", args).await?;
         single::<bool>(reply)
     }
 
@@ -4038,6 +6932,15 @@ impl Robot {
         FromReply::from_reply(reply)
     }
 
+    /// [`Self::swing`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn swing_async(&self, side: impl Into<Number>, face: Option<Number>, sneaky: Option<bool>) -> Result<(bool, OcString)> {
+        let args = args(vec![Some(Value::Number(side.into())), face.map(Value::Number), sneaky.map(Value::Bool)]);
+        let reply = self.invoke_async("swing", args).await?;
+        FromReply::from_reply(reply)
+    }
+
     /// The number of tanks installed in the device.
     ///
     /// Lua: `robot.tankCount():number`
@@ -4045,6 +6948,15 @@ impl Robot {
     pub fn tank_count(&self) -> Result<Number> {
         let args = args(vec![]);
         let reply = self.invoke("tankCount", args)?;
+        single::<Number>(reply)
+    }
+
+    /// [`Self::tank_count`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn tank_count_async(&self) -> Result<Number> {
+        let args = args(vec![]);
+        let reply = self.invoke_async("tankCount", args).await?;
         single::<Number>(reply)
     }
 
@@ -4058,6 +6970,15 @@ impl Robot {
         single::<Number>(reply)
     }
 
+    /// [`Self::tank_level`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn tank_level_async(&self, index: Option<Number>) -> Result<Number> {
+        let args = args(vec![index.map(Value::Number)]);
+        let reply = self.invoke_async("tankLevel", args).await?;
+        single::<Number>(reply)
+    }
+
     /// Get the remaining fluid capacity in the specified or selected tank.
     ///
     /// Lua: `robot.tankSpace([index:number]):number`
@@ -4065,6 +6986,15 @@ impl Robot {
     pub fn tank_space(&self, index: Option<Number>) -> Result<Number> {
         let args = args(vec![index.map(Value::Number)]);
         let reply = self.invoke("tankSpace", args)?;
+        single::<Number>(reply)
+    }
+
+    /// [`Self::tank_space`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn tank_space_async(&self, index: Option<Number>) -> Result<Number> {
+        let args = args(vec![index.map(Value::Number)]);
+        let reply = self.invoke_async("tankSpace", args).await?;
         single::<Number>(reply)
     }
 
@@ -4079,6 +7009,15 @@ impl Robot {
         single::<bool>(reply)
     }
 
+    /// [`Self::transfer_fluid_to`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn transfer_fluid_to_async(&self, index: impl Into<Number>, count: Option<Number>) -> Result<bool> {
+        let args = args(vec![Some(Value::Number(index.into())), count.map(Value::Number)]);
+        let reply = self.invoke_async("transferFluidTo", args).await?;
+        single::<bool>(reply)
+    }
+
     /// Move up to the specified amount of items from the selected slot into the specified slot.
     ///
     /// Lua: `robot.transferTo(toSlot:number[, amount:number]):boolean`
@@ -4086,6 +7025,15 @@ impl Robot {
     pub fn transfer_to(&self, to_slot: impl Into<Number>, amount: Option<Number>) -> Result<bool> {
         let args = args(vec![Some(Value::Number(to_slot.into())), amount.map(Value::Number)]);
         let reply = self.invoke("transferTo", args)?;
+        single::<bool>(reply)
+    }
+
+    /// [`Self::transfer_to`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn transfer_to_async(&self, to_slot: impl Into<Number>, amount: Option<Number>) -> Result<bool> {
+        let args = args(vec![Some(Value::Number(to_slot.into())), amount.map(Value::Number)]);
+        let reply = self.invoke_async("transferTo", args).await?;
         single::<bool>(reply)
     }
 
@@ -4099,6 +7047,15 @@ impl Robot {
         single::<bool>(reply)
     }
 
+    /// [`Self::turn`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn turn_async(&self, clockwise: bool) -> Result<bool> {
+        let args = args(vec![Some(Value::Bool(clockwise))]);
+        let reply = self.invoke_async("turn", args).await?;
+        single::<bool>(reply)
+    }
+
     /// Perform a 'right click' towards the specified side. The `face' allows a more precise click calibration, and is relative to the targeted blockspace.
     ///
     /// Lua: `robot.use(side:number[, face:number=side[, sneaky:boolean=false[, duration:number=0]]]):boolean, string`
@@ -4109,6 +7066,15 @@ impl Robot {
     pub fn r#use(&self, side: impl Into<Number>, face: Option<Number>, sneaky: Option<bool>, duration: Option<Number>) -> Result<(bool, OcString)> {
         let args = args(vec![Some(Value::Number(side.into())), face.map(Value::Number), sneaky.map(Value::Bool), duration.map(Value::Number)]);
         let reply = self.invoke("use", args)?;
+        FromReply::from_reply(reply)
+    }
+
+    /// [`Self::use`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn use_async(&self, side: impl Into<Number>, face: Option<Number>, sneaky: Option<bool>, duration: Option<Number>) -> Result<(bool, OcString)> {
+        let args = args(vec![Some(Value::Number(side.into())), face.map(Value::Number), sneaky.map(Value::Bool), duration.map(Value::Number)]);
+        let reply = self.invoke_async("use", args).await?;
         FromReply::from_reply(reply)
     }
 }
@@ -4140,6 +7106,15 @@ impl Screen {
         FromReply::from_reply(reply)
     }
 
+    /// [`Self::get_aspect_ratio`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn get_aspect_ratio_async(&self) -> Result<(Number, Number)> {
+        let args = args(vec![]);
+        let reply = self.invoke_async("getAspectRatio", args).await?;
+        FromReply::from_reply(reply)
+    }
+
     /// The list of keyboards attached to the screen.
     ///
     /// Lua: `screen.getKeyboards():table`
@@ -4147,6 +7122,15 @@ impl Screen {
     pub fn get_keyboards(&self) -> Result<Value> {
         let args = args(vec![]);
         let reply = self.invoke("getKeyboards", args)?;
+        single::<Value>(reply)
+    }
+
+    /// [`Self::get_keyboards`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn get_keyboards_async(&self) -> Result<Value> {
+        let args = args(vec![]);
+        let reply = self.invoke_async("getKeyboards", args).await?;
         single::<Value>(reply)
     }
 
@@ -4160,6 +7144,15 @@ impl Screen {
         single::<bool>(reply)
     }
 
+    /// [`Self::is_on`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn is_on_async(&self) -> Result<bool> {
+        let args = args(vec![]);
+        let reply = self.invoke_async("isOn", args).await?;
+        single::<bool>(reply)
+    }
+
     /// Returns whether the screen is in high precision mode (sub-pixel mouse event positions).
     ///
     /// Lua: `screen.isPrecise():boolean`
@@ -4167,6 +7160,15 @@ impl Screen {
     pub fn is_precise(&self) -> Result<bool> {
         let args = args(vec![]);
         let reply = self.invoke("isPrecise", args)?;
+        single::<bool>(reply)
+    }
+
+    /// [`Self::is_precise`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn is_precise_async(&self) -> Result<bool> {
+        let args = args(vec![]);
+        let reply = self.invoke_async("isPrecise", args).await?;
         single::<bool>(reply)
     }
 
@@ -4180,6 +7182,15 @@ impl Screen {
         single::<bool>(reply)
     }
 
+    /// [`Self::is_touch_mode_inverted`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn is_touch_mode_inverted_async(&self) -> Result<bool> {
+        let args = args(vec![]);
+        let reply = self.invoke_async("isTouchModeInverted", args).await?;
+        single::<bool>(reply)
+    }
+
     /// Set whether to use high precision mode (sub-pixel mouse event positions).
     ///
     /// Lua: `screen.setPrecise(enabled:boolean):boolean`
@@ -4187,6 +7198,15 @@ impl Screen {
     pub fn set_precise(&self, enabled: bool) -> Result<bool> {
         let args = args(vec![Some(Value::Bool(enabled))]);
         let reply = self.invoke("setPrecise", args)?;
+        single::<bool>(reply)
+    }
+
+    /// [`Self::set_precise`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn set_precise_async(&self, enabled: bool) -> Result<bool> {
+        let args = args(vec![Some(Value::Bool(enabled))]);
+        let reply = self.invoke_async("setPrecise", args).await?;
         single::<bool>(reply)
     }
 
@@ -4200,6 +7220,15 @@ impl Screen {
         single::<bool>(reply)
     }
 
+    /// [`Self::set_touch_mode_inverted`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn set_touch_mode_inverted_async(&self, value: bool) -> Result<bool> {
+        let args = args(vec![Some(Value::Bool(value))]);
+        let reply = self.invoke_async("setTouchModeInverted", args).await?;
+        single::<bool>(reply)
+    }
+
     /// Turns off the screen. Returns true if it was on.
     ///
     /// Lua: `screen.turnOff():boolean`
@@ -4210,6 +7239,15 @@ impl Screen {
         single::<bool>(reply)
     }
 
+    /// [`Self::turn_off`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn turn_off_async(&self) -> Result<bool> {
+        let args = args(vec![]);
+        let reply = self.invoke_async("turnOff", args).await?;
+        single::<bool>(reply)
+    }
+
     /// Turns the screen on. Returns true if it was off.
     ///
     /// Lua: `screen.turnOn():boolean`
@@ -4217,6 +7255,15 @@ impl Screen {
     pub fn turn_on(&self) -> Result<bool> {
         let args = args(vec![]);
         let reply = self.invoke("turnOn", args)?;
+        single::<bool>(reply)
+    }
+
+    /// [`Self::turn_on`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn turn_on_async(&self) -> Result<bool> {
+        let args = args(vec![]);
+        let reply = self.invoke_async("turnOn", args).await?;
         single::<bool>(reply)
     }
 }
@@ -4248,6 +7295,15 @@ impl Sign {
         single::<OcString>(reply)
     }
 
+    /// [`Self::get_value`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn get_value_async(&self, side: impl Into<Number>) -> Result<OcString> {
+        let args = args(vec![Some(Value::Number(side.into()))]);
+        let reply = self.invoke_async("getValue", args).await?;
+        single::<OcString>(reply)
+    }
+
     /// Set the text on the sign on the specified side of the adapter.
     ///
     /// Lua: `sign.setValue(side:number, value:string):string`
@@ -4255,6 +7311,15 @@ impl Sign {
     pub fn set_value(&self, side: impl Into<Number>, value: impl AsRef<[u8]>) -> Result<OcString> {
         let args = args(vec![Some(Value::Number(side.into())), Some(Value::text(value.as_ref()))]);
         let reply = self.invoke("setValue", args)?;
+        single::<OcString>(reply)
+    }
+
+    /// [`Self::set_value`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn set_value_async(&self, side: impl Into<Number>, value: impl AsRef<[u8]>) -> Result<OcString> {
+        let args = args(vec![Some(Value::Number(side.into())), Some(Value::text(value.as_ref()))]);
+        let reply = self.invoke_async("setValue", args).await?;
         single::<OcString>(reply)
     }
 }
@@ -4286,6 +7351,15 @@ impl Tablet {
         single::<Number>(reply)
     }
 
+    /// [`Self::get_pitch`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn get_pitch_async(&self) -> Result<Number> {
+        let args = args(vec![]);
+        let reply = self.invoke_async("getPitch", args).await?;
+        single::<Number>(reply)
+    }
+
     /// Gets the yaw of the player holding the tablet.
     ///
     /// Lua: `tablet.getYaw():number`
@@ -4293,6 +7367,15 @@ impl Tablet {
     pub fn get_yaw(&self) -> Result<Number> {
         let args = args(vec![]);
         let reply = self.invoke("getYaw", args)?;
+        single::<Number>(reply)
+    }
+
+    /// [`Self::get_yaw`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn get_yaw_async(&self) -> Result<Number> {
+        let args = args(vec![]);
+        let reply = self.invoke_async("getYaw", args).await?;
         single::<Number>(reply)
     }
 }
@@ -4324,6 +7407,15 @@ impl TankController {
         single::<bool>(reply)
     }
 
+    /// [`Self::drain`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn drain_async(&self, amount: Option<Number>) -> Result<bool> {
+        let args = args(vec![amount.map(Value::Number)]);
+        let reply = self.invoke_async("drain", args).await?;
+        single::<bool>(reply)
+    }
+
     /// Transfers fluid from the selected tank to a tank in the selected inventory slot.
     ///
     /// Lua: `tank_controller.fill([amount:number]):boolean`
@@ -4331,6 +7423,15 @@ impl TankController {
     pub fn fill(&self, amount: Option<Number>) -> Result<bool> {
         let args = args(vec![amount.map(Value::Number)]);
         let reply = self.invoke("fill", args)?;
+        single::<bool>(reply)
+    }
+
+    /// [`Self::fill`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn fill_async(&self, amount: Option<Number>) -> Result<bool> {
+        let args = args(vec![amount.map(Value::Number)]);
+        let reply = self.invoke_async("fill", args).await?;
         single::<bool>(reply)
     }
 
@@ -4344,6 +7445,15 @@ impl TankController {
         single::<Value>(reply)
     }
 
+    /// [`Self::get_fluid_in_internal_tank`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn get_fluid_in_internal_tank_async(&self, tank: Option<Number>) -> Result<Value> {
+        let args = args(vec![tank.map(Value::Number)]);
+        let reply = self.invoke_async("getFluidInInternalTank", args).await?;
+        single::<Value>(reply)
+    }
+
     /// Get a description of the fluid in the the tank on the specified side.
     ///
     /// Lua: `tank_controller.getFluidInTank(side:number [, tank:number]):table`
@@ -4351,6 +7461,15 @@ impl TankController {
     pub fn get_fluid_in_tank(&self, side: impl Into<Number>, tank: Option<Number>) -> Result<Value> {
         let args = args(vec![Some(Value::Number(side.into())), tank.map(Value::Number)]);
         let reply = self.invoke("getFluidInTank", args)?;
+        single::<Value>(reply)
+    }
+
+    /// [`Self::get_fluid_in_tank`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn get_fluid_in_tank_async(&self, side: impl Into<Number>, tank: Option<Number>) -> Result<Value> {
+        let args = args(vec![Some(Value::Number(side.into())), tank.map(Value::Number)]);
+        let reply = self.invoke_async("getFluidInTank", args).await?;
         single::<Value>(reply)
     }
 
@@ -4364,6 +7483,15 @@ impl TankController {
         single::<Value>(reply)
     }
 
+    /// [`Self::get_fluid_in_tank_in_slot`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn get_fluid_in_tank_in_slot_async(&self, slot: Option<Number>) -> Result<Value> {
+        let args = args(vec![slot.map(Value::Number)]);
+        let reply = self.invoke_async("getFluidInTankInSlot", args).await?;
+        single::<Value>(reply)
+    }
+
     /// Get the capacity of the tank on the specified side.
     ///
     /// Lua: `tank_controller.getTankCapacity(side:number [, tank:number]):number`
@@ -4371,6 +7499,15 @@ impl TankController {
     pub fn get_tank_capacity(&self, side: impl Into<Number>, tank: Option<Number>) -> Result<Number> {
         let args = args(vec![Some(Value::Number(side.into())), tank.map(Value::Number)]);
         let reply = self.invoke("getTankCapacity", args)?;
+        single::<Number>(reply)
+    }
+
+    /// [`Self::get_tank_capacity`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn get_tank_capacity_async(&self, side: impl Into<Number>, tank: Option<Number>) -> Result<Number> {
+        let args = args(vec![Some(Value::Number(side.into())), tank.map(Value::Number)]);
+        let reply = self.invoke_async("getTankCapacity", args).await?;
         single::<Number>(reply)
     }
 
@@ -4384,6 +7521,15 @@ impl TankController {
         single::<Number>(reply)
     }
 
+    /// [`Self::get_tank_capacity_in_slot`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn get_tank_capacity_in_slot_async(&self, slot: Option<Number>) -> Result<Number> {
+        let args = args(vec![slot.map(Value::Number)]);
+        let reply = self.invoke_async("getTankCapacityInSlot", args).await?;
+        single::<Number>(reply)
+    }
+
     /// Get the amount of fluid in the tank on the specified side.
     ///
     /// Lua: `tank_controller.getTankLevel(side:number [, tank:number]):number`
@@ -4394,6 +7540,15 @@ impl TankController {
         single::<Number>(reply)
     }
 
+    /// [`Self::get_tank_level`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn get_tank_level_async(&self, side: impl Into<Number>, tank: Option<Number>) -> Result<Number> {
+        let args = args(vec![Some(Value::Number(side.into())), tank.map(Value::Number)]);
+        let reply = self.invoke_async("getTankLevel", args).await?;
+        single::<Number>(reply)
+    }
+
     /// Get the amount of fluid in the tank item in the specified slot or the selected slot.
     ///
     /// Lua: `tank_controller.getTankLevelInSlot([slot:number]):number`
@@ -4401,6 +7556,15 @@ impl TankController {
     pub fn get_tank_level_in_slot(&self, slot: Option<Number>) -> Result<Number> {
         let args = args(vec![slot.map(Value::Number)]);
         let reply = self.invoke("getTankLevelInSlot", args)?;
+        single::<Number>(reply)
+    }
+
+    /// [`Self::get_tank_level_in_slot`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn get_tank_level_in_slot_async(&self, slot: Option<Number>) -> Result<Number> {
+        let args = args(vec![slot.map(Value::Number)]);
+        let reply = self.invoke_async("getTankLevelInSlot", args).await?;
         single::<Number>(reply)
     }
 }
@@ -4431,6 +7595,15 @@ impl TractorBeam {
         let reply = self.invoke("suck", args)?;
         single::<bool>(reply)
     }
+
+    /// [`Self::suck`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn suck_async(&self) -> Result<bool> {
+        let args = args(vec![]);
+        let reply = self.invoke_async("suck", args).await?;
+        single::<bool>(reply)
+    }
 }
 
 /// The `trading` component (1 methods).
@@ -4457,6 +7630,15 @@ impl Trading {
     pub fn get_trades(&self) -> Result<Value> {
         let args = args(vec![]);
         let reply = self.invoke("getTrades", args)?;
+        single::<Value>(reply)
+    }
+
+    /// [`Self::get_trades`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn get_trades_async(&self) -> Result<Value> {
+        let args = args(vec![]);
+        let reply = self.invoke_async("getTrades", args).await?;
         single::<Value>(reply)
     }
 }
@@ -4488,6 +7670,15 @@ impl Transposer {
         single::<bool>(reply)
     }
 
+    /// [`Self::are_stacks_equivalent`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn are_stacks_equivalent_async(&self, side: impl Into<Number>, slot_a: impl Into<Number>, slot_b: impl Into<Number>) -> Result<bool> {
+        let args = args(vec![Some(Value::Number(side.into())), Some(Value::Number(slot_a.into())), Some(Value::Number(slot_b.into()))]);
+        let reply = self.invoke_async("areStacksEquivalent", args).await?;
+        single::<bool>(reply)
+    }
+
     /// Compare an item in the specified slot in the inventory on the specified side with one in the database with the specified address.
     ///
     /// Lua: `transposer.compareStackToDatabase(side:number, slot:number, dbAddress:string, dbSlot:number[, checkNBT:boolean=false]):boolean`
@@ -4496,6 +7687,15 @@ impl Transposer {
     pub fn compare_stack_to_database(&self, side: impl Into<Number>, slot: impl Into<Number>, db_address: impl AsRef<[u8]>, db_slot: impl Into<Number>, check_nbt: Option<bool>) -> Result<bool> {
         let args = args(vec![Some(Value::Number(side.into())), Some(Value::Number(slot.into())), Some(Value::text(db_address.as_ref())), Some(Value::Number(db_slot.into())), check_nbt.map(Value::Bool)]);
         let reply = self.invoke("compareStackToDatabase", args)?;
+        single::<bool>(reply)
+    }
+
+    /// [`Self::compare_stack_to_database`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn compare_stack_to_database_async(&self, side: impl Into<Number>, slot: impl Into<Number>, db_address: impl AsRef<[u8]>, db_slot: impl Into<Number>, check_nbt: Option<bool>) -> Result<bool> {
+        let args = args(vec![Some(Value::Number(side.into())), Some(Value::Number(slot.into())), Some(Value::text(db_address.as_ref())), Some(Value::Number(db_slot.into())), check_nbt.map(Value::Bool)]);
+        let reply = self.invoke_async("compareStackToDatabase", args).await?;
         single::<bool>(reply)
     }
 
@@ -4510,6 +7710,15 @@ impl Transposer {
         single::<bool>(reply)
     }
 
+    /// [`Self::compare_stacks`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn compare_stacks_async(&self, side: impl Into<Number>, slot_a: impl Into<Number>, slot_b: impl Into<Number>, check_nbt: Option<bool>) -> Result<bool> {
+        let args = args(vec![Some(Value::Number(side.into())), Some(Value::Number(slot_a.into())), Some(Value::Number(slot_b.into())), check_nbt.map(Value::Bool)]);
+        let reply = self.invoke_async("compareStacks", args).await?;
+        single::<bool>(reply)
+    }
+
     /// Get a description of all stacks in the inventory on the specified side of the device.
     ///
     /// Lua: `transposer.getAllStacks(side:number):userdata`
@@ -4517,6 +7726,15 @@ impl Transposer {
     pub fn get_all_stacks(&self, side: impl Into<Number>) -> Result<Handle> {
         let args = args(vec![Some(Value::Number(side.into()))]);
         let reply = self.invoke("getAllStacks", args)?;
+        single::<Handle>(reply)
+    }
+
+    /// [`Self::get_all_stacks`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn get_all_stacks_async(&self, side: impl Into<Number>) -> Result<Handle> {
+        let args = args(vec![Some(Value::Number(side.into()))]);
+        let reply = self.invoke_async("getAllStacks", args).await?;
         single::<Handle>(reply)
     }
 
@@ -4530,6 +7748,15 @@ impl Transposer {
         single::<Value>(reply)
     }
 
+    /// [`Self::get_fluid_in_tank`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn get_fluid_in_tank_async(&self, side: impl Into<Number>, tank: Option<Number>) -> Result<Value> {
+        let args = args(vec![Some(Value::Number(side.into())), tank.map(Value::Number)]);
+        let reply = self.invoke_async("getFluidInTank", args).await?;
+        single::<Value>(reply)
+    }
+
     /// Get the the name of the inventory on the specified side of the device.
     ///
     /// Lua: `transposer.getInventoryName(side:number):string`
@@ -4537,6 +7764,15 @@ impl Transposer {
     pub fn get_inventory_name(&self, side: impl Into<Number>) -> Result<OcString> {
         let args = args(vec![Some(Value::Number(side.into()))]);
         let reply = self.invoke("getInventoryName", args)?;
+        single::<OcString>(reply)
+    }
+
+    /// [`Self::get_inventory_name`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn get_inventory_name_async(&self, side: impl Into<Number>) -> Result<OcString> {
+        let args = args(vec![Some(Value::Number(side.into()))]);
+        let reply = self.invoke_async("getInventoryName", args).await?;
         single::<OcString>(reply)
     }
 
@@ -4550,6 +7786,15 @@ impl Transposer {
         single::<Number>(reply)
     }
 
+    /// [`Self::get_inventory_size`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn get_inventory_size_async(&self, side: impl Into<Number>) -> Result<Number> {
+        let args = args(vec![Some(Value::Number(side.into()))]);
+        let reply = self.invoke_async("getInventorySize", args).await?;
+        single::<Number>(reply)
+    }
+
     /// Get the maximum number of items in the specified slot of the inventory on the specified side of the device.
     ///
     /// Lua: `transposer.getSlotMaxStackSize(side:number, slot:number):number`
@@ -4557,6 +7802,15 @@ impl Transposer {
     pub fn get_slot_max_stack_size(&self, side: impl Into<Number>, slot: impl Into<Number>) -> Result<Number> {
         let args = args(vec![Some(Value::Number(side.into())), Some(Value::Number(slot.into()))]);
         let reply = self.invoke("getSlotMaxStackSize", args)?;
+        single::<Number>(reply)
+    }
+
+    /// [`Self::get_slot_max_stack_size`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn get_slot_max_stack_size_async(&self, side: impl Into<Number>, slot: impl Into<Number>) -> Result<Number> {
+        let args = args(vec![Some(Value::Number(side.into())), Some(Value::Number(slot.into()))]);
+        let reply = self.invoke_async("getSlotMaxStackSize", args).await?;
         single::<Number>(reply)
     }
 
@@ -4570,6 +7824,15 @@ impl Transposer {
         single::<Number>(reply)
     }
 
+    /// [`Self::get_slot_stack_size`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn get_slot_stack_size_async(&self, side: impl Into<Number>, slot: impl Into<Number>) -> Result<Number> {
+        let args = args(vec![Some(Value::Number(side.into())), Some(Value::Number(slot.into()))]);
+        let reply = self.invoke_async("getSlotStackSize", args).await?;
+        single::<Number>(reply)
+    }
+
     /// Get a description of the stack in the inventory on the specified side of the device.
     ///
     /// Lua: `transposer.getStackInSlot(side:number, slot:number):table`
@@ -4577,6 +7840,15 @@ impl Transposer {
     pub fn get_stack_in_slot(&self, side: impl Into<Number>, slot: impl Into<Number>) -> Result<Value> {
         let args = args(vec![Some(Value::Number(side.into())), Some(Value::Number(slot.into()))]);
         let reply = self.invoke("getStackInSlot", args)?;
+        single::<Value>(reply)
+    }
+
+    /// [`Self::get_stack_in_slot`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn get_stack_in_slot_async(&self, side: impl Into<Number>, slot: impl Into<Number>) -> Result<Value> {
+        let args = args(vec![Some(Value::Number(side.into())), Some(Value::Number(slot.into()))]);
+        let reply = self.invoke_async("getStackInSlot", args).await?;
         single::<Value>(reply)
     }
 
@@ -4590,6 +7862,15 @@ impl Transposer {
         single::<Number>(reply)
     }
 
+    /// [`Self::get_tank_capacity`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn get_tank_capacity_async(&self, side: impl Into<Number>, tank: Option<Number>) -> Result<Number> {
+        let args = args(vec![Some(Value::Number(side.into())), tank.map(Value::Number)]);
+        let reply = self.invoke_async("getTankCapacity", args).await?;
+        single::<Number>(reply)
+    }
+
     /// Get the amount of fluid in the tank on the specified side.
     ///
     /// Lua: `transposer.getTankLevel(side:number [, tank:number]):number`
@@ -4597,6 +7878,15 @@ impl Transposer {
     pub fn get_tank_level(&self, side: impl Into<Number>, tank: Option<Number>) -> Result<Number> {
         let args = args(vec![Some(Value::Number(side.into())), tank.map(Value::Number)]);
         let reply = self.invoke("getTankLevel", args)?;
+        single::<Number>(reply)
+    }
+
+    /// [`Self::get_tank_level`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn get_tank_level_async(&self, side: impl Into<Number>, tank: Option<Number>) -> Result<Number> {
+        let args = args(vec![Some(Value::Number(side.into())), tank.map(Value::Number)]);
+        let reply = self.invoke_async("getTankLevel", args).await?;
         single::<Number>(reply)
     }
 
@@ -4610,6 +7900,15 @@ impl Transposer {
         single::<bool>(reply)
     }
 
+    /// [`Self::store`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn store_async(&self, side: impl Into<Number>, slot: impl Into<Number>, db_address: impl AsRef<[u8]>, db_slot: impl Into<Number>) -> Result<bool> {
+        let args = args(vec![Some(Value::Number(side.into())), Some(Value::Number(slot.into())), Some(Value::text(db_address.as_ref())), Some(Value::Number(db_slot.into()))]);
+        let reply = self.invoke_async("store", args).await?;
+        single::<bool>(reply)
+    }
+
     /// Transfer some items between two inventories.
     ///
     /// Lua: `transposer.transferFluid(sourceSide:number, sinkSide:number[, count:number]):number`
@@ -4620,6 +7919,15 @@ impl Transposer {
         single::<Number>(reply)
     }
 
+    /// [`Self::transfer_fluid`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn transfer_fluid_async(&self, source_side: impl Into<Number>, sink_side: impl Into<Number>, count: Option<Number>) -> Result<Number> {
+        let args = args(vec![Some(Value::Number(source_side.into())), Some(Value::Number(sink_side.into())), count.map(Value::Number)]);
+        let reply = self.invoke_async("transferFluid", args).await?;
+        single::<Number>(reply)
+    }
+
     /// Transfer some items between two inventories.
     ///
     /// Lua: `transposer.transferItem(sourceSide:number, sinkSide:number[, count:number[, sourceSlot:number[, sinkSlot:number]]]):boolean`
@@ -4627,6 +7935,15 @@ impl Transposer {
     pub fn transfer_item(&self, source_side: impl Into<Number>, sink_side: impl Into<Number>, count: Option<Number>, source_slot: Option<Number>, sink_slot: Option<Number>) -> Result<bool> {
         let args = args(vec![Some(Value::Number(source_side.into())), Some(Value::Number(sink_side.into())), count.map(Value::Number), source_slot.map(Value::Number), sink_slot.map(Value::Number)]);
         let reply = self.invoke("transferItem", args)?;
+        single::<bool>(reply)
+    }
+
+    /// [`Self::transfer_item`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn transfer_item_async(&self, source_side: impl Into<Number>, sink_side: impl Into<Number>, count: Option<Number>, source_slot: Option<Number>, sink_slot: Option<Number>) -> Result<bool> {
+        let args = args(vec![Some(Value::Number(source_side.into())), Some(Value::Number(sink_side.into())), count.map(Value::Number), source_slot.map(Value::Number), sink_slot.map(Value::Number)]);
+        let reply = self.invoke_async("transferItem", args).await?;
         single::<bool>(reply)
     }
 }
@@ -4658,6 +7975,15 @@ impl Tunnel {
         single::<OcString>(reply)
     }
 
+    /// [`Self::get_channel`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn get_channel_async(&self) -> Result<OcString> {
+        let args = args(vec![]);
+        let reply = self.invoke_async("getChannel", args).await?;
+        single::<OcString>(reply)
+    }
+
     /// Get the current wake-up message.
     ///
     /// Lua: `tunnel.getWakeMessage():string, boolean`
@@ -4668,6 +7994,15 @@ impl Tunnel {
         FromReply::from_reply(reply)
     }
 
+    /// [`Self::get_wake_message`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn get_wake_message_async(&self) -> Result<(OcString, bool)> {
+        let args = args(vec![]);
+        let reply = self.invoke_async("getWakeMessage", args).await?;
+        FromReply::from_reply(reply)
+    }
+
     /// Gets the maximum packet size (config setting).
     ///
     /// Lua: `tunnel.maxPacketSize():number`
@@ -4675,6 +8010,15 @@ impl Tunnel {
     pub fn max_packet_size(&self) -> Result<Number> {
         let args = args(vec![]);
         let reply = self.invoke("maxPacketSize", args)?;
+        single::<Number>(reply)
+    }
+
+    /// [`Self::max_packet_size`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn max_packet_size_async(&self) -> Result<Number> {
+        let args = args(vec![]);
+        let reply = self.invoke_async("maxPacketSize", args).await?;
         single::<Number>(reply)
     }
 
@@ -4689,6 +8033,16 @@ impl Tunnel {
         FromReply::from_reply(reply)
     }
 
+    /// [`Self::send`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn send_async(&self, data: &[Value]) -> Result<()> {
+        let mut args: Vec<Value> = vec![].into_iter().map(Option::unwrap_or_default).collect();
+        args.extend_from_slice(data);
+        let reply = self.invoke_async("send", args).await?;
+        FromReply::from_reply(reply)
+    }
+
     /// Set the wake-up message and whether to ignore additional data/parameters.
     ///
     /// Lua: `tunnel.setWakeMessage(message:string[, fuzzy:boolean]):string`
@@ -4696,6 +8050,15 @@ impl Tunnel {
     pub fn set_wake_message(&self, message: impl AsRef<[u8]>, fuzzy: Option<bool>) -> Result<OcString> {
         let args = args(vec![Some(Value::text(message.as_ref())), fuzzy.map(Value::Bool)]);
         let reply = self.invoke("setWakeMessage", args)?;
+        single::<OcString>(reply)
+    }
+
+    /// [`Self::set_wake_message`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn set_wake_message_async(&self, message: impl AsRef<[u8]>, fuzzy: Option<bool>) -> Result<OcString> {
+        let args = args(vec![Some(Value::text(message.as_ref())), fuzzy.map(Value::Bool)]);
+        let reply = self.invoke_async("setWakeMessage", args).await?;
         single::<OcString>(reply)
     }
 }
@@ -4727,6 +8090,15 @@ impl Waypoint {
         single::<OcString>(reply)
     }
 
+    /// [`Self::get_label`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn get_label_async(&self) -> Result<OcString> {
+        let args = args(vec![]);
+        let reply = self.invoke_async("getLabel", args).await?;
+        single::<OcString>(reply)
+    }
+
     /// Set the label for this waypoint.
     ///
     /// Lua: `waypoint.setLabel(value:string)`
@@ -4734,6 +8106,15 @@ impl Waypoint {
     pub fn set_label(&self, value: impl AsRef<[u8]>) -> Result<()> {
         let args = args(vec![Some(Value::text(value.as_ref()))]);
         let reply = self.invoke("setLabel", args)?;
+        FromReply::from_reply(reply)
+    }
+
+    /// [`Self::set_label`] without blocking: the call is queued, and
+    /// the program keeps running until the result comes back; see [`crate::task`].
+    #[cfg(feature = "async")]
+    pub async fn set_label_async(&self, value: impl AsRef<[u8]>) -> Result<()> {
+        let args = args(vec![Some(Value::text(value.as_ref()))]);
+        let reply = self.invoke_async("setLabel", args).await?;
         FromReply::from_reply(reply)
     }
 }

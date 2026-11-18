@@ -14,6 +14,6 @@ pub mod storage;
 pub mod value;
 mod wasi;
 
-pub use machine::{OcMachine, Request, RunOutcome};
+pub use machine::{AsyncTarget, OcMachine, Request, RunOutcome};
 pub use storage::WorkDir;
 pub use value::OcValue;

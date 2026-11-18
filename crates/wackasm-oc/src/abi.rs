@@ -61,6 +61,15 @@ pub const RUN_INVOKE_VALUE: i32 = 11;
 /// Java disposes of it (closing a socket, for example), forgets its id and
 /// responds `STATUS_OK`.
 pub const RUN_RELEASE_VALUE: i32 = 12;
+/// The next call from the async queue (`oc.invoke_async`). Payload:
+/// `[ticket, target, method, args: array]`, where `target` is a component
+/// address (string) or a userdata value. Java runs it like `RUN_INVOKE` or
+/// `RUN_INVOKE_VALUE` (inline if direct, otherwise from `runSynchronized`)
+/// and calls `respond`. The answer goes to the guest's completion queue, not
+/// to a pending import. From `runSynchronized`, `nextAsync` makes the next
+/// queued call pending without running the guest, so several indirect calls
+/// can be served in one tick.
+pub const RUN_INVOKE_ASYNC: i32 = 13;
 
 // ---------------------------------------------------------------------------
 // Process events: what `spawn` and `resume` return to the parent. The
@@ -95,6 +104,15 @@ pub const STATUS_NO_SUCH_COMPONENT: i32 = -3;
 pub const STATUS_NO_SUCH_METHOD: i32 = -4;
 /// `spawn_file`: there is no such file.
 pub const STATUS_NOT_FOUND: i32 = -5;
+/// `invoke_async`: this process already has `MAX_ASYNC_CALLS` calls queued or
+/// completed and unread.
+pub const STATUS_QUEUE_FULL: i32 = -6;
+/// `wait_ms`: an async call has completed; read it with `completion_next`.
+pub const STATUS_COMPLETION: i32 = 2;
+
+/// Async calls a process may have outstanding (queued, running, or completed
+/// and not yet read) at once.
+pub const MAX_ASYNC_CALLS: usize = 64;
 
 /// Every function in the `oc` import module. The signature comments use wasm
 /// types; `ptr`/`len` are `i32` offsets into memory 0.
@@ -180,6 +198,28 @@ pub mod imports {
     /// `(value: u32) -> status`: disposes of a userdata value and forgets it.
     /// Values are otherwise kept until the machine stops.
     pub const RELEASE_VALUE: &str = "release_value";
+    /// `(addr, addr_len, method, method_len, args, args_len) -> i64`: queues a
+    /// component call and returns at once with a ticket (`>= 0`), or a negative
+    /// status (`STATUS_BAD_ARGUMENT`, `STATUS_QUEUE_FULL`). Queued calls run in
+    /// order, before any blocking call the guest makes after them. Each one's
+    /// result arrives in the completion queue (see `completion_next`).
+    pub const INVOKE_ASYNC: &str = "invoke_async";
+    /// `(value: u32, method, method_len, args, args_len) -> i64`: `invoke_async`
+    /// for a method of a userdata value.
+    pub const INVOKE_VALUE_ASYNC: &str = "invoke_value_async";
+    /// `() -> status`: `STATUS_OK` with the next completed async call in the
+    /// response buffer as `[ticket, status, payload: bytes]` (the payload is
+    /// what `invoke` would have left in the response buffer), or
+    /// `STATUS_TIMEOUT` (1) if none has completed.
+    pub const COMPLETION_NEXT: &str = "completion_next";
+    /// `(ticket: i64) -> status`: forgets an async call. If it hasn't run, it
+    /// never will; if it is running, its result is discarded. `STATUS_NOT_FOUND`
+    /// for an unknown ticket.
+    pub const CANCEL: &str = "cancel";
+    /// `(timeout_ms: i64) -> status`: `pull_signal_ms` that also wakes when an
+    /// async call completes, returning `STATUS_COMPLETION`. `pull_signal` and
+    /// `pull_signal_ms` ignore completions.
+    pub const WAIT_MS: &str = "wait_ms";
     /// `() -> status`: the address of the filesystem this process's WASI
     /// calls use (the disk it sees as `/`), in the response buffer.
     /// `STATUS_NOT_FOUND` if there is none. Picking it is the same as on a

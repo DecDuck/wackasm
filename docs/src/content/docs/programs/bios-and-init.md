@@ -2,7 +2,7 @@
 title: Custom BIOS and init
 description: Replace the shell, or write your own EEPROM code.
 sidebar:
-  order: 6
+  order: 7
 ---
 
 A computer boots in two stages, like a Lua one:

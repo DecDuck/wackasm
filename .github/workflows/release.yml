@@ -56,7 +56,7 @@ jobs:
         with:
           key: ${{ matrix.target }}
       - name: Apply the wasmparser patch
-        run: cargo patch-crate
+        run: cargo patch-crate --force
       - name: Build
         run: cargo build -p wackasm-oc --release --target ${{ matrix.target }}
       - uses: actions/upload-artifact@v7
@@ -86,7 +86,7 @@ jobs:
             crates/wackasm-oc-guest
             crates/wackasm-oc-programs
       - name: Apply the wasmparser patch
-        run: cargo patch-crate
+        run: cargo patch-crate --force
       - name: Rust tests
         run: cargo test -p wackasm-oc -p wackasm-opencomputers -p wackasm-wasi
       # Java 8 for Minecraft, 21 to run Gradle (the last one is the default).
@@ -210,7 +210,7 @@ jobs:
         run: cargo install patch-crate --version 0.1.13 --locked
       # Cargo loads the whole workspace, and its [patch] points into target/.
       - name: Apply the wasmparser patch
-        run: cargo patch-crate
+        run: cargo patch-crate --force
       - name: Publish wackasm-opencomputers
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}

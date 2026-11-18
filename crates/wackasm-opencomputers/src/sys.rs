@@ -23,6 +23,16 @@ unsafe extern "C" {
     pub fn files_disk() -> i32;
     pub fn invoke_value(value: u32, method: *const u8, method_len: usize, args: *const u8, args_len: usize) -> i32;
     pub fn release_value(value: u32) -> i32;
+    #[cfg(feature = "async")]
+    pub fn invoke_async(addr: *const u8, addr_len: usize, method: *const u8, method_len: usize, args: *const u8, args_len: usize) -> i64;
+    #[cfg(feature = "async")]
+    pub fn invoke_value_async(value: u32, method: *const u8, method_len: usize, args: *const u8, args_len: usize) -> i64;
+    #[cfg(feature = "async")]
+    pub fn completion_next() -> i32;
+    #[cfg(feature = "async")]
+    pub fn cancel(ticket: i64) -> i32;
+    #[cfg(feature = "async")]
+    pub fn wait_ms(timeout_ms: i64) -> i32;
     pub fn shutdown(reboot: i32) -> !;
     pub fn crash(msg: *const u8, len: usize) -> !;
 }
@@ -50,6 +60,16 @@ mod host {
     pub unsafe fn files_disk() -> i32 { unavailable() }
     pub unsafe fn invoke_value(_: u32, _: *const u8, _: usize, _: *const u8, _: usize) -> i32 { unavailable() }
     pub unsafe fn release_value(_: u32) -> i32 { unavailable() }
+    #[cfg(feature = "async")]
+    pub unsafe fn invoke_async(_: *const u8, _: usize, _: *const u8, _: usize, _: *const u8, _: usize) -> i64 { unavailable() }
+    #[cfg(feature = "async")]
+    pub unsafe fn invoke_value_async(_: u32, _: *const u8, _: usize, _: *const u8, _: usize) -> i64 { unavailable() }
+    #[cfg(feature = "async")]
+    pub unsafe fn completion_next() -> i32 { unavailable() }
+    #[cfg(feature = "async")]
+    pub unsafe fn cancel(_: i64) -> i32 { unavailable() }
+    #[cfg(feature = "async")]
+    pub unsafe fn wait_ms(_: i64) -> i32 { unavailable() }
     pub unsafe fn shutdown(_: i32) -> ! { unavailable() }
     pub unsafe fn crash(_: *const u8, _: usize) -> ! { unavailable() }
 }
@@ -60,6 +80,13 @@ pub const STATUS_OK: i32 = 0;
 pub const STATUS_NO_SUCH_COMPONENT: i32 = -3;
 pub const STATUS_NO_SUCH_METHOD: i32 = -4;
 pub const STATUS_NOT_FOUND: i32 = -5;
+#[cfg(feature = "async")]
+#[allow(dead_code)]
+pub const STATUS_QUEUE_FULL: i32 = -6;
+/// `wait_ms`: an async call has completed.
+#[cfg(feature = "async")]
+#[allow(dead_code)]
+pub const STATUS_COMPLETION: i32 = 2;
 
 // Process events, as `spawn_with` and `resume` return them.
 pub const EVENT_EXITED: i32 = 0;

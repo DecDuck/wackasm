@@ -28,7 +28,7 @@ use std::{
 
 use anyhow::{Result, anyhow, bail};
 use wackasm_oc::{
-    OcMachine, OcValue, Request, RunOutcome, WorkDir,
+    AsyncTarget, OcMachine, OcValue, Request, RunOutcome, WorkDir,
     abi::{STATUS_ERROR, STATUS_NO_SUCH_COMPONENT, STATUS_OK, STATUS_TIMEOUT},
 };
 
@@ -116,6 +116,8 @@ struct Sim {
     /// Userdata values of the internet card, by id (shared with `handles`).
     net: HashMap<u32, Net>,
     net_calls: std::collections::BTreeMap<String, usize>,
+    /// Calls that came through the async queue.
+    async_calls: usize,
 }
 
 fn int(args: &[OcValue], i: usize) -> i64 {
@@ -483,6 +485,19 @@ impl Sim {
                     Err(e) => (STATUS_ERROR, e.into_bytes()),
                 }
             }
+            // Served like the blocking calls; the machine routes the answer.
+            Request::InvokeAsync { target, method, args, .. } => {
+                self.async_calls += 1;
+                let inner = match target {
+                    AsyncTarget::Component(address) => {
+                        Request::Invoke { address: address.clone(), method: method.clone(), args: args.clone() }
+                    }
+                    AsyncTarget::Value(value) => {
+                        Request::InvokeValue { value: *value, method: method.clone(), args: args.clone() }
+                    }
+                };
+                return self.serve(&inner);
+            }
             Request::ReleaseValue { value } => {
                 self.net.remove(value);
                 self.handles.remove(value);
@@ -535,6 +550,7 @@ fn main() -> Result<()> {
         internet,
         net: HashMap::new(),
         net_calls: Default::default(),
+        async_calls: 0,
     };
     machine.boot(Some(&sim.eeprom_code))?;
 
@@ -581,6 +597,9 @@ fn main() -> Result<()> {
     println!("eeprom: {:?}, {} bytes of code", sim.eeprom_label, sim.eeprom_code.len());
     let total: usize = sim.fs_calls.values().sum();
     println!("filesystem calls: {total} {:?}", sim.fs_calls);
+    if sim.async_calls > 0 {
+        println!("async calls served: {}", sim.async_calls);
+    }
     if sim.internet {
         println!("internet value calls: {:?}, values left unreleased: {}", sim.net_calls, sim.net.len());
     }

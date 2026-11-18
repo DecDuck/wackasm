@@ -159,6 +159,7 @@ caught and rethrown as exceptions too.
 | 10 `DEFAULT_DISK` | `[]` | respond with `[address]` of the disk for WASI files, or `[]` |
 | 11 `INVOKE_VALUE` | `[userdata, method, args[]]` | `machine.invoke(Value, ...)`: direct → inline; else `SynchronizedCall`. An unknown id is `NO_SUCH_COMPONENT` |
 | 12 `RELEASE_VALUE` | `[userdata]` | dispose of the value, forget its id, respond `OK` |
+| 13 `INVOKE_ASYNC` | `[ticket, address \| userdata, method, args[]]` | the head of the async queue: like `INVOKE`/`INVOKE_VALUE`, but the answer goes to the guest's completion queue. `runSynchronized` serves up to `asyncCallsPerTick` indirect calls, using `nextAsync` to take the next one |
 
 `respond` statuses: `0 OK`, `1 TIMEOUT`, `-1 ERROR`, `-2 BAD_ARGUMENT`,
 `-3 NO_SUCH_COMPONENT`, `-4 NO_SUCH_METHOD`. On `OK` the payload is an encoded
@@ -191,6 +192,11 @@ Pointers are `i32` offsets into memory 0. The entry point is the export
 | `kill` | `() -> status` | Rust-only; ends the child |
 | `invoke_value` | `(value: u32, method, method_len, args, args_len) -> status` | a method of a userdata value (`value` is its id), such as an internet card request's `read`; results go in the response buffer. Direct callbacks run inline, others wait for the server tick, as for `invoke` |
 | `release_value` | `(value: u32) -> status` | dispose of a userdata value (closing it) and forget its id. Values are otherwise kept until the machine stops |
+| `invoke_async` | `(addr, addr_len, method, method_len, args, args_len) -> i64` | queues a call and returns a ticket, or `-2`/`-6` (queue full, 64 outstanding). Queued calls run in order, before any later blocking call |
+| `invoke_value_async` | `(value: u32, method, method_len, args, args_len) -> i64` | the same for a userdata value |
+| `completion_next` | `() -> status` | `0` with `[ticket, status, payload bytes]` in the response, or `1` if none |
+| `cancel` | `(ticket: i64) -> status` | drops a queued call, or discards a running one's result |
+| `wait_ms` | `(timeout_ms: i64) -> status` | `pull_signal_ms` that also returns `2` when a completion is ready |
 | `files_disk` | `() -> status` | Rust-only; the address of this process's WASI disk (chosen as for a first file access) in the response, or `-5` if there is none |
 | `shutdown` | `(reboot: i32)` | halts |
 | `crash` | `(msg, len)` | halts with an error |

@@ -77,6 +77,14 @@ has a worked example (`demo`).
   whenever the program links the crate, which can take a `use wackasm_opencomputers
   as _;`. In a build without LTO, call `process::enter_working_dir()` at the
   top of `main` to be sure.
+* **`task`** (the optional `async` feature): a single-threaded executor
+  (`task::run`, `spawn`, `join`, `join_all`, `sleep`, `timeout`, `signal`),
+  an `_async` twin of every component method, `component::invoke_async`,
+  and async internet (`get_async`, `send_async`, `read_async`,
+  `connect_async`, ...). Calls are queued with the architecture and the
+  program keeps running until their results come back, so one program can
+  wait on several calls, timers and signals at once. Enable it with
+  `features = ["async"]`; everything else works without it.
 * `Side`, `Color` and `keys`: the codes robots, redstone and keyboards use.
 
 Files are easiest through `std::fs`, which the architecture maps onto a disk.

@@ -206,6 +206,16 @@ public final class WackasmArchitecture implements Architecture {
                         }
                         break;
                     }
+                    case WackasmNative.RUN_INVOKE_ASYNC: {
+                        Object[] p = payload();
+                        if (!isDirectAsync(p)) return new ExecutionResult.SynchronizedCall();
+                        try {
+                            invokeAsync(p);
+                        } catch (LimitReachedException e) {
+                            return new ExecutionResult.Sleep(0); // reported again next tick
+                        }
+                        break;
+                    }
                     case WackasmNative.RUN_RELEASE_VALUE: {
                         Object value = payload()[0];
                         if (value instanceof Value) userdata.release((Value) value, machine);
@@ -298,7 +308,9 @@ public final class WackasmArchitecture implements Architecture {
         if (handle == 0) return;
         try {
             Object[] p = payload();
-            if (p[0] instanceof Value) {
+            if (p[0] instanceof Long) {
+                serveAsyncQueue(p);
+            } else if (p[0] instanceof Value) {
                 invokeValue((Value) p[0], (String) p[1], (Object[]) p[2]);
             } else {
                 invoke((String) p[0], (String) p[1], (Object[]) p[2]);
@@ -309,6 +321,46 @@ public final class WackasmArchitecture implements Architecture {
         } catch (IllegalStateException e) {
             machine.crash("wackasm: " + e.getMessage());
         }
+    }
+
+    /**
+     * Serves the async queue from the server thread, starting with the pending
+     * call {@code p}: up to {@link WackasmConfig#asyncCallsPerTick} indirect calls,
+     * and any direct calls between them. A call left over stays pending, and
+     * runThreaded reports it again next tick.
+     */
+    private void serveAsyncQueue(Object[] p) throws LimitReachedException {
+        int indirect = 0;
+        while (true) {
+            boolean direct = isDirectAsync(p);
+            if (!direct && indirect >= WackasmConfig.asyncCallsPerTick) return;
+            invokeAsync(p);
+            if (!direct) indirect++;
+            if (!WackasmNative.nextAsync(handle)) return;
+            p = payload();
+        }
+    }
+
+    /** {@code [ticket, target, method, args]}: target is an address or a userdata value. */
+    private void invokeAsync(Object[] p) throws LimitReachedException {
+        Object target = p[1];
+        String method = (String) p[2];
+        Object[] args = (Object[]) p[3];
+        if (target instanceof Value) {
+            invokeValue((Value) target, method, args);
+        } else if (target instanceof String) {
+            invoke((String) target, method, args);
+        } else {
+            respondStatus(WackasmNative.STATUS_NO_SUCH_COMPONENT, "no such value (already released?)");
+        }
+    }
+
+    private boolean isDirectAsync(Object[] p) {
+        Object target = p[1];
+        String method = (String) p[2];
+        if (target instanceof Value) return isDirect((Value) target, method);
+        if (target instanceof String) return isDirect((String) target, method);
+        return true; // an unknown value fails inline
     }
 
     // ---------------------------------------------------------------- helpers

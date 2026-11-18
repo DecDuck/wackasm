@@ -25,6 +25,9 @@
 //! * [`computer`]: this computer's address, uptime, memory and power.
 //! * [`process`]: running other programs, like `std::process`.
 //! * [`internet`]: HTTP requests and TCP connections through an internet card.
+//! * `task` (with the `async` feature): an async executor, so programs can
+//!   wait on several component calls, timers and signals at once. Every
+//!   component method then has an `_async` twin.
 //! * [`Side`], [`Color`], [`keys`]: the numeric codes components use.
 //!
 //! Files are simplest through `std::fs`, which the architecture maps onto a
@@ -41,6 +44,8 @@ pub mod internet;
 pub mod process;
 pub mod signal;
 mod sys;
+#[cfg(feature = "async")]
+pub mod task;
 mod types;
 mod value;
 

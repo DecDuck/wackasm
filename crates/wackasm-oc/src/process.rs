@@ -35,6 +35,23 @@ pub(crate) struct Process {
     pub io: ProcessIo,
     /// This child has delivered an event and waits for its parent's `resume`.
     pub paused: bool,
+    /// Unique for the machine's lifetime (process 0 is 0). Async calls belong
+    /// to a process by id, so a call outliving its process is dropped.
+    pub id: u64,
+    /// The next `invoke_async` ticket.
+    pub next_ticket: i64,
+    /// Async calls that have completed and not been read yet.
+    pub completions: VecDeque<Completion>,
+    /// Tickets cancelled while Java was running them: their results are dropped.
+    pub cancelled: Vec<i64>,
+}
+
+/// A finished async call, as `completion_next` returns it.
+#[derive(Serialize, Deserialize)]
+pub(crate) struct Completion {
+    pub ticket: i64,
+    pub status: i32,
+    pub payload: Vec<u8>,
 }
 
 impl Process {
@@ -48,6 +65,10 @@ impl Process {
                 ..ProcessIo::default()
             },
             paused: false,
+            id: 0,
+            next_ticket: 0,
+            completions: VecDeque::new(),
+            cancelled: Vec::new(),
         }
     }
 

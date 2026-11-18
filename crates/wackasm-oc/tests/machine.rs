@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
 use wackasm_oc::{
-    OcMachine, OcValue, Request, RunOutcome, WorkDir,
+    AsyncTarget, OcMachine, OcValue, Request, RunOutcome, WorkDir,
     abi::{STATUS_ERROR, STATUS_OK, STATUS_TIMEOUT},
 };
 
@@ -936,5 +936,204 @@ fn methods_of_userdata_values_go_to_java() {
     m.respond(STATUS_OK, Vec::new()).unwrap();
     // The release left an empty response; the read's reply was replaced.
     assert_eq!(m.run(0.0, 1_000_000).unwrap(), RunOutcome::Error(String::new()));
+    let _ = std::fs::remove_dir_all(dir);
+}
+
+// ---------------------------------------------------------------- async calls
+
+/// Imports and data for async tests: "gpu" at 0, methods "a" at 16 and "b" at
+/// 24, an empty encoded array at 32, and `$rec` appending a character ('0' + n)
+/// to a log at 512 that `$done` crashes with.
+const ASYNC_PRELUDE: &str = r#"
+  (import "oc" "invoke_async"    (func $invoke_async (param i32 i32 i32 i32 i32 i32) (result i64)))
+  (import "oc" "invoke"          (func $invoke (param i32 i32 i32 i32 i32 i32) (result i32)))
+  (import "oc" "completion_next" (func $completion_next (result i32)))
+  (import "oc" "cancel"          (func $cancel (param i64) (result i32)))
+  (import "oc" "wait_ms"         (func $wait_ms (param i64) (result i32)))
+  (import "oc" "pull_signal_ms"  (func $pull_signal_ms (param i64) (result i32)))
+  (import "oc" "response_read"   (func $rread (param i32 i32) (result i32)))
+  (import "oc" "crash"           (func $crash (param i32 i32)))
+  (memory 1)
+  (data (i32.const 0)  "gpu")
+  (data (i32.const 16) "a")
+  (data (i32.const 24) "b")
+  (data (i32.const 32) "\07\00\00\00\00")
+  (global $n (mut i32) (i32.const 0))
+  (func $rec (param $e i32)
+    (i32.store8 (i32.add (i32.const 512) (global.get $n)) (i32.add (i32.const 48) (local.get $e)))
+    (global.set $n (i32.add (global.get $n) (i32.const 1))))
+  (func $done (call $crash (i32.const 512) (global.get $n)))
+  (func $call_a (result i64) (call $invoke_async (i32.const 0) (i32.const 3) (i32.const 16) (i32.const 1) (i32.const 32) (i32.const 5)))
+  (func $call_b (result i64) (call $invoke_async (i32.const 0) (i32.const 3) (i32.const 24) (i32.const 1) (i32.const 32) (i32.const 5)))
+  ;; Reads one completion: records completion_next's status, then (if there
+  ;; was one) its ticket and the call's status, from [ticket, status, payload]
+  ;; read to 1024: tag 7, count, then tag 3 + i64 ticket at 1030, tag 3 +
+  ;; i64 status at 1039.
+  (func $take
+    (local $s i32)
+    (local.set $s (call $completion_next))
+    (call $rec (local.get $s))
+    (if (i32.eqz (local.get $s))
+      (then
+        (drop (call $rread (i32.const 1024) (i32.const 256)))
+        (call $rec (i32.load8_u (i32.const 1030)))
+        (call $rec (i32.load8_s (i32.const 1039))))))
+"#;
+
+fn async_guest(body: &str) -> Vec<u8> {
+    wat::parse_str(format!(r#"(module {ASYNC_PRELUDE} (func (export "oc_main") {body} (call $done)))"#)).unwrap()
+}
+
+fn expect_async(m: &mut OcMachine, ticket: i64, method: &str) {
+    match m.run(0.0, 1_000_000).unwrap() {
+        RunOutcome::Request(Request::InvokeAsync { ticket: t, target, method: got, args }) => {
+            assert_eq!((t, got.as_str()), (ticket, method));
+            assert_eq!(target, AsyncTarget::Component("gpu".into()));
+            assert!(args.is_empty());
+        }
+        other => panic!("expected async call {ticket} ({method}), got {other:?}"),
+    }
+}
+
+const QUEUE_TWO_AND_WAIT: &str = r#"
+    (call $rec (i32.wrap_i64 (call $call_a)))
+    (call $rec (i32.wrap_i64 (call $call_b)))
+    (call $rec (call $wait_ms (i64.const -1)))
+    (call $take) (call $take) (call $take)
+"#;
+
+#[test]
+fn async_calls_run_in_order_and_complete_into_the_queue() {
+    let dir = scratch_dir("async-order");
+    let mut m = machine(&dir);
+    m.boot(Some(&async_guest(QUEUE_TWO_AND_WAIT))).unwrap();
+    let ok = |values: Vec<OcValue>| OcValue::Array(values).encode();
+    expect_async(&mut m, 0, "a");
+    m.respond(STATUS_OK, ok(vec![OcValue::Int(7)])).unwrap();
+    expect_async(&mut m, 1, "b");
+    m.respond(STATUS_ERROR, b"broken".to_vec()).unwrap();
+    // Tickets 0 and 1; wait_ms: a completion is ready (2); completion 0 with
+    // status 0; completion 1 with status -1 ('/'); then none (1).
+    assert_eq!(m.run(0.0, 1_000_000).unwrap(), RunOutcome::Error("0120000 1/1".replace(' ', "").into()));
+    let _ = std::fs::remove_dir_all(dir);
+}
+
+#[test]
+fn async_queue_survives_a_reload() {
+    let dir = scratch_dir("async-reload");
+    let mut m = machine(&dir);
+    m.boot(Some(&async_guest(QUEUE_TWO_AND_WAIT))).unwrap();
+    let ok = OcValue::Array(Vec::new()).encode();
+    expect_async(&mut m, 0, "a");
+    // Saved while Java runs call 0: it is reported again after the reload.
+    let mut m = reload(m, &dir);
+    expect_async(&mut m, 0, "a");
+    m.respond(STATUS_OK, ok.clone()).unwrap();
+    let mut m = reload(m, &dir);
+    expect_async(&mut m, 1, "b");
+    m.respond(STATUS_OK, ok).unwrap();
+    let mut m = reload(m, &dir);
+    assert_eq!(m.run(0.0, 1_000_000).unwrap(), RunOutcome::Error("0120000101".into()));
+    let _ = std::fs::remove_dir_all(dir);
+}
+
+#[test]
+fn a_blocking_call_waits_behind_queued_async_calls() {
+    let dir = scratch_dir("async-blocking");
+    let mut m = machine(&dir);
+    m.boot(Some(&async_guest(r#"
+        (drop (call $call_a))
+        (call $rec (call $invoke (i32.const 0) (i32.const 3) (i32.const 24) (i32.const 1) (i32.const 32) (i32.const 5)))
+        (call $take)
+    "#)))
+    .unwrap();
+    let ok = OcValue::Array(Vec::new()).encode();
+    expect_async(&mut m, 0, "a");
+    m.respond(STATUS_OK, ok.clone()).unwrap();
+    match m.run(0.0, 1_000_000).unwrap() {
+        RunOutcome::Request(Request::Invoke { method, .. }) => assert_eq!(method, "b"),
+        other => panic!("expected the blocking call after the async one, got {other:?}"),
+    }
+    m.respond(STATUS_OK, ok).unwrap();
+    // The blocking call returned 0, then completion 0 (status 0) was waiting.
+    assert_eq!(m.run(0.0, 1_000_000).unwrap(), RunOutcome::Error("0000".into()));
+    let _ = std::fs::remove_dir_all(dir);
+}
+
+#[test]
+fn cancelled_async_calls_never_run() {
+    let dir = scratch_dir("async-cancel");
+    let mut m = machine(&dir);
+    m.boot(Some(&async_guest(r#"
+        (drop (call $call_a))
+        (drop (call $call_b))
+        (call $rec (call $cancel (i64.const 0)))
+        (call $rec (call $cancel (i64.const 99)))
+        (call $rec (call $wait_ms (i64.const -1)))
+        (call $take) (call $take)
+    "#)))
+    .unwrap();
+    // Only "b" (ticket 1) reaches Java.
+    expect_async(&mut m, 1, "b");
+    m.respond(STATUS_OK, OcValue::Array(Vec::new()).encode()).unwrap();
+    // cancel: ok, then not found (-5, '+'); a completion is ready; ticket 1
+    // with status 0; then none.
+    assert_eq!(m.run(0.0, 1_000_000).unwrap(), RunOutcome::Error("0+20101".into()));
+    let _ = std::fs::remove_dir_all(dir);
+}
+
+#[test]
+fn async_calls_are_capped_per_process() {
+    let dir = scratch_dir("async-full");
+    let mut m = machine(&dir);
+    m.boot(Some(&async_guest(r#"
+        (local $i i32)
+        (loop $more
+          (drop (call $call_a))
+          (local.set $i (i32.add (local.get $i) (i32.const 1)))
+          (br_if $more (i32.lt_u (local.get $i) (i32.const 64))))
+        ;; The 65th: STATUS_QUEUE_FULL (-6), '0' - 6 = '*'.
+        (call $rec (i32.wrap_i64 (call $call_a)))
+    "#)))
+    .unwrap();
+    assert_eq!(m.run(0.0, 10_000_000).unwrap(), RunOutcome::Error("*".into()));
+    let _ = std::fs::remove_dir_all(dir);
+}
+
+#[test]
+fn pull_signal_ignores_completions_but_wait_ms_does_not() {
+    let dir = scratch_dir("async-pull");
+    let mut m = machine(&dir);
+    m.boot(Some(&async_guest(r#"
+        (drop (call $call_a))
+        (call $rec (call $pull_signal_ms (i64.const 5000)))
+        (call $rec (call $wait_ms (i64.const 5000)))
+    "#)))
+    .unwrap();
+    expect_async(&mut m, 0, "a");
+    m.respond(STATUS_OK, OcValue::Array(Vec::new()).encode()).unwrap();
+    // pull_signal_ms still goes to Java, which times it out (1).
+    assert!(matches!(m.run(0.0, 1_000_000).unwrap(), RunOutcome::Request(Request::PullSignal { .. })));
+    m.respond(STATUS_TIMEOUT, Vec::new()).unwrap();
+    // wait_ms sees the completion without asking Java (2).
+    assert_eq!(m.run(0.0, 1_000_000).unwrap(), RunOutcome::Error("12".into()));
+    let _ = std::fs::remove_dir_all(dir);
+}
+
+#[test]
+fn next_async_serves_queued_calls_without_running_the_guest() {
+    let dir = scratch_dir("async-next");
+    let mut m = machine(&dir);
+    m.boot(Some(&async_guest(QUEUE_TWO_AND_WAIT))).unwrap();
+    let ok = OcValue::Array(Vec::new()).encode();
+    expect_async(&mut m, 0, "a");
+    m.respond(STATUS_OK, ok.clone()).unwrap();
+    // As runSynchronized does: the next call, without a `run`.
+    assert!(m.next_async().unwrap());
+    assert!(matches!(m.pending_request(), Some(Request::InvokeAsync { ticket: 1, .. })));
+    assert!(!m.next_async().unwrap(), "a request is already pending");
+    m.respond(STATUS_OK, ok).unwrap();
+    assert!(!m.next_async().unwrap(), "the queue is empty");
+    assert_eq!(m.run(0.0, 1_000_000).unwrap(), RunOutcome::Error("0120000101".into()));
     let _ = std::fs::remove_dir_all(dir);
 }

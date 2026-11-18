@@ -27,7 +27,8 @@ message on failure.
 | `-2` BAD_ARGUMENT | a bad pointer, invalid UTF-8 or a malformed encoding |
 | `-3` NO_SUCH_COMPONENT | |
 | `-4` NO_SUCH_METHOD | |
-| `-5` NOT_FOUND | no such file, or no files disk |
+| `-5` NOT_FOUND | no such file, no files disk, or an unknown async ticket |
+| `-6` QUEUE_FULL | `invoke_async`: 64 calls already outstanding |
 
 Wrong import signatures or unknown imports crash the computer.
 
@@ -70,6 +71,23 @@ Pass them back as arguments, or call their methods with `invoke_value`.
 
 Direct callbacks run immediately (drawing on the call budget); others wait
 for the next server tick.
+
+### Async calls
+
+These queue a call and return at once; see [Async programs](/wackasm/programs/async/).
+Queued calls run in the order they were made, before any blocking call made
+after them.
+
+| import | signature | notes |
+|---|---|---|
+| `invoke_async` | `(addr, addr_len, method, method_len, args, args_len) -> i64` | queues a component call. Returns a ticket (`>= 0`), or a negative status (`-2` bad argument, `-6` queue full) |
+| `invoke_value_async` | `(value: u32, method, method_len, args, args_len) -> i64` | the same, for a method of a userdata value |
+| `completion_next` | `() -> status` | `0`: the response holds `[ticket, status, payload]`, where payload is the bytes `invoke` would have left in the response. `1`: none have completed |
+| `cancel` | `(ticket: i64) -> status` | forgets a call. If it hasn't run, it won't; if it's running, its result is dropped. `-5` for an unknown ticket |
+| `wait_ms` | `(timeout_ms: i64) -> status` | like `pull_signal_ms`, but also returns `2` as soon as a call has completed. `pull_signal` and `pull_signal_ms` ignore completions |
+
+A process can have 64 calls outstanding: queued, running, or completed and
+not yet read.
 
 ### This computer
 

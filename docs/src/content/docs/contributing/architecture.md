@@ -46,6 +46,7 @@ thread.
 | 10 DEFAULT_DISK | `[]` | `[address]` of the disk for WASI files |
 | 11 INVOKE_VALUE | `[userdata, method, args]` | `machine.invoke(Value, ...)` |
 | 12 RELEASE_VALUE | `[userdata]` | dispose of the value |
+| 13 INVOKE_ASYNC | `[ticket, address or userdata, method, args]` | like INVOKE; the answer goes to the guest's completion queue |
 
 ## Suspension
 
@@ -70,6 +71,23 @@ and the parent's `spawn` or `resume` returns that event. A middle process can
 relay its child's events upward. The stack is part of the snapshot. All
 processes share the machine's RAM: each is capped at the total minus what
 the others hold. A child's trap ends only that child.
+
+## Async calls
+
+`invoke_async` appends a call to a machine-wide queue and returns a ticket;
+the guest keeps running. Whenever the guest waits or its slice ends, `run`
+reports the head of the queue (`INVOKE_ASYNC`) before anything else, and
+Java serves it like any other call. Its answer goes into the completion
+queue of the process that made it, instead of completing an import. A
+blocking request made while calls are queued is simply not reported yet:
+the import stays pending, runs again once the queue is empty, and asks for
+the same thing, so order is preserved.
+
+From `runSynchronized`, Java serves up to `asyncCallsPerTick` indirect calls
+per tick: after each answer, the native `nextAsync` makes the next queued
+call pending without running the guest. The queue, tickets and completion
+queues are part of the snapshot. Calls belong to a process by id, so the
+calls of a process that has exited are dropped.
 
 ## Module cache
 

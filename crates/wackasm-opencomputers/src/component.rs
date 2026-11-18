@@ -83,6 +83,20 @@ pub fn invoke_value(value: Handle, method: &str, args: Vec<Value>) -> Result<Vec
     reply(status)
 }
 
+/// Like [`invoke`], but without blocking: queues the call and returns a future
+/// for its result. Must be awaited inside [`crate::task::run`]. Requires the
+/// `async` feature.
+#[cfg(feature = "async")]
+pub fn invoke_async(address: &str, method: &str, args: Vec<Value>) -> crate::task::Call {
+    crate::task::Call::new(crate::task::Target::Component(address.to_owned()), method, args)
+}
+
+/// Like [`invoke_value`], but without blocking; see [`invoke_async`].
+#[cfg(feature = "async")]
+pub fn invoke_value_async(value: Handle, method: &str, args: Vec<Value>) -> crate::task::Call {
+    crate::task::Call::new(crate::task::Target::Value(value.0), method, args)
+}
+
 /// Tells the host this program is done with `value`. The host disposes of it
 /// (an open socket is closed) and the handle stops working. Values that are
 /// never released stay alive until the computer stops.
@@ -91,7 +105,12 @@ pub fn release_value(value: Handle) {
 }
 
 fn reply(status: i32) -> Result<Vec<Value>> {
-    let reply = sys::response();
+    decode_reply(status, sys::response())
+}
+
+/// A call's result from its status and response bytes (also used for the
+/// results of async calls).
+pub(crate) fn decode_reply(status: i32, reply: Vec<u8>) -> Result<Vec<Value>> {
     match status {
         sys::STATUS_OK => match Value::decode(&reply) {
             Some(Value::Array(items)) => Ok(items),
@@ -192,6 +211,12 @@ pub trait Component: Sized {
     /// An untyped call, for methods the wrapper doesn't know.
     fn invoke(&self, method: &str, args: Vec<Value>) -> Result<Vec<Value>> {
         invoke(self.address().as_str(), method, args)
+    }
+
+    /// [`Component::invoke`] without blocking; see [`invoke_async`].
+    #[cfg(feature = "async")]
+    fn invoke_async(&self, method: &str, args: Vec<Value>) -> crate::task::Call {
+        invoke_async(self.address().as_str(), method, args)
     }
 }
 

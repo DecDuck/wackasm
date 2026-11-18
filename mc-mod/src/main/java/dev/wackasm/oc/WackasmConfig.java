@@ -27,6 +27,16 @@ public final class WackasmConfig {
     public static double memoryMultiplier = 1.8;
 
     @Config.Comment({
+        "Indirect component calls a WebAssembly computer's async queue (oc.invoke_async, the",
+        "wackasm-opencomputers `async` feature) may run per tick. Lua computers, and blocking",
+        "calls, get one indirect call per tick, so 1 keeps wasm at parity: the program still",
+        "keeps running while its calls wait. Raise it (16 is reasonable) to let programs overlap",
+        "several indirect calls, such as transposers or internet reads, in one tick."
+    })
+    @Config.RangeInt(min = 1, max = 64)
+    public static int asyncCallsPerTick = 1;
+
+    @Config.Comment({
         "WebAssembly instructions per execution slice. A machine that uses up its slice",
         "continues on the next tick."
     })

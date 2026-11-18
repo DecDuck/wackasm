@@ -23,6 +23,7 @@ public final class WackasmNative {
     public static final int RUN_DEFAULT_DISK = 10;
     public static final int RUN_INVOKE_VALUE = 11;
     public static final int RUN_RELEASE_VALUE = 12;
+    public static final int RUN_INVOKE_ASYNC = 13;
 
     // respond() statuses
     public static final int STATUS_OK = 0;
@@ -66,6 +67,13 @@ public final class WackasmNative {
     public static native void respond(long handle, int status, byte[] payloadOrNull);
 
     /** Writes the snapshot into the work dir; NBT only needs the key. */
+    /**
+     * Makes the next queued async call the pending request, without running the
+     * guest, so {@code runSynchronized} can serve several in one tick. False if
+     * there is none or a request is already pending.
+     */
+    public static native boolean nextAsync(long handle);
+
     public static native void save(long handle);
 
     /** Restores the snapshot. Returns false if there is none. */

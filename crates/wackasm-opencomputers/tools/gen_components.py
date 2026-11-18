@@ -171,6 +171,25 @@ def method(kind, lua_name, attrs, used):
     lines.append(f"        let reply = self.invoke({json.dumps(lua_name)}, args)?;")
     lines.append(f"        {decode}")
     lines.append("    }")
+
+    # The non-blocking twin, for the `async` feature (see `crate::task`).
+    twin = name.removeprefix("r#") + "_async"
+    while twin in used:
+        twin += "_"
+    used.add(twin)
+    lines.append("")
+    lines.append(f"    /// [`Self::{name.removeprefix('r#')}`] without blocking: the call is queued, and")
+    lines.append("    /// the program keeps running until the result comes back; see [`crate::task`].")
+    lines.append('    #[cfg(feature = "async")]')
+    lines.append(f"    pub async fn {twin}({sig}) -> Result<{ret}> {{")
+    if varargs:
+        lines.append(f"        let mut args: Vec<Value> = vec![{', '.join(exprs)}].into_iter().map(Option::unwrap_or_default).collect();")
+        lines.append(f"        args.extend_from_slice({varargs});")
+    else:
+        lines.append(f"        let args = args(vec![{', '.join(exprs)}]);")
+    lines.append(f"        let reply = self.invoke_async({json.dumps(lua_name)}, args).await?;")
+    lines.append(f"        {decode}")
+    lines.append("    }")
     return lines
 
 
@@ -185,6 +204,8 @@ def main(src, dst):
         "//! One struct per component type, one method per callback. The docs on",
         "//! each method are OpenComputers' own, followed by the Lua signature.",
         "//! Find components with [`Component::first`] or [`Component::all`].",
+        "//! With the `async` feature, each method also has an `_async` twin that",
+        "//! doesn't block (see `crate::task`).",
         "",
         "#![allow(clippy::too_many_arguments)]",
         "",

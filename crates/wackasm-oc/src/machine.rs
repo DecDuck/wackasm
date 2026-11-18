@@ -18,6 +18,8 @@
 //! OS at the bottom, and `oc.spawn`ed children above it. Whichever one is
 //! active is the one `run` executes and `respond` answers.
 
+use std::collections::VecDeque;
+
 use anyhow::{Context as _, Result, anyhow, bail};
 use serde::{Deserialize, Serialize};
 use wackasm::{
@@ -29,7 +31,7 @@ use wackasm_wasi::{WASI_PREVIEW1, Wasi1};
 use crate::{
     abi::*,
     cache::{self, Load},
-    process::{Event, Process, ProcessIo},
+    process::{Completion, Event, Process, ProcessIo},
     storage::WorkDir,
     value::OcValue,
     wasi::{Disk, HostAnswer, resolve},
@@ -39,7 +41,8 @@ const SNAPSHOT_MAGIC: &[u8; 4] = b"WKOC";
 // v2: MemoryManager carries the host memory limit.
 // v3: a stack of processes with WASI stdio.
 // v4: processes have environment variables.
-const SNAPSHOT_VERSION: u32 = 4;
+// v5: the async call queue, process ids and completion queues.
+const SNAPSHOT_VERSION: u32 = 5;
 /// WASI `errno` for "function not implemented".
 const WASI_ENOSYS: i32 = 52;
 
@@ -67,6 +70,42 @@ pub enum Request {
     },
     /// See `RUN_RELEASE_VALUE`.
     ReleaseValue { value: u32 },
+    /// The head of the async queue; see `RUN_INVOKE_ASYNC`.
+    InvokeAsync {
+        ticket: i64,
+        target: AsyncTarget,
+        method: String,
+        args: Vec<OcValue>,
+    },
+}
+
+/// What an async call is made on.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub enum AsyncTarget {
+    Component(String),
+    Value(u32),
+}
+
+/// A call queued with `invoke_async`, waiting for Java.
+#[derive(Clone, Serialize, Deserialize)]
+struct QueuedCall {
+    /// The process that queued it ([`Process::id`]).
+    owner: u64,
+    ticket: i64,
+    target: AsyncTarget,
+    method: String,
+    args: Vec<OcValue>,
+}
+
+impl QueuedCall {
+    fn request(&self) -> Request {
+        Request::InvokeAsync {
+            ticket: self.ticket,
+            target: self.target.clone(),
+            method: self.method.clone(),
+            args: self.args.clone(),
+        }
+    }
 }
 
 impl Request {
@@ -81,6 +120,7 @@ impl Request {
             Request::DefaultDisk => RUN_DEFAULT_DISK,
             Request::InvokeValue { .. } => RUN_INVOKE_VALUE,
             Request::ReleaseValue { .. } => RUN_RELEASE_VALUE,
+            Request::InvokeAsync { .. } => RUN_INVOKE_ASYNC,
         }
     }
 
@@ -114,6 +154,15 @@ impl Request {
                 vec![OcValue::Userdata(*value), OcValue::str(method), OcValue::Array(args.clone())]
             }
             Request::ReleaseValue { value } => vec![OcValue::Userdata(*value)],
+            Request::InvokeAsync { ticket, target, method, args } => vec![
+                OcValue::Int(*ticket),
+                match target {
+                    AsyncTarget::Component(address) => OcValue::str(address),
+                    AsyncTarget::Value(id) => OcValue::Userdata(*id),
+                },
+                OcValue::str(method),
+                OcValue::Array(args.clone()),
+            ],
         })
     }
 }
@@ -168,6 +217,12 @@ struct State {
     request: Option<Request>,
     /// Uptime passed to the most recent `run`.
     uptime: f64,
+    /// Async calls in the order they were made, machine-wide. The head is
+    /// the one reported to Java (as `Request::InvokeAsync`) and stays here
+    /// until answered.
+    outbox: VecDeque<QueuedCall>,
+    /// The last process id handed out.
+    next_pid: u64,
 }
 
 /// How a child ended.
@@ -217,6 +272,26 @@ impl State {
     fn pause(&mut self, child: usize, event: Event) -> Result<()> {
         self.processes[child].paused = true;
         self.deliver(child, event)
+    }
+
+    /// The async call Java should run next, if any. Calls whose process has
+    /// gone are dropped on the way (the one Java is running stays until its
+    /// answer comes back, which is then discarded).
+    fn next_async(&mut self) -> Option<Request> {
+        let in_flight = matches!(self.request, Some(Request::InvokeAsync { .. }));
+        while let Some(head) = self.outbox.front() {
+            if in_flight || self.processes.iter().any(|p| p.id == head.owner) {
+                return Some(head.request());
+            }
+            self.outbox.pop_front();
+        }
+        None
+    }
+
+    /// Calls a process has outstanding: queued (or running) plus unread.
+    fn outstanding(&self, active: usize) -> usize {
+        let process = &self.processes[active];
+        self.outbox.iter().filter(|c| c.owner == process.id).count() + process.completions.len()
     }
 
     /// Ends `child` and everything above it, and tells its parent why,
@@ -341,6 +416,8 @@ impl OcMachine {
             status: Status::Running,
             request: None,
             uptime: 0.0,
+            outbox: VecDeque::new(),
+            next_pid: 0,
         });
         Ok(())
     }
@@ -354,6 +431,19 @@ impl OcMachine {
 
         if let Some(outcome) = terminal_outcome(&state.status) {
             return Ok(outcome);
+        }
+
+        // Java works through the async queue before the guest runs on: a
+        // call it couldn't finish (the call budget ran out) is reported again,
+        // then the rest in order.
+        if let Some(request) = &state.request
+            && matches!(request, Request::InvokeAsync { .. })
+        {
+            return Ok(RunOutcome::Request(request.clone()));
+        }
+        if let Some(request) = state.next_async() {
+            state.request = Some(request.clone());
+            return Ok(RunOutcome::Request(request));
         }
 
         let active = state.active();
@@ -378,6 +468,23 @@ impl OcMachine {
             state.request = Some(request.clone());
         }
         Ok(outcome)
+    }
+
+    /// From `runSynchronized`: makes the next queued async call the pending
+    /// request, without running the guest. `false` if there is none, or a
+    /// request is already pending.
+    pub fn next_async(&mut self) -> Result<bool> {
+        let state = self.state.as_mut().ok_or_else(|| anyhow!("machine not booted"))?;
+        if state.request.is_some() || terminal_outcome(&state.status).is_some() {
+            return Ok(false);
+        }
+        match state.next_async() {
+            Some(request) => {
+                state.request = Some(request);
+                Ok(true)
+            }
+            None => Ok(false),
+        }
     }
 
     /// The request awaiting a response, if any. It survives save/load, which
@@ -415,6 +522,22 @@ impl OcMachine {
         } else {
             (status, payload)
         };
+
+        // An async call: its answer goes to the completion queue of the
+        // process that made it, if that process is still there.
+        if let Request::InvokeAsync { ticket, .. } = request {
+            let call = state.outbox.pop_front().ok_or_else(|| anyhow!("async queue is empty"))?;
+            debug_assert_eq!(call.ticket, ticket);
+            if let Some(owner) = state.processes.iter_mut().find(|p| p.id == call.owner) {
+                match owner.cancelled.iter().position(|&t| t == call.ticket) {
+                    Some(i) => {
+                        owner.cancelled.swap_remove(i);
+                    }
+                    None => owner.completions.push_back(Completion { ticket: call.ticket, status, payload }),
+                }
+            }
+            return Ok(());
+        }
 
         // Requests only come from the active process, which can't change
         // until the request is answered.
@@ -525,7 +648,14 @@ fn step(state: &mut State, work_dir: &WorkDir, key: &str, total: Option<u64>) ->
         let yielded = state.processes[active].executor.execute()?;
 
         let (module, name, args, should_return) = match yielded {
-            HostYield::OutOfFuel => return Ok(RunOutcome::Yield),
+            // Queued calls go to Java at the end of the slice rather than
+            // waiting for the next tick.
+            HostYield::OutOfFuel => {
+                return Ok(match state.next_async() {
+                    Some(request) => RunOutcome::Request(request),
+                    None => RunOutcome::Yield,
+                });
+            }
             HostYield::Return if active == 0 => {
                 state.status = Status::Halted;
                 return Ok(RunOutcome::Halted);
@@ -570,7 +700,11 @@ fn step(state: &mut State, work_dir: &WorkDir, key: &str, total: Option<u64>) ->
                     let _ = work_dir.append_log(key, text.trim_end_matches('\n'));
                 }
             }
-            ImportAction::Suspend(request) => return Ok(RunOutcome::Request(request)),
+            // Calls queued earlier run first. The import stays pending and
+            // runs again (asking for the same thing) once the queue is empty.
+            ImportAction::Suspend(request) => {
+                return Ok(RunOutcome::Request(state.next_async().unwrap_or(request)));
+            }
             ImportAction::Halt(status) => {
                 let outcome = terminal_outcome(&status).expect("halt status is terminal");
                 state.status = status;
@@ -583,9 +717,16 @@ fn step(state: &mut State, work_dir: &WorkDir, key: &str, total: Option<u64>) ->
                 process.executor = executor;
                 process.response.clear();
                 process.pull_deadline = None;
+                // The old program's async calls are orphaned.
+                state.next_pid += 1;
+                process.id = state.next_pid;
+                process.completions.clear();
+                process.cancelled.clear();
                 state.apply_limits(total);
             }
-            ImportAction::Spawn(child) => {
+            ImportAction::Spawn(mut child) => {
+                state.next_pid += 1;
+                child.id = state.next_pid;
                 child.executor.set_fuel(state.processes[active].executor.get_fuel());
                 state.processes.push(child);
                 state.apply_limits(total);
@@ -728,6 +869,69 @@ fn resolve_from(base: &str, path: &str) -> Result<String, wackasm_wasi::WasiErrn
 /// The `PWD` an environment names, or `/`.
 fn working_dir(env: &[String]) -> &str {
     env.iter().rev().find_map(|var| var.strip_prefix("PWD=")).filter(|dir| dir.starts_with('/')).unwrap_or("/")
+}
+
+/// `oc.invoke_async`, `oc.invoke_value_async` and `oc.cancel`.
+fn async_import(state: &mut State, active: usize, name: &str, args: &[Value]) -> Result<ImportAction> {
+    use crate::abi::imports::*;
+
+    let ret64 = |v: i64| Ok(ImportAction::Return(vec![Value::from_i64(v)]));
+    let ret32 = |v: i32| Ok(ImportAction::Return(vec![Value::from_i32(v)]));
+    if name == CANCEL {
+        let ticket = args[0].as_i64();
+        let id = state.processes[active].id;
+        let running = matches!(&state.request, Some(Request::InvokeAsync { ticket: t, .. }) if *t == ticket)
+            && state.outbox.front().is_some_and(|c| c.owner == id);
+        let process = &mut state.processes[active];
+        if running {
+            process.cancelled.push(ticket);
+            return ret32(STATUS_OK);
+        }
+        if let Some(i) = state.outbox.iter().position(|c| c.owner == id && c.ticket == ticket) {
+            state.outbox.remove(i);
+            return ret32(STATUS_OK);
+        }
+        if let Some(i) = process.completions.iter().position(|c| c.ticket == ticket) {
+            process.completions.remove(i);
+            return ret32(STATUS_OK);
+        }
+        return ret32(STATUS_NOT_FOUND);
+    }
+
+    let full = state.outstanding(active) >= MAX_ASYNC_CALLS;
+    let process = &mut state.processes[active];
+    let exec = &process.executor;
+    let parsed = (|| {
+        Ok::<_, BadArgument>(if name == INVOKE_ASYNC {
+            (
+                AsyncTarget::Component(guest_str(exec, args[0], args[1])?),
+                guest_str(exec, args[2], args[3])?,
+                guest_array(exec, args[4], args[5])?,
+            )
+        } else {
+            (
+                AsyncTarget::Value(args[0].as_u32()),
+                guest_str(exec, args[1], args[2])?,
+                guest_array(exec, args[3], args[4])?,
+            )
+        })
+    })();
+    let (target, method, call_args) = match parsed {
+        Ok(parsed) => parsed,
+        Err(BadArgument(message)) => {
+            process.response = message.into_bytes();
+            return ret64(STATUS_BAD_ARGUMENT as i64);
+        }
+    };
+    if full {
+        process.response = format!("too many async calls outstanding (at most {MAX_ASYNC_CALLS})").into_bytes();
+        return ret64(STATUS_QUEUE_FULL as i64);
+    }
+    let ticket = process.next_ticket;
+    process.next_ticket += 1;
+    let owner = process.id;
+    state.outbox.push_back(QueuedCall { owner, ticket, target, method, args: call_args });
+    ret64(ticket)
 }
 
 /// `oc.files_disk`: the filesystem this process's WASI calls use, chosen
@@ -894,13 +1098,13 @@ fn handle_import(
     use crate::abi::imports::*;
 
     let arity = match name {
-        INVOKE | SPAWN_FILE => 6,
-        INVOKE_VALUE => 5,
+        INVOKE | SPAWN_FILE | INVOKE_ASYNC => 6,
+        INVOKE_VALUE | INVOKE_VALUE_ASYNC => 5,
         SPAWN => 4,
-        PULL_SIGNAL | PULL_SIGNAL_MS | SHUTDOWN | RELEASE_VALUE => 1,
+        PULL_SIGNAL | PULL_SIGNAL_MS | SHUTDOWN | RELEASE_VALUE | CANCEL | WAIT_MS => 1,
         PUSH_SIGNAL | COMPONENTS | METHODS | BEEP | RESPONSE_READ | ADDRESS | LOG | CRASH | EXEC
         | RESUME | SPAWN_WITH => 2,
-        RESPONSE_LEN | UPTIME | UPTIME_MS | MEMORY_LIMIT | KILL | FILES_DISK => 0,
+        RESPONSE_LEN | UPTIME | UPTIME_MS | MEMORY_LIMIT | KILL | FILES_DISK | COMPLETION_NEXT => 0,
         _ => bail!("unknown import oc.{name}"),
     };
     if args.len() != arity {
@@ -911,6 +1115,9 @@ fn handle_import(
     }
     if name == FILES_DISK {
         return files_disk(&mut state.processes[active]);
+    }
+    if matches!(name, INVOKE_ASYNC | INVOKE_VALUE_ASYNC | CANCEL) {
+        return async_import(state, active, name, args);
     }
 
     let available = state.available(total);
@@ -933,8 +1140,24 @@ fn handle_import(
                 args: guest_array(exec, args[3], args[4])?,
             }),
             RELEASE_VALUE => ImportAction::Suspend(Request::ReleaseValue { value: args[0].as_u32() }),
-            PULL_SIGNAL | PULL_SIGNAL_MS => {
-                let timeout = if name == PULL_SIGNAL_MS {
+            COMPLETION_NEXT => match process.completions.pop_front() {
+                Some(done) => {
+                    process.response = OcValue::Array(vec![
+                        OcValue::Int(done.ticket),
+                        OcValue::Int(done.status as i64),
+                        OcValue::Bytes(done.payload),
+                    ])
+                    .encode();
+                    ImportAction::Return(vec![Value::from_i32(STATUS_OK)])
+                }
+                None => ImportAction::Return(vec![Value::from_i32(STATUS_TIMEOUT)]),
+            },
+            WAIT_MS if !process.completions.is_empty() => {
+                process.pull_deadline = None;
+                ImportAction::Return(vec![Value::from_i32(STATUS_COMPLETION)])
+            }
+            PULL_SIGNAL | PULL_SIGNAL_MS | WAIT_MS => {
+                let timeout = if name != PULL_SIGNAL {
                     args[0].as_i64() as f64 / 1000.0
                 } else {
                     args[0].as_f64()
