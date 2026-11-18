@@ -71,6 +71,26 @@ pub fn invoke(address: &str, method: &str, args: Vec<Value>) -> Result<Vec<Value
     let status = unsafe {
         sys::invoke(address.as_ptr(), address.len(), method.as_ptr(), method.len(), args.as_ptr(), args.len())
     };
+    reply(status)
+}
+
+/// Calls `method` on a userdata value, such as the request object
+/// `internet.request` returns (Lua's `handle.read()`). A value that was
+/// released is [`Error::NoSuchComponent`].
+pub fn invoke_value(value: Handle, method: &str, args: Vec<Value>) -> Result<Vec<Value>> {
+    let args = Value::Array(args).encode();
+    let status = unsafe { sys::invoke_value(value.0, method.as_ptr(), method.len(), args.as_ptr(), args.len()) };
+    reply(status)
+}
+
+/// Tells the host this program is done with `value`. The host disposes of it
+/// (an open socket is closed) and the handle stops working. Values that are
+/// never released stay alive until the computer stops.
+pub fn release_value(value: Handle) {
+    unsafe { sys::release_value(value.0) };
+}
+
+fn reply(status: i32) -> Result<Vec<Value>> {
     let reply = sys::response();
     match status {
         sys::STATUS_OK => match Value::decode(&reply) {

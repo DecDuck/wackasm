@@ -40,6 +40,18 @@ final class UserdataTable {
         return byId.get(id);
     }
 
+    /** Disposes of one value the guest is done with, and forgets its id. */
+    void release(Value value, Context context) {
+        Integer id = byValue.remove(value);
+        if (id == null) return;
+        byId.remove(id);
+        try {
+            value.dispose(context);
+        } catch (Throwable ignored) {
+            // Releasing must not crash the machine.
+        }
+    }
+
     void disposeAll(Context context) {
         for (Value value : byId.values()) {
             try {

@@ -156,6 +156,9 @@ caught and rethrown as exceptions too.
 | 7 `COMPONENTS` | `[filter]` | respond with map address → type |
 | 8 `METHODS` | `[address]` | respond with map name → `{direct, doc}` |
 | 9 `BEEP` | `[freq, ms]` | `machine.beep` |
+| 10 `DEFAULT_DISK` | `[]` | respond with `[address]` of the disk for WASI files, or `[]` |
+| 11 `INVOKE_VALUE` | `[userdata, method, args[]]` | `machine.invoke(Value, ...)`: direct → inline; else `SynchronizedCall`. An unknown id is `NO_SUCH_COMPONENT` |
+| 12 `RELEASE_VALUE` | `[userdata]` | dispose of the value, forget its id, respond `OK` |
 
 `respond` statuses: `0 OK`, `1 TIMEOUT`, `-1 ERROR`, `-2 BAD_ARGUMENT`,
 `-3 NO_SUCH_COMPONENT`, `-4 NO_SUCH_METHOD`. On `OK` the payload is an encoded
@@ -186,6 +189,8 @@ Pointers are `i32` offsets into memory 0. The entry point is the export
 | `spawn_with` | `(spec, spec_len) -> event \| status` | Rust-only; the general spawn. `spec` is an encoded map: `path` (with optional `disk`, else the caller's disk) or `image`, plus optional `argv`, `env` (`["NAME=value"]` or a map; default: the caller's) and `cwd` (the child's working directory, given to it as `PWD`). A relative `cwd` starts at the caller's `PWD`, and a relative `path` at the child's directory. The child shares the caller's WASI disk |
 | `resume` | `(input, input_len) -> event \| status` | Rust-only; continues the paused child, appending `input` to its stdin |
 | `kill` | `() -> status` | Rust-only; ends the child |
+| `invoke_value` | `(value: u32, method, method_len, args, args_len) -> status` | a method of a userdata value (`value` is its id), such as an internet card request's `read`; results go in the response buffer. Direct callbacks run inline, others wait for the server tick, as for `invoke` |
+| `release_value` | `(value: u32) -> status` | dispose of a userdata value (closing it) and forget its id. Values are otherwise kept until the machine stops |
 | `files_disk` | `() -> status` | Rust-only; the address of this process's WASI disk (chosen as for a first file access) in the response, or `-5` if there is none |
 | `shutdown` | `(reboot: i32)` | halts |
 | `crash` | `(msg, len)` | halts with an error |

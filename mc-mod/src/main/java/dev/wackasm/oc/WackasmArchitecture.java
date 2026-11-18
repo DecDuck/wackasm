@@ -14,6 +14,7 @@ import li.cil.oc.api.machine.ExecutionResult;
 import li.cil.oc.api.machine.LimitReachedException;
 import li.cil.oc.api.machine.Machine;
 import li.cil.oc.api.machine.Signal;
+import li.cil.oc.api.machine.Value;
 import li.cil.oc.api.network.Component;
 import li.cil.oc.api.network.Node;
 import net.minecraft.item.ItemStack;
@@ -180,6 +181,27 @@ public final class WackasmArchitecture implements Architecture {
                         }
                         break;
                     }
+                    case WackasmNative.RUN_INVOKE_VALUE: {
+                        Object[] p = payload();
+                        Value value = p[0] instanceof Value ? (Value) p[0] : null;
+                        if (value == null) {
+                            respondStatus(WackasmNative.STATUS_NO_SUCH_COMPONENT, "no such value (already released?)");
+                            break;
+                        }
+                        if (!isDirect(value, (String) p[1])) return new ExecutionResult.SynchronizedCall();
+                        try {
+                            invokeValue(value, (String) p[1], (Object[]) p[2]);
+                        } catch (LimitReachedException e) {
+                            return new ExecutionResult.Sleep(0);
+                        }
+                        break;
+                    }
+                    case WackasmNative.RUN_RELEASE_VALUE: {
+                        Object value = payload()[0];
+                        if (value instanceof Value) userdata.release((Value) value, machine);
+                        respondOk(null);
+                        break;
+                    }
                     case WackasmNative.RUN_PULL_SIGNAL: {
                         Signal signal = machine.popSignal();
                         if (signal != null) {
@@ -266,7 +288,11 @@ public final class WackasmArchitecture implements Architecture {
         if (handle == 0) return;
         try {
             Object[] p = payload();
-            invoke((String) p[0], (String) p[1], (Object[]) p[2]);
+            if (p[0] instanceof Value) {
+                invokeValue((Value) p[0], (String) p[1], (Object[]) p[2]);
+            } else {
+                invoke((String) p[0], (String) p[1], (Object[]) p[2]);
+            }
         } catch (LimitReachedException e) {
             // Synchronized calls aren't budgeted, so this shouldn't happen. If it
             // does, the request stays pending and runThreaded reissues it.
@@ -304,6 +330,31 @@ public final class WackasmArchitecture implements Architecture {
             respondStatus(missing ? WackasmNative.STATUS_NO_SUCH_COMPONENT : WackasmNative.STATUS_ERROR,
                     missing ? "no such component" : String.valueOf(t.getMessage()));
         }
+    }
+
+    /**
+     * Calls a method of a userdata value, such as an internet card's HTTP
+     * request. This goes through {@link Machine#invoke(Value, String, Object[])}
+     * as for Lua, so direct callbacks cost the usual budget
+     * ({@link WackasmConfig#callBudgetMultiplier} does not apply; the internet
+     * card's direct value callbacks are only {@code response}, {@code close}
+     * and {@code id}).
+     */
+    private void invokeValue(Value value, String method, Object[] args) throws LimitReachedException {
+        try {
+            respondOk(machine.invoke(value, method, args));
+        } catch (LimitReachedException e) {
+            throw e;
+        } catch (NoSuchMethodException e) {
+            respondStatus(WackasmNative.STATUS_NO_SUCH_METHOD, "no such method: " + method);
+        } catch (Throwable t) {
+            respondStatus(WackasmNative.STATUS_ERROR, String.valueOf(t.getMessage()));
+        }
+    }
+
+    private boolean isDirect(Value value, String method) {
+        Callback cb = machine.methods(value).get(method);
+        return cb == null || cb.direct(); // unknown methods fail inline
     }
 
     /**

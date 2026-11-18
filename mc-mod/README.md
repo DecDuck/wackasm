@@ -96,7 +96,11 @@ doesn't link the crate starts in `/`.
 The floppy ships examples
 ([`crates/wackasm-oc-programs`](../crates/wackasm-oc-programs)): `echo`,
 `hello`, `cat FILE...`, `write FILE [TEXT...]` (without TEXT it saves what you
-type until Ctrl+D), `dir [PATH]`, `pwd`, `demo`, and three that run other programs:
+type until Ctrl+D), `dir [PATH]`, `pwd`, `demo`, `flash` (see below), two that
+need an internet card:
+`curl [-i] [-I] [-f] [-X METHOD] [-H "Name: value"] [-d DATA|@FILE] [-o FILE | -O] URL`
+and `nc [-C] [-w SECS] HOST PORT` (sends the lines you type, then prints
+replies until the connection closes or goes quiet), and three that run other programs:
 `time PROGRAM ARGS...`, `env [NAME=VALUE...] [PROGRAM ARGS...]` and
 `lines PROGRAM ARGS...` (numbers a program's output). Programs start with
 `PATH=/bin` and can run others through `opencomputers::process::Command`.
@@ -110,9 +114,29 @@ cargo build --release --target wasm32-wasip1
 ```
 
 From the shell, `mytool some "quoted words"` runs it. To get the file onto a
-disk, either download it from a Lua computer running OpenOS with an internet
-card (`wget`), or copy it into the disk's folder on the server,
-`<world>/opencomputers/<disk address>/`.
+disk:
+* with an internet card, host it anywhere the server can reach and download it
+  from the shell: `cd /bin`, then `curl -O https://example.com/mytool.wasm`
+  (or `curl -o /bin/mytool.wasm URL`). Downloads go to the disk programs use
+  (see above), and `/bin` there is searched like the floppy's;
+* or copy it into the disk's folder on the server,
+  `<world>/opencomputers/<disk address>/`.
+
+### Flashing the EEPROM
+
+`flash FILE [LABEL]` writes your own BIOS to the EEPROM, after checking that
+it's a wasm module with an `oc_main` (or `_start`) export and that it fits,
+and asking for confirmation (`-y` skips that). It keeps the EEPROM's data,
+the remembered boot disk. `flash -r FILE` backs up the current code,
+`flash -i` shows the label, size and checksum, and `flash /bios.wasm`
+restores the stock BIOS from the shell floppy. Reboot to run what you flashed.
+
+An EEPROM holds 4096 bytes, so the code must be a tiny `oc_main` program
+(`no_std`, `wasm32-unknown-unknown`), like
+[`crates/wackasm-oc-bios`](../crates/wackasm-oc-bios). An ordinary WASI
+program is 60 KB or more and won't fit. To replace the shell with your own
+program instead, make it a disk's `/init.wasm`: the stock BIOS boots that,
+with no size limit.
 
 Limits for now:
 * no SIMD, and a few `i64` operations (`i64.rotl`, `i64.popcnt`, ...) are

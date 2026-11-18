@@ -21,6 +21,8 @@ unsafe extern "C" {
     pub fn resume(input: *const u8, input_len: usize) -> i32;
     pub fn kill() -> i32;
     pub fn files_disk() -> i32;
+    pub fn invoke_value(value: u32, method: *const u8, method_len: usize, args: *const u8, args_len: usize) -> i32;
+    pub fn release_value(value: u32) -> i32;
     pub fn shutdown(reboot: i32) -> !;
     pub fn crash(msg: *const u8, len: usize) -> !;
 }
@@ -46,6 +48,8 @@ mod host {
     pub unsafe fn resume(_: *const u8, _: usize) -> i32 { unavailable() }
     pub unsafe fn kill() -> i32 { unavailable() }
     pub unsafe fn files_disk() -> i32 { unavailable() }
+    pub unsafe fn invoke_value(_: u32, _: *const u8, _: usize, _: *const u8, _: usize) -> i32 { unavailable() }
+    pub unsafe fn release_value(_: u32) -> i32 { unavailable() }
     pub unsafe fn shutdown(_: i32) -> ! { unavailable() }
     pub unsafe fn crash(_: *const u8, _: usize) -> ! { unavailable() }
 }

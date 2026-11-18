@@ -124,6 +124,11 @@ def stageNatives = tasks.register('stageNatives', Sync) {
         rename { 'bios.wasm' }
         into 'assets/wackasm'
     }
+    // A copy on the floppy, so `flash /bios.wasm` can restore the stock BIOS.
+    from(new File(biosDir, "${wasmOut}/wackasm_oc_bios.wasm")) {
+        rename { 'bios.wasm' }
+        into 'assets/wackasm/loot/shell'
+    }
     from(new File(guestDir, "${wasmOut}/wackasm_oc_guest.wasm")) {
         rename { 'init.wasm' }
         into 'assets/wackasm/loot/shell'

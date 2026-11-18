@@ -903,3 +903,38 @@ fn spawn_with_cwd_is_relative_to_the_callers_pwd_unless_absolute() {
     assert_eq!(run("/b"), RunOutcome::Error("07".into()));
     assert_eq!(run("c"), RunOutcome::Error("09".into()));
 }
+
+#[test]
+fn methods_of_userdata_values_go_to_java() {
+    let dir = scratch_dir("invoke-value");
+    let args = OcValue::Array(vec![OcValue::Int(16)]).encode();
+    let guest = wat::parse_str(format!(
+        r#"(module
+          (import "oc" "invoke_value"  (func $invoke_value (param i32 i32 i32 i32 i32) (result i32)))
+          (import "oc" "release_value" (func $release (param i32) (result i32)))
+          (import "oc" "response_read" (func $rread (param i32 i32) (result i32)))
+          (import "oc" "crash"         (func $crash (param i32 i32)))
+          (memory 1)
+          (data (i32.const 0) "read")
+          (data (i32.const 16) "{args}")
+          (func (export "oc_main")
+            (drop (call $invoke_value (i32.const 7) (i32.const 0) (i32.const 4) (i32.const 16) (i32.const {len})))
+            (drop (call $release (i32.const 7)))
+            (call $crash (i32.const 100) (call $rread (i32.const 100) (i32.const 64)))))"#,
+        args = escape(&args),
+        len = args.len()
+    ))
+    .unwrap();
+    let mut m = machine(&dir);
+    m.boot(Some(&guest)).unwrap();
+    let request = Request::InvokeValue { value: 7, method: "read".into(), args: vec![OcValue::Int(16)] };
+    assert_eq!(m.run(0.0, 1_000_000).unwrap(), RunOutcome::Request(request.clone()));
+    // The value crosses to Java as userdata, so the codec hands Java the object.
+    assert_eq!(request.payload(), OcValue::Array(vec![OcValue::Userdata(7), OcValue::str("read"), OcValue::Array(vec![OcValue::Int(16)])]));
+    m.respond(STATUS_OK, OcValue::Array(vec![OcValue::Bytes(b"abc".to_vec())]).encode()).unwrap();
+    assert_eq!(m.run(0.0, 1_000_000).unwrap(), RunOutcome::Request(Request::ReleaseValue { value: 7 }));
+    m.respond(STATUS_OK, Vec::new()).unwrap();
+    // The release left an empty response; the read's reply was replaced.
+    assert_eq!(m.run(0.0, 1_000_000).unwrap(), RunOutcome::Error(String::new()));
+    let _ = std::fs::remove_dir_all(dir);
+}

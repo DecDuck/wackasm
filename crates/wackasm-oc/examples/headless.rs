@@ -1,7 +1,7 @@
 //! Runs a machine against fake OpenComputers components and prints the screen.
 //!
 //! ```text
-//! cargo run -p wackasm-oc --example headless -- --eeprom <bios.wasm> [--disk <dir>] [--ram <KiB>] [--keys "help\r"]
+//! cargo run -p wackasm-oc --example headless -- --eeprom <bios.wasm> [--disk <dir>] [--ram <KiB>] [--keys "help\r"] [--internet]
 //! ```
 //!
 //! The simulated computer has:
@@ -9,12 +9,22 @@
 //! * a GPU bound to a 50x16 screen;
 //! * a keyboard that types `--keys` (`\r` = enter, `\b` = backspace, `\d` = Ctrl+D);
 //! * with `--disk`, a filesystem backed by that host directory, whose
-//!   `open`/`read`/`close` hand out userdata handles like OpenComputers does.
+//!   `open`/`read`/`close` hand out userdata handles like OpenComputers does;
+//! * with `--internet`, an internet card making real connections from this
+//!   host: `request` (plain `http://` only) and `connect`, whose userdata
+//!   values answer `finishConnect`, `response`, `read`, `write` and `close`.
+//!   Reads hand out at most 2 KiB, and the first read of a request finds
+//!   nothing yet, as on a real server.
 //!
 //! RAM defaults to 192 KiB, one tier 1 stick. Every few slices the machine is
 //! also saved and reloaded, which exercises suspension.
 
-use std::{collections::{HashMap, VecDeque}, path::PathBuf};
+use std::{
+    collections::{HashMap, VecDeque},
+    io::{Read as _, Write as _},
+    net::TcpStream,
+    path::PathBuf,
+};
 
 use anyhow::{Result, anyhow, bail};
 use wackasm_oc::{
@@ -27,6 +37,7 @@ const SCREEN: &str = "screen-0000";
 const KEYBOARD: &str = "keyboard-0000";
 const EEPROM: &str = "eeprom-0000";
 const DISK: &str = "disk-0000";
+const INTERNET: &str = "internet-0000";
 const W: usize = 50;
 const H: usize = 16;
 /// OpenComputers' default `maxReadBuffer`.
@@ -40,17 +51,71 @@ struct Handle {
     writable: bool,
 }
 
+/// A userdata value from the simulated internet card.
+enum Net {
+    Http {
+        url: String,
+        method: String,
+        body: Vec<u8>,
+        headers: Vec<(String, String)>,
+        /// Status, message, headers and body, once fetched.
+        response: Option<HttpReply>,
+        pos: usize,
+        polled: bool,
+    },
+    Tcp {
+        address: String,
+        stream: Option<TcpStream>,
+        closed: bool,
+    },
+}
+
+type HttpReply = (i64, String, Vec<(String, String)>, Vec<u8>);
+
+/// A blocking HTTP/1.0 exchange.
+fn http_fetch(url: &str, method: &str, body: &[u8], headers: &[(String, String)]) -> Result<HttpReply, String> {
+    let rest = url.strip_prefix("http://").ok_or_else(|| format!("{url}: only http:// is simulated"))?;
+    let (authority, path) = rest.split_once('/').map_or((rest, "/".to_owned()), |(a, p)| (a, format!("/{p}")));
+    let host_port = if authority.contains(':') { authority.to_owned() } else { format!("{authority}:80") };
+    let mut stream = TcpStream::connect(&host_port).map_err(|e| format!("{host_port}: {e}"))?;
+    let mut head = format!("{method} {path} HTTP/1.0\r\nHost: {authority}\r\nUser-Agent: wackasm-headless\r\n");
+    for (k, v) in headers {
+        head.push_str(&format!("{k}: {v}\r\n"));
+    }
+    if !body.is_empty() {
+        head.push_str(&format!("Content-Length: {}\r\n", body.len()));
+    }
+    head.push_str("\r\n");
+    stream.write_all(head.as_bytes()).and_then(|_| stream.write_all(body)).map_err(|e| e.to_string())?;
+    let mut reply = Vec::new();
+    stream.read_to_end(&mut reply).map_err(|e| e.to_string())?;
+    let split = reply.windows(4).position(|w| w == b"\r\n\r\n").ok_or("malformed response")?;
+    let head = String::from_utf8_lossy(&reply[..split]).into_owned();
+    let mut lines = head.split("\r\n");
+    let status = lines.next().unwrap_or_default();
+    let mut parts = status.splitn(3, ' ').skip(1);
+    let code = parts.next().and_then(|c| c.parse().ok()).ok_or("malformed status line")?;
+    let message = parts.next().unwrap_or_default().to_owned();
+    let headers = lines.filter_map(|l| l.split_once(':')).map(|(k, v)| (k.trim().to_owned(), v.trim().to_owned())).collect();
+    Ok((code, message, headers, reply[split + 4..].to_vec()))
+}
+
 struct Sim {
     grid: Vec<Vec<char>>,
     keys: VecDeque<char>,
     beeps: usize,
     eeprom_code: Vec<u8>,
     eeprom_data: Vec<u8>,
+    eeprom_label: String,
     disk: Option<PathBuf>,
     handles: HashMap<u32, Handle>,
     next_handle: u32,
     /// Filesystem calls by method, to see what programs cost.
     fs_calls: std::collections::BTreeMap<String, usize>,
+    internet: bool,
+    /// Userdata values of the internet card, by id (shared with `handles`).
+    net: HashMap<u32, Net>,
+    net_calls: std::collections::BTreeMap<String, usize>,
 }
 
 fn int(args: &[OcValue], i: usize) -> i64 {
@@ -117,6 +182,26 @@ impl Sim {
         Ok(match method {
             "get" => vec![OcValue::Bytes(self.eeprom_code.clone())],
             "getData" => vec![OcValue::Bytes(self.eeprom_data.clone())],
+            "getSize" => vec![OcValue::Int(4096)],
+            "getDataSize" => vec![OcValue::Int(256)],
+            "set" => {
+                let code = text(args, 0);
+                if code.len() > 4096 {
+                    return Err("not enough space".into());
+                }
+                self.eeprom_code = code;
+                Vec::new()
+            }
+            "getLabel" => vec![OcValue::str(self.eeprom_label.as_str())],
+            "setLabel" => {
+                self.eeprom_label = String::from_utf8_lossy(&text(args, 0)).into_owned();
+                vec![OcValue::str(self.eeprom_label.as_str())]
+            }
+            // Not OpenComputers' CRC32, just something that changes with the code.
+            "getChecksum" => {
+                let sum = self.eeprom_code.iter().fold(0u32, |h, &b| h.rotate_left(5) ^ u32::from(b));
+                vec![OcValue::str(format!("{sum:08x}").as_str())]
+            }
             "setData" => {
                 self.eeprom_data = text(args, 0);
                 Vec::new()
@@ -220,6 +305,120 @@ impl Sim {
         })
     }
 
+    fn internet(&mut self, method: &str, args: &[OcValue]) -> Result<Vec<OcValue>, String> {
+        let string = |i: usize| String::from_utf8_lossy(&text(args, i)).into_owned();
+        let value = match method {
+            "isHttpEnabled" | "isTcpEnabled" => return Ok(vec![OcValue::Bool(true)]),
+            "request" => {
+                let body = text(args, 1);
+                let headers = match args.get(2) {
+                    Some(OcValue::Map(entries)) => entries
+                        .iter()
+                        .filter_map(|(k, v)| Some((k.as_str()?.to_owned(), v.as_str()?.to_owned())))
+                        .collect(),
+                    _ => Vec::new(),
+                };
+                let method = match args.get(3) {
+                    Some(OcValue::String(m)) => m.clone(),
+                    _ if !body.is_empty() => "POST".into(),
+                    _ => "GET".into(),
+                };
+                Net::Http { url: string(0), method, body, headers, response: None, pos: 0, polled: false }
+            }
+            "connect" => {
+                let address = match args.get(1) {
+                    Some(port) if !matches!(port, OcValue::Nil) => format!("{}:{}", string(0), int(args, 1)),
+                    _ => string(0),
+                };
+                Net::Tcp { address, stream: None, closed: false }
+            }
+            _ => return Err(format!("no such method: {method}")),
+        };
+        let id = self.next_handle;
+        self.next_handle += 1;
+        self.net.insert(id, value);
+        Ok(vec![OcValue::Userdata(id)])
+    }
+
+    fn net_value(&mut self, id: u32, method: &str, args: &[OcValue]) -> Result<Vec<OcValue>, String> {
+        *self.net_calls.entry(method.to_owned()).or_default() += 1;
+        let net = self.net.get_mut(&id).ok_or("no such value")?;
+        let max = match args.first() {
+            Some(OcValue::Int(n)) => (*n).clamp(0, MAX_READ as i64) as usize,
+            Some(OcValue::Float(n)) => n.clamp(0.0, MAX_READ as f64) as usize,
+            _ => MAX_READ,
+        };
+        match net {
+            Net::Http { url, method: verb, body, headers, response, pos, polled } => {
+                if response.is_none() && matches!(method, "finishConnect" | "read" | "response") {
+                    *response = Some(http_fetch(url, verb, body, headers)?);
+                }
+                let Some((code, message, headers, data)) = response else { return Ok(Vec::new()) };
+                Ok(match method {
+                    "finishConnect" => vec![OcValue::Bool(true)],
+                    "response" => {
+                        // OpenComputers gives each header as a list of values.
+                        let headers = headers.iter().map(|(k, v)| (OcValue::str(k), OcValue::Array(vec![OcValue::str(v)]))).collect();
+                        vec![OcValue::Int(*code), OcValue::str(message.as_str()), OcValue::Map(headers)]
+                    }
+                    "read" if !*polled => {
+                        *polled = true;
+                        vec![OcValue::Bytes(Vec::new())]
+                    }
+                    "read" if *pos >= data.len() => vec![OcValue::Nil],
+                    "read" => {
+                        let end = (*pos + max).min(data.len());
+                        let chunk = data[*pos..end].to_vec();
+                        *pos = end;
+                        vec![OcValue::Bytes(chunk)]
+                    }
+                    "close" => Vec::new(),
+                    _ => return Err(format!("no such method: {method}")),
+                })
+            }
+            Net::Tcp { address, stream, closed } => {
+                if *closed {
+                    return Ok(vec![OcValue::Nil, OcValue::str("connection lost")]);
+                }
+                if stream.is_none() && method != "close" {
+                    let s = TcpStream::connect(address.as_str()).map_err(|e| format!("{address}: {e}"))?;
+                    s.set_nonblocking(true).map_err(|e| e.to_string())?;
+                    *stream = Some(s);
+                }
+                Ok(match method {
+                    "finishConnect" => vec![OcValue::Bool(true)],
+                    "read" => {
+                        let mut buf = vec![0u8; max.max(1)];
+                        match stream.as_mut().unwrap().read(&mut buf) {
+                            Ok(0) => vec![OcValue::Nil],
+                            Ok(n) => vec![OcValue::Bytes(buf[..n].to_vec())],
+                            Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => {
+                                // Give the other side a moment, as a tick would.
+                                std::thread::sleep(std::time::Duration::from_millis(50));
+                                vec![OcValue::Bytes(Vec::new())]
+                            }
+                            Err(e) => return Err(e.to_string()),
+                        }
+                    }
+                    "write" => {
+                        let data = text(args, 0);
+                        let s = stream.as_mut().unwrap();
+                        s.set_nonblocking(false).map_err(|e| e.to_string())?;
+                        s.write_all(&data).map_err(|e| e.to_string())?;
+                        s.set_nonblocking(true).map_err(|e| e.to_string())?;
+                        vec![OcValue::Int(data.len() as i64)]
+                    }
+                    "close" => {
+                        *closed = true;
+                        *stream = None;
+                        Vec::new()
+                    }
+                    _ => return Err(format!("no such method: {method}")),
+                })
+            }
+        }
+    }
+
     /// Returns (status, payload) for a request, or `None` to leave it pending.
     fn serve(&mut self, request: &Request) -> Option<(i32, Vec<u8>)> {
         Some(match request {
@@ -227,6 +426,9 @@ impl Sim {
                 let mut all = vec![(GPU, "gpu"), (SCREEN, "screen"), (KEYBOARD, "keyboard"), (EEPROM, "eeprom")];
                 if self.disk.is_some() {
                     all.push((DISK, "filesystem"));
+                }
+                if self.internet {
+                    all.push((INTERNET, "internet"));
                 }
                 let map = all
                     .iter()
@@ -243,6 +445,7 @@ impl Sim {
                         *self.fs_calls.entry(method.clone()).or_default() += 1;
                         self.filesystem(method, args)
                     }
+                    INTERNET if self.internet => self.internet(method, args),
                     _ => return Some((STATUS_NO_SUCH_COMPONENT, b"no such component".to_vec())),
                 };
                 match result {
@@ -271,12 +474,26 @@ impl Sim {
                 self.beeps += 1;
                 (STATUS_OK, Vec::new())
             }
+            Request::InvokeValue { value, method, args } => {
+                if !self.net.contains_key(value) {
+                    return Some((STATUS_NO_SUCH_COMPONENT, b"no such value".to_vec()));
+                }
+                match self.net_value(*value, method, args) {
+                    Ok(results) => (STATUS_OK, OcValue::Array(results).encode()),
+                    Err(e) => (STATUS_ERROR, e.into_bytes()),
+                }
+            }
+            Request::ReleaseValue { value } => {
+                self.net.remove(value);
+                self.handles.remove(value);
+                (STATUS_OK, Vec::new())
+            }
         })
     }
 }
 
 fn main() -> Result<()> {
-    let (mut eeprom, mut disk, mut ram_kib, mut keys) = (None, None, 192u64, None);
+    let (mut eeprom, mut disk, mut ram_kib, mut keys, mut internet) = (None, None, 192u64, None, false);
     let mut args = std::env::args().skip(1);
     while let Some(arg) = args.next() {
         let mut value = || args.next().ok_or_else(|| anyhow!("{arg} needs a value"));
@@ -285,7 +502,8 @@ fn main() -> Result<()> {
             "--disk" => disk = Some(PathBuf::from(value()?)),
             "--ram" => ram_kib = value()?.parse()?,
             "--keys" => keys = Some(value()?),
-            other => bail!("unknown argument {other}; usage: headless --eeprom <bios.wasm> [--disk <dir>] [--ram <KiB>] [--keys <text>]"),
+            "--internet" => internet = true,
+            other => bail!("unknown argument {other}; usage: headless --eeprom <bios.wasm> [--disk <dir>] [--ram <KiB>] [--keys <text>] [--internet]"),
         }
     }
     let eeprom = eeprom.ok_or_else(|| anyhow!("--eeprom is required"))?;
@@ -309,10 +527,14 @@ fn main() -> Result<()> {
         beeps: 0,
         eeprom_code: std::fs::read(&eeprom)?,
         eeprom_data: Vec::new(),
+        eeprom_label: "EEPROM (WebAssembly BIOS)".into(),
         disk,
         handles: HashMap::new(),
         next_handle: 1,
         fs_calls: Default::default(),
+        internet,
+        net: HashMap::new(),
+        net_calls: Default::default(),
     };
     machine.boot(Some(&sim.eeprom_code))?;
 
@@ -356,8 +578,12 @@ fn main() -> Result<()> {
         sim.beeps
     );
     println!("eeprom data (boot address): {:?}", String::from_utf8_lossy(&sim.eeprom_data));
+    println!("eeprom: {:?}, {} bytes of code", sim.eeprom_label, sim.eeprom_code.len());
     let total: usize = sim.fs_calls.values().sum();
     println!("filesystem calls: {total} {:?}", sim.fs_calls);
+    if sim.internet {
+        println!("internet value calls: {:?}, values left unreleased: {}", sim.net_calls, sim.net.len());
+    }
     if let Ok(log) = std::fs::read_to_string(dir.join("logs/headless.log")) {
         print!("guest log:\n{log}");
     }

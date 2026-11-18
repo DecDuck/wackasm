@@ -24,6 +24,7 @@
 //! * [`signal`]: typed events.
 //! * [`computer`]: this computer's address, uptime, memory and power.
 //! * [`process`]: running other programs, like `std::process`.
+//! * [`internet`]: HTTP requests and TCP connections through an internet card.
 //! * [`Side`], [`Color`], [`keys`]: the numeric codes components use.
 //!
 //! Files are simplest through `std::fs`, which the architecture maps onto a
@@ -36,6 +37,7 @@ pub mod component;
 pub mod components;
 pub mod computer;
 mod error;
+pub mod internet;
 pub mod process;
 pub mod signal;
 mod sys;
@@ -53,6 +55,7 @@ pub mod prelude {
     pub use crate::{
         Address, Color, Component, Error, Handle, Number, OcString, Proxy, Result, Side, Signal, Value,
         components::*, computer, keys,
+        internet,
         process::{self, Command},
         signal,
     };

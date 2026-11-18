@@ -21,6 +21,8 @@ public final class WackasmNative {
     public static final int RUN_METHODS = 8;
     public static final int RUN_BEEP = 9;
     public static final int RUN_DEFAULT_DISK = 10;
+    public static final int RUN_INVOKE_VALUE = 11;
+    public static final int RUN_RELEASE_VALUE = 12;
 
     // respond() statuses
     public static final int STATUS_OK = 0;

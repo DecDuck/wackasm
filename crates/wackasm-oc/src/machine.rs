@@ -59,6 +59,14 @@ pub enum Request {
     Beep { frequency: i32, duration_ms: i32 },
     /// Which filesystem a WASI process should use; see `RUN_DEFAULT_DISK`.
     DefaultDisk,
+    /// A method of a userdata value; see `RUN_INVOKE_VALUE`.
+    InvokeValue {
+        value: u32,
+        method: String,
+        args: Vec<OcValue>,
+    },
+    /// See `RUN_RELEASE_VALUE`.
+    ReleaseValue { value: u32 },
 }
 
 impl Request {
@@ -71,6 +79,8 @@ impl Request {
             Request::Methods { .. } => RUN_METHODS,
             Request::Beep { .. } => RUN_BEEP,
             Request::DefaultDisk => RUN_DEFAULT_DISK,
+            Request::InvokeValue { .. } => RUN_INVOKE_VALUE,
+            Request::ReleaseValue { .. } => RUN_RELEASE_VALUE,
         }
     }
 
@@ -100,6 +110,10 @@ impl Request {
                 OcValue::Int(*duration_ms as i64),
             ],
             Request::DefaultDisk => Vec::new(),
+            Request::InvokeValue { value, method, args } => {
+                vec![OcValue::Userdata(*value), OcValue::str(method), OcValue::Array(args.clone())]
+            }
+            Request::ReleaseValue { value } => vec![OcValue::Userdata(*value)],
         })
     }
 }
@@ -875,8 +889,9 @@ fn handle_import(
 
     let arity = match name {
         INVOKE | SPAWN_FILE => 6,
+        INVOKE_VALUE => 5,
         SPAWN => 4,
-        PULL_SIGNAL | PULL_SIGNAL_MS | SHUTDOWN => 1,
+        PULL_SIGNAL | PULL_SIGNAL_MS | SHUTDOWN | RELEASE_VALUE => 1,
         PUSH_SIGNAL | COMPONENTS | METHODS | BEEP | RESPONSE_READ | ADDRESS | LOG | CRASH | EXEC
         | RESUME | SPAWN_WITH => 2,
         RESPONSE_LEN | UPTIME | UPTIME_MS | MEMORY_LIMIT | KILL | FILES_DISK => 0,
@@ -906,6 +921,12 @@ fn handle_import(
                 method: guest_str(exec, args[2], args[3])?,
                 args: guest_array(exec, args[4], args[5])?,
             }),
+            INVOKE_VALUE => ImportAction::Suspend(Request::InvokeValue {
+                value: args[0].as_u32(),
+                method: guest_str(exec, args[1], args[2])?,
+                args: guest_array(exec, args[3], args[4])?,
+            }),
+            RELEASE_VALUE => ImportAction::Suspend(Request::ReleaseValue { value: args[0].as_u32() }),
             PULL_SIGNAL | PULL_SIGNAL_MS => {
                 let timeout = if name == PULL_SIGNAL_MS {
                     args[0].as_i64() as f64 / 1000.0

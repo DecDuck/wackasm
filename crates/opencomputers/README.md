@@ -52,6 +52,13 @@ has a worked example (`demo`).
   redstone, modem messages, motion, ...). Anything else arrives as `Signal::Other`.
 * **`computer`**: address, uptime, memory, beep, shutdown and reboot, crash,
   logging to the server, and `files_disk()` (the disk `std::fs` uses).
+* **`internet`**: HTTP(S) through an internet card,
+  `internet::get(url)` or `internet::Request::new(url)` with `method`,
+  `header`, `body`, then `send()`. That returns a `Response` with `status()`,
+  `message()` and `headers()`, and the body as `std::io::Read`.
+  `internet::TcpStream::connect(host, port)` is `Read + Write`, with
+  `try_read` for polling. Dropping either closes and releases it. Reads come
+  in 2 KiB chunks, one per tick.
 * **`process`**: running other programs, like `std::process`.
   `Command::new("cat").arg("notes.txt")`, with `env`, `envs`, `env_remove`,
   `env_clear`, `current_dir` and `disk`, then `status()` (this program's stdin and stdout),

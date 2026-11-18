@@ -51,6 +51,16 @@ pub const RUN_BEEP: i32 = 9;
 /// the first usable disk: the boot disk if writable, else the first writable
 /// filesystem, else any. It never picks the computer's tmpfs.
 pub const RUN_DEFAULT_DISK: i32 = 10;
+/// Method call on a userdata value (an object a component returned, such as
+/// the internet card's HTTP request). Payload: `[value: userdata, method,
+/// args: array]`. Java calls it through `Machine.invoke(Value, ...)`, inline
+/// if the callback is direct, otherwise from `runSynchronized`, then calls
+/// `respond`. An unknown value is `STATUS_NO_SUCH_COMPONENT`.
+pub const RUN_INVOKE_VALUE: i32 = 11;
+/// The guest is done with a userdata value. Payload: `[value: userdata]`.
+/// Java disposes of it (closing a socket, for example), forgets its id and
+/// responds `STATUS_OK`.
+pub const RUN_RELEASE_VALUE: i32 = 12;
 
 // ---------------------------------------------------------------------------
 // Process events: what `spawn` and `resume` return to the parent. The
@@ -163,6 +173,13 @@ pub mod imports {
     /// caller's. Returns the first event, like
     /// `spawn`, or `STATUS_NOT_FOUND`, `STATUS_ERROR` or `STATUS_BAD_ARGUMENT`.
     pub const SPAWN_WITH: &str = "spawn_with";
+    /// `(value: u32, method, method_len, args, args_len) -> status`: like
+    /// `invoke`, but calls a method on a userdata value (`value` is its id, as
+    /// the codec carries it). The response holds the encoded results.
+    pub const INVOKE_VALUE: &str = "invoke_value";
+    /// `(value: u32) -> status`: disposes of a userdata value and forgets it.
+    /// Values are otherwise kept until the machine stops.
+    pub const RELEASE_VALUE: &str = "release_value";
     /// `() -> status`: the address of the filesystem this process's WASI
     /// calls use (the disk it sees as `/`), in the response buffer.
     /// `STATUS_NOT_FOUND` if there is none. Picking it is the same as on a
