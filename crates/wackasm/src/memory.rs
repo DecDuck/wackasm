@@ -161,6 +161,15 @@ impl MemoryManager {
         Ok(())
     }
 
+    /// `memory.size`: the current size in pages.
+    pub(crate) fn size(&self, mem: u32) -> Result<i32, HaltError> {
+        let memory = self
+            .memories
+            .get(mem as usize)
+            .ok_or_else(|| anyhow!("memory not found for index {}", mem))?;
+        Ok(memory.current.try_into()?)
+    }
+
     pub(crate) fn grow(&mut self, mem: u32, amount: i32) -> Result<i32, HaltError> {
         let used = self.used_bytes();
         let host_limit = self.limit;

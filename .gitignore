@@ -1,7 +1,9 @@
-/target
+target
 *.wasm
 /flamegraph.svg
 /perf.data*
 /profile.json.gz
 *.tsv
-/tmp
+/tmp/crates/wackasm-oc-guest/target
+/crates/wackasm-oc-bios/target
+/crates/wackasm-oc-programs/target

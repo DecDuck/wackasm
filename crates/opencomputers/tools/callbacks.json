@@ -1,0 +1,3023 @@
+{
+ "assembler": {
+  "classes": [
+   "li.cil.oc.common.tileentity.Assembler"
+  ],
+  "methods": {
+   "start": {
+    "direct": false,
+    "doc": "function():boolean -- Start assembling, if possible. Returns whether assembly was started or not.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "status": {
+    "direct": false,
+    "doc": "function(): string, number or boolean -- The current state of the assembler, `busy' or `idle', followed by the progress or template validity, respectively.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   }
+  }
+ },
+ "barcode_reader": {
+  "classes": [
+   "li.cil.oc.server.component.UpgradeBarcodeReader"
+  ],
+  "methods": {}
+ },
+ "beacon": {
+  "classes": [
+   "li.cil.oc.integration.minecraft.DriverBeacon$Environment"
+  ],
+  "methods": {
+   "getLevels": {
+    "direct": false,
+    "doc": "function():number -- Get the number of levels for this beacon.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "getPrimaryEffect": {
+    "direct": false,
+    "doc": "function():string -- Get the name of the active primary effect.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "getSecondaryEffect": {
+    "direct": false,
+    "doc": "function():string -- Get the name of the active secondary effect.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   }
+  }
+ },
+ "brewing_stand": {
+  "classes": [
+   "li.cil.oc.integration.minecraft.DriverBrewingStand$Environment"
+  ],
+  "methods": {
+   "getBrewTime": {
+    "direct": false,
+    "doc": "function():number -- Get the number of ticks remaining of the current brewing operation.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   }
+  }
+ },
+ "chunkloader": {
+  "classes": [
+   "li.cil.oc.server.component.UpgradeChunkloader"
+  ],
+  "methods": {
+   "isActive": {
+    "direct": false,
+    "doc": "function():boolean -- Gets whether the chunkloader is currently active.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "setActive": {
+    "direct": false,
+    "doc": "function(enabled:boolean):boolean -- Enables or disables the chunkloader, returns true if active changed",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   }
+  }
+ },
+ "command_block": {
+  "classes": [
+   "li.cil.oc.integration.minecraft.DriverCommandBlock$Environment"
+  ],
+  "methods": {
+   "executeCommand": {
+    "direct": false,
+    "doc": "function():number -- Execute the currently set command. This has a slight delay to allow the command block to properly update.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "getCommand": {
+    "direct": true,
+    "doc": "function():string -- Get the command currently set in this command block.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "setCommand": {
+    "direct": false,
+    "doc": "function(value:string) -- Set the specified command for the command block.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   }
+  }
+ },
+ "comparator": {
+  "classes": [
+   "li.cil.oc.integration.minecraft.DriverComparator$Environment"
+  ],
+  "methods": {
+   "getOutputSignal": {
+    "direct": false,
+    "doc": "function():number -- Get the strength of the comparators output signal.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   }
+  }
+ },
+ "computer": {
+  "classes": [
+   "li.cil.oc.server.machine.Machine"
+  ],
+  "methods": {
+   "beep": {
+    "direct": false,
+    "doc": "function([frequency:string or number[, duration:number]]) -- Plays a tone, useful to alert users via audible feedback.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "getDeviceInfo": {
+    "direct": true,
+    "doc": "function():table -- Collect information on all connected devices.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "getProgramLocations": {
+    "direct": false,
+    "doc": "function():table -- Returns a map of program name to disk label for known programs.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "isRunning": {
+    "direct": true,
+    "doc": "function():boolean -- Returns whether the computer is running.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "start": {
+    "direct": false,
+    "doc": "function():boolean -- Starts the computer. Returns true if the state changed.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "stop": {
+    "direct": false,
+    "doc": "function():boolean -- Stops the computer. Returns true if the state changed.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   }
+  }
+ },
+ "crafting": {
+  "classes": [
+   "li.cil.oc.server.component.UpgradeCrafting"
+  ],
+  "methods": {
+   "craft": {
+    "direct": false,
+    "doc": "function([count:number]):number -- Tries to craft the specified number of items in the top left area of the inventory.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   }
+  }
+ },
+ "data": {
+  "classes": [
+   "li.cil.oc.server.component.DataCard",
+   "li.cil.oc.server.component.DataCard$Tier1",
+   "li.cil.oc.server.component.DataCard$Tier2",
+   "li.cil.oc.server.component.DataCard$Tier3"
+  ],
+  "methods": {
+   "crc32": {
+    "direct": true,
+    "doc": "function(data:string):string -- Computes CRC-32 hash of the data. Result is binary data.",
+    "getter": false,
+    "limit": 32,
+    "setter": false
+   },
+   "decode64": {
+    "direct": true,
+    "doc": "function(data:string):string -- Applies base64 decoding to the data.",
+    "getter": false,
+    "limit": 32,
+    "setter": false
+   },
+   "decrypt": {
+    "direct": true,
+    "doc": "function(data:string, key:string, iv:string):string -- Decrypt data with AES.",
+    "getter": false,
+    "limit": 8,
+    "setter": false
+   },
+   "deflate": {
+    "direct": true,
+    "doc": "function(data:string):string -- Applies deflate compression to the data.",
+    "getter": false,
+    "limit": 4,
+    "setter": false
+   },
+   "deserializeKey": {
+    "direct": true,
+    "doc": "function(data:string, type:string):userdata -- Restores key from its string representation.",
+    "getter": false,
+    "limit": 8,
+    "setter": false
+   },
+   "ecdh": {
+    "direct": true,
+    "doc": "function(priv:userdata, pub:userdata):string -- Generates a shared key. ecdh(a.priv, b.pub) == ecdh(b.priv, a.pub)",
+    "getter": false,
+    "limit": 1,
+    "setter": false
+   },
+   "ecdsa": {
+    "direct": true,
+    "doc": "function(data:string, key:userdata[, sig:string]):string or boolean -- Signs or verifies data.",
+    "getter": false,
+    "limit": 1,
+    "setter": false
+   },
+   "encode64": {
+    "direct": true,
+    "doc": "function(data:string):string -- Applies base64 encoding to the data.",
+    "getter": false,
+    "limit": 32,
+    "setter": false
+   },
+   "encrypt": {
+    "direct": true,
+    "doc": "function(data:string, key: string, iv:string):string -- Encrypt data with AES. Result is binary data.",
+    "getter": false,
+    "limit": 8,
+    "setter": false
+   },
+   "generateKeyPair": {
+    "direct": true,
+    "doc": "function([bitLen:number]):userdata, userdata -- Generates key pair. Returns: public, private keys. Allowed key lengths: 256, 384 bits.",
+    "getter": false,
+    "limit": 1,
+    "setter": false
+   },
+   "getLimit": {
+    "direct": true,
+    "doc": "function():number -- The maximum size of data that can be passed to other functions of the card.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "inflate": {
+    "direct": true,
+    "doc": "function(data:string):string -- Applies inflate decompression to the data.",
+    "getter": false,
+    "limit": 4,
+    "setter": false
+   },
+   "md5": {
+    "direct": true,
+    "doc": "function(data:string):string -- Computes MD5 hash of the data. Result is binary data.",
+    "getter": false,
+    "limit": 8,
+    "setter": false
+   },
+   "random": {
+    "direct": true,
+    "doc": "function(len:number):string -- Generates secure random binary data.",
+    "getter": false,
+    "limit": 4,
+    "setter": false
+   },
+   "sha256": {
+    "direct": true,
+    "doc": "function(data:string):string -- Computes SHA2-256 hash of the data. Result is binary data.",
+    "getter": false,
+    "limit": 4,
+    "setter": false
+   }
+  }
+ },
+ "database": {
+  "classes": [
+   "li.cil.oc.server.component.UpgradeDatabase"
+  ],
+  "methods": {
+   "clear": {
+    "direct": false,
+    "doc": "function(slot:number):boolean -- Clears the specified slot. Returns true if there was something in the slot before.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "clone": {
+    "direct": false,
+    "doc": "function(address:string):number -- Copies the data stored in this database to another database with the specified address.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "computeHash": {
+    "direct": false,
+    "doc": "function(slot:number):string -- Computes a hash value for the item stack in the specified slot.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "copy": {
+    "direct": false,
+    "doc": "function(fromSlot:number, toSlot:number[, address:string]):boolean -- Copies an entry to another slot, optionally to another database. Returns true if something was overwritten.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "get": {
+    "direct": false,
+    "doc": "function(slot:number):table -- Get the representation of the item stack stored in the specified slot.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "indexOf": {
+    "direct": false,
+    "doc": "function(hash:string):number -- Get the index of an item stack with the specified hash. Returns a negative value if no such stack was found.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   }
+  }
+ },
+ "debug": {
+  "classes": [
+   "li.cil.oc.server.component.DebugCard"
+  ],
+  "methods": {
+   "changeBuffer": {
+    "direct": false,
+    "doc": "function(value:number):number -- Changes the component network's energy buffer by the specified delta.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "connectToBlock": {
+    "direct": false,
+    "doc": "function(x:number, y:number, z:number):boolean -- Add a component block at the specified coordinates to the computer network.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "getPlayer": {
+    "direct": false,
+    "doc": "function(name:string):userdata -- Get the entity of a player.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "getPlayers": {
+    "direct": false,
+    "doc": "function():table -- Get a list of currently logged-in players.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "getScoreboard": {
+    "direct": false,
+    "doc": "function():userdata -- Get the scoreboard object for the world",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "getWorld": {
+    "direct": false,
+    "doc": "function([id:number]):userdata -- Get the world object for the specified dimension ID, or the container's.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "getWorlds": {
+    "direct": false,
+    "doc": "function():table -- Get a list of all world IDs, loaded and unloaded.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "getX": {
+    "direct": false,
+    "doc": "function():number -- Get the container's X position in the world.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "getY": {
+    "direct": false,
+    "doc": "function():number -- Get the container's Y position in the world.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "getZ": {
+    "direct": false,
+    "doc": "function():number -- Get the container's Z position in the world.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "isModLoaded": {
+    "direct": false,
+    "doc": "function(name:string):boolean -- Get whether a mod or API is loaded.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "runCommand": {
+    "direct": false,
+    "doc": "function(command:string):number -- Runs an arbitrary command using a fake player.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "scanContentsAt": {
+    "direct": false,
+    "doc": "function(x: number, y: number, z: number[, worldId: number]):boolean, string, table -- returns contents at the location in world by id (default host world)",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "sendToClipboard": {
+    "direct": false,
+    "doc": "function(player:string, text:string) -- Sends text to the specified player's clipboard if possible.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "sendToDebugCard": {
+    "direct": false,
+    "doc": "function(address:string, data...) -- Sends data to the debug card with the specified address.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "test": {
+    "direct": false,
+    "doc": "function():userdata -- Test method for user-data and general value conversion.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   }
+  }
+ },
+ "disk_drive": {
+  "classes": [
+   "li.cil.oc.common.tileentity.DiskDrive",
+   "li.cil.oc.server.component.DiskDriveMountable"
+  ],
+  "methods": {
+   "eject": {
+    "direct": false,
+    "doc": "function([velocity:number]):boolean -- Eject the currently present medium from the drive.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "isEmpty": {
+    "direct": false,
+    "doc": "function():boolean -- Checks whether some medium is currently in the drive.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "media": {
+    "direct": false,
+    "doc": "function(): string -- Return the internal floppy disk address",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   }
+  }
+ },
+ "drive": {
+  "classes": [
+   "li.cil.oc.server.component.Drive"
+  ],
+  "methods": {
+   "getCapacity": {
+    "direct": true,
+    "doc": "function():number -- Returns the total capacity of the drive, in bytes.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "getLabel": {
+    "direct": true,
+    "doc": "function():string -- Get the current label of the drive.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "getPlatterCount": {
+    "direct": true,
+    "doc": "function():number -- Returns the number of platters in the drive.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "getSectorSize": {
+    "direct": true,
+    "doc": "function():number -- Returns the size of a single sector on the drive, in bytes.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "readByte": {
+    "direct": true,
+    "doc": "function(offset:number):number -- Read a single byte at the specified offset.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "readSector": {
+    "direct": true,
+    "doc": "function(sector:number):string -- Read the current contents of the specified sector.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "setLabel": {
+    "direct": false,
+    "doc": "function(value:string):string -- Sets the label of the drive. Returns the new value, which may be truncated.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "writeByte": {
+    "direct": true,
+    "doc": "function(offset:number, value:number) -- Write a single byte to the specified offset.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "writeSector": {
+    "direct": true,
+    "doc": "function(sector:number, value:string) -- Write the specified contents to the specified sector.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   }
+  }
+ },
+ "drone": {
+  "classes": [
+   "li.cil.oc.server.component.Drone"
+  ],
+  "methods": {
+   "compare": {
+    "direct": false,
+    "doc": "function(side:number[, fuzzy:boolean=false]):boolean -- Compare the block on the specified side with the one in the selected slot. Returns true if equal.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "compareFluid": {
+    "direct": false,
+    "doc": "function(side:number [, tank:number]):boolean -- Compare the fluid in the selected tank with the fluid in the specified tank on the specified side. Returns true if equal.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "compareFluidTo": {
+    "direct": false,
+    "doc": "function(index:number):boolean -- Compares the fluids in the selected and the specified tank. Returns true if equal.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "compareTo": {
+    "direct": false,
+    "doc": "function(otherSlot:number[, checkNBT:boolean=false]):boolean -- Compare the contents of the selected slot to the contents of the specified slot.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "count": {
+    "direct": true,
+    "doc": "function([slot:number]):number -- Get the number of items in the specified slot, otherwise in the selected slot.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "detect": {
+    "direct": false,
+    "doc": "function(side:number):boolean, string -- Checks the contents of the block on the specified sides and returns the findings.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "drain": {
+    "direct": false,
+    "doc": "function(side:boolean[, amount:number=1000]):boolean, number or string -- Drains the specified amount of fluid from the specified side. Returns the amount drained, or an error message.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "drop": {
+    "direct": false,
+    "doc": "function(side:number[, count:number=64]):boolean -- Drops items from the selected slot towards the specified side.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "fill": {
+    "direct": false,
+    "doc": "function(side:number[, amount:number=1000]):boolean, number of string -- Eject the specified amount of fluid to the specified side. Returns the amount ejected or an error message.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "getAcceleration": {
+    "direct": false,
+    "doc": "function():number -- Get the currently set acceleration.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "getLightColor": {
+    "direct": false,
+    "doc": "function():number -- Get the current color of the flap lights as an integer encoded RGB value (0xRRGGBB).",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "getMaxVelocity": {
+    "direct": false,
+    "doc": "function():number -- Get the maximum velocity, in m/s.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "getOffset": {
+    "direct": false,
+    "doc": "function():number -- Get the current distance to the target position.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "getStatusText": {
+    "direct": false,
+    "doc": "function():string -- Get the status text currently being displayed in the GUI.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "getVelocity": {
+    "direct": false,
+    "doc": "function():number -- Get the current velocity in m/s.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "inventorySize": {
+    "direct": false,
+    "doc": "function():number -- The size of this device's internal inventory.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "move": {
+    "direct": false,
+    "doc": "function(dx:number, dy:number, dz:number) -- Change the target position by the specified offset.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "name": {
+    "direct": false,
+    "doc": "function():string -- Get the name of the agent.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "place": {
+    "direct": false,
+    "doc": "function(side:number[, face:number=side[, sneaky:boolean=false]]):boolean -- Place a block towards the specified side. The `face' allows a more precise click calibration, and is relative to the targeted blockspace.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "select": {
+    "direct": false,
+    "doc": "function([slot:number]):number -- Get the currently selected slot; set the selected slot if specified.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "selectTank": {
+    "direct": false,
+    "doc": "function([index:number]):number -- Select a tank and/or get the number of the currently selected tank.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "setAcceleration": {
+    "direct": false,
+    "doc": "function(value:number):number -- Try to set the acceleration to the specified value and return the new acceleration.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "setLightColor": {
+    "direct": false,
+    "doc": "function(value:number):number -- Set the color of the flap lights to the specified integer encoded RGB value (0xRRGGBB).",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "setStatusText": {
+    "direct": false,
+    "doc": "function(value:string):string -- Set the status text to display in the GUI, returns new value.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "space": {
+    "direct": true,
+    "doc": "function([slot:number]):number -- Get the remaining space in the specified slot, otherwise in the selected slot.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "suck": {
+    "direct": false,
+    "doc": "function(side:number[, count:number=64]):boolean -- Suck up items from the specified side.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "swing": {
+    "direct": false,
+    "doc": "function(side:number[, face:number=side[, sneaky:boolean=false]]):boolean, string -- Perform a 'left click' towards the specified side. The `face' allows a more precise click calibration, and is relative to the targeted blockspace.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "tankCount": {
+    "direct": false,
+    "doc": "function():number -- The number of tanks installed in the device.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "tankLevel": {
+    "direct": true,
+    "doc": "function([index:number]):number -- Get the fluid amount in the specified or selected tank.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "tankSpace": {
+    "direct": true,
+    "doc": "function([index:number]):number -- Get the remaining fluid capacity in the specified or selected tank.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "transferFluidTo": {
+    "direct": false,
+    "doc": "function(index:number[, count:number=1000]):boolean -- Move the specified amount of fluid from the selected tank into the specified tank.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "transferTo": {
+    "direct": false,
+    "doc": "function(toSlot:number[, amount:number]):boolean -- Move up to the specified amount of items from the selected slot into the specified slot.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "use": {
+    "direct": false,
+    "doc": "function(side:number[, face:number=side[, sneaky:boolean=false[, duration:number=0]]]):boolean, string -- Perform a 'right click' towards the specified side. The `face' allows a more precise click calibration, and is relative to the targeted blockspace.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   }
+  }
+ },
+ "eeprom": {
+  "classes": [
+   "li.cil.oc.server.component.EEPROM"
+  ],
+  "methods": {
+   "get": {
+    "direct": true,
+    "doc": "function():string -- Get the currently stored byte array.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "getChecksum": {
+    "direct": true,
+    "doc": "function():string -- Get the checksum of the data on this EEPROM.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "getData": {
+    "direct": true,
+    "doc": "function():string -- Get the currently stored byte array.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "getDataSize": {
+    "direct": true,
+    "doc": "function():number -- Get the storage capacity of this EEPROM.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "getLabel": {
+    "direct": true,
+    "doc": "function():string -- Get the label of the EEPROM.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "getSize": {
+    "direct": true,
+    "doc": "function():number -- Get the storage capacity of this EEPROM.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "makeReadonly": {
+    "direct": true,
+    "doc": "function(checksum:string):boolean -- Make this EEPROM readonly if it isn't already. This process cannot be reversed!",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "set": {
+    "direct": false,
+    "doc": "function(data:string) -- Overwrite the currently stored byte array.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "setData": {
+    "direct": false,
+    "doc": "function(data:string) -- Overwrite the currently stored byte array.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "setLabel": {
+    "direct": false,
+    "doc": "function(data:string):string -- Set the label of the EEPROM.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   }
+  }
+ },
+ "experience": {
+  "classes": [
+   "li.cil.oc.server.component.UpgradeExperience"
+  ],
+  "methods": {
+   "consume": {
+    "direct": false,
+    "doc": "function():boolean -- Tries to consume an enchanted item to add experience to the upgrade.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "level": {
+    "direct": true,
+    "doc": "function():number -- The current level of experience stored in this experience upgrade.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   }
+  }
+ },
+ "filesystem": {
+  "classes": [
+   "li.cil.oc.server.component.FileSystem"
+  ],
+  "methods": {
+   "close": {
+    "direct": true,
+    "doc": "function(handle:userdata) -- Closes an open file descriptor with the specified handle.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "exists": {
+    "direct": true,
+    "doc": "function(path:string):boolean -- Returns whether an object exists at the specified absolute path in the file system.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "getLabel": {
+    "direct": true,
+    "doc": "function():string -- Get the current label of the drive.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "isDirectory": {
+    "direct": true,
+    "doc": "function(path:string):boolean -- Returns whether the object at the specified absolute path in the file system is a directory.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "isReadOnly": {
+    "direct": true,
+    "doc": "function():boolean -- Returns whether the file system is read-only.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "lastModified": {
+    "direct": true,
+    "doc": "function(path:string):number -- Returns the (real world) timestamp of when the object at the specified absolute path in the file system was modified.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "list": {
+    "direct": false,
+    "doc": "function(path:string):table -- Returns a list of names of objects in the directory at the specified absolute path in the file system.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "makeDirectory": {
+    "direct": false,
+    "doc": "function(path:string):boolean -- Creates a directory at the specified absolute path in the file system. Creates parent directories, if necessary.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "open": {
+    "direct": true,
+    "doc": "function(path:string[, mode:string='r']):userdata -- Opens a new file descriptor and returns its handle.",
+    "getter": false,
+    "limit": 4,
+    "setter": false
+   },
+   "read": {
+    "direct": true,
+    "doc": "function(handle:userdata, count:number):string or nil -- Reads up to the specified amount of data from an open file descriptor with the specified handle. Returns nil when EOF is reached.",
+    "getter": false,
+    "limit": 15,
+    "setter": false
+   },
+   "remove": {
+    "direct": false,
+    "doc": "function(path:string):boolean -- Removes the object at the specified absolute path in the file system.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "rename": {
+    "direct": false,
+    "doc": "function(from:string, to:string):boolean -- Renames/moves an object from the first specified absolute path in the file system to the second.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "seek": {
+    "direct": true,
+    "doc": "function(handle:userdata, whence:string, offset:number):number -- Seeks in an open file descriptor with the specified handle. Returns the new pointer position.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "setLabel": {
+    "direct": false,
+    "doc": "function(value:string):string -- Sets the label of the drive. Returns the new value, which may be truncated.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "size": {
+    "direct": true,
+    "doc": "function(path:string):number -- Returns the size of the object at the specified absolute path in the file system.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "spaceTotal": {
+    "direct": true,
+    "doc": "function():number -- The overall capacity of the file system, in bytes.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "spaceUsed": {
+    "direct": true,
+    "doc": "function():number -- The currently used capacity of the file system, in bytes.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "write": {
+    "direct": true,
+    "doc": "function(handle:userdata, value:string):boolean -- Writes the specified data to an open file descriptor with the specified handle.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   }
+  }
+ },
+ "fluid_handler": {
+  "classes": [
+   "li.cil.oc.integration.minecraft.DriverFluidHandler$Environment"
+  ],
+  "methods": {
+   "getTankInfo": {
+    "direct": false,
+    "doc": "function():table -- Get some information about the tank accessible from the specified side.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   }
+  }
+ },
+ "fluid_tank": {
+  "classes": [
+   "li.cil.oc.integration.minecraft.DriverFluidTank$Environment"
+  ],
+  "methods": {
+   "getInfo": {
+    "direct": false,
+    "doc": "function():table -- Get some information about this tank.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   }
+  }
+ },
+ "furnace": {
+  "classes": [
+   "li.cil.oc.integration.minecraft.DriverFurnace$Environment"
+  ],
+  "methods": {
+   "getBurnTime": {
+    "direct": false,
+    "doc": "function():number -- The number of ticks that the furnace will keep burning from the last consumed fuel.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "getCookTime": {
+    "direct": false,
+    "doc": "function():number -- The number of ticks that the current item has been cooking for.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "getCurrentItemBurnTime": {
+    "direct": false,
+    "doc": "function():number -- The number of ticks that the currently burning fuel lasts in total.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "getTotalCookTime": {
+    "direct": false,
+    "doc": "function():number -- The number of ticks that the current item needs to cook.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "isBurning": {
+    "direct": false,
+    "doc": "function():boolean -- Get whether the furnace is currently active.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   }
+  }
+ },
+ "generator": {
+  "classes": [
+   "li.cil.oc.server.component.UpgradeGenerator"
+  ],
+  "methods": {
+   "count": {
+    "direct": false,
+    "doc": "function():number -- Get the size of the item stack in the generator's queue.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "insert": {
+    "direct": false,
+    "doc": "function([count:number]):boolean -- Tries to insert fuel from the selected slot into the generator's queue.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "remove": {
+    "direct": false,
+    "doc": "function([count:number]):boolean -- Tries to remove items from the generator's queue.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   }
+  }
+ },
+ "geolyzer": {
+  "classes": [
+   "li.cil.oc.server.component.Geolyzer"
+  ],
+  "methods": {
+   "analyze": {
+    "direct": false,
+    "doc": "function(side:number[,options:table]):table -- Get some information on a directly adjacent block.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "canSeeSky": {
+    "direct": false,
+    "doc": "function():boolean -- Returns whether there is a clear line of sight to the sky directly above.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "detect": {
+    "direct": false,
+    "doc": "function(side:number):boolean, string -- Checks the contents of the block on the specified sides and returns the findings.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "isSunVisible": {
+    "direct": false,
+    "doc": "function():boolean -- Return whether the sun is currently visible directly above.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "scan": {
+    "direct": false,
+    "doc": "function(x:number, z:number[, y:number, w:number, d:number, h:number][, ignoreReplaceable:boolean|options:table]):table -- Analyzes the density of the column at the specified relative coordinates.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "store": {
+    "direct": false,
+    "doc": "function(side:number, dbAddress:string, dbSlot:number):boolean -- Store an item stack representation of the block on the specified side in a database component.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   }
+  }
+ },
+ "gpu": {
+  "classes": [
+   "li.cil.oc.server.component.APU",
+   "li.cil.oc.server.component.GraphicsCard"
+  ],
+  "methods": {
+   "allocateBuffer": {
+    "direct": true,
+    "doc": "function([width: number, height: number]): number -- allocates a new buffer with dimensions width*height (defaults to max resolution) and appends it to the buffer list. Returns the index of the new buffer and returns nil with an error message on failure. A buffer can be allocated even when there is no screen bound to this gpu. Index 0 is always reserved for the screen and thus the lowest index of an allocated buffer is always 1.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "bind": {
+    "direct": false,
+    "doc": "function(address:string[, reset:boolean=true]):boolean -- Binds the GPU to the screen with the specified address and resets screen settings if `reset` is true.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "bitblt": {
+    "direct": true,
+    "doc": "function([dst: number, col: number, row: number, width: number, height: number, src: number, fromCol: number, fromRow: number]):boolean -- bitblt from buffer to screen. All parameters are optional. Writes to `dst` page in rectangle `x, y, width, height`, defaults to the bound screen and its viewport. Reads data from `src` page at `fx, fy`, default is the active page from position 1, 1",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "buffers": {
+    "direct": true,
+    "doc": "function(): number -- Returns an array of indexes of the allocated buffers",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "copy": {
+    "direct": true,
+    "doc": "function(x:number, y:number, width:number, height:number, tx:number, ty:number):boolean -- Copies a portion of the screen from the specified location with the specified size by the specified translation.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "fill": {
+    "direct": true,
+    "doc": "function(x:number, y:number, width:number, height:number, char:string):boolean -- Fills a portion of the screen at the specified position with the specified size with the specified character.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "freeAllBuffers": {
+    "direct": true,
+    "doc": "function(): number -- Closes all buffers and returns the count. If the active buffer is closed, index moves to 0",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "freeBuffer": {
+    "direct": true,
+    "doc": "function(index: number): boolean -- Closes buffer at `index`. Returns true if a buffer closed. If the current buffer is closed, index moves to 0",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "freeMemory": {
+    "direct": true,
+    "doc": "function(): number -- returns the total free memory not allocated to buffers. This does not include the screen.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "get": {
+    "direct": true,
+    "doc": "function(x:number, y:number):string, number, number, number or nil, number or nil -- Get the value displayed on the screen at the specified index, as well as the foreground and background color. If the foreground or background is from the palette, returns the palette indices as fourth and fifth results, else nil, respectively.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "getActiveBuffer": {
+    "direct": true,
+    "doc": "function(): number -- returns the index of the currently selected buffer. 0 is reserved for the screen. Can return 0 even when there is no screen",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "getBackground": {
+    "direct": true,
+    "doc": "function():number, boolean -- Get the current background color and whether it's from the palette or not.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "getBufferSize": {
+    "direct": true,
+    "doc": "function(index: number): number, number -- returns the buffer size at index. Returns the screen resolution for index 0. returns nil for invalid indexes",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "getDepth": {
+    "direct": true,
+    "doc": "function():number -- Returns the currently set color depth.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "getForeground": {
+    "direct": true,
+    "doc": "function():number, boolean -- Get the current foreground color and whether it's from the palette or not.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "getPaletteColor": {
+    "direct": true,
+    "doc": "function(index:number):number -- Get the palette color at the specified palette index.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "getResolution": {
+    "direct": true,
+    "doc": "function():number, number -- Get the current screen resolution.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "getScreen": {
+    "direct": true,
+    "doc": "function():string -- Get the address of the screen the GPU is currently bound to.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "getViewport": {
+    "direct": true,
+    "doc": "function():number, number -- Get the current viewport resolution.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "maxDepth": {
+    "direct": true,
+    "doc": "function():number -- Get the maximum supported color depth.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "maxResolution": {
+    "direct": true,
+    "doc": "function():number, number -- Get the maximum screen resolution.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "set": {
+    "direct": true,
+    "doc": "function(x:number, y:number, value:string[, vertical:boolean]):boolean -- Plots a string value to the screen at the specified position. Optionally writes the string vertically.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "setActiveBuffer": {
+    "direct": true,
+    "doc": "function(index: number): number -- Sets the active buffer to `index`. 1 is the first vram buffer and 0 is reserved for the screen. returns nil for invalid index (0 is always valid)",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "setBackground": {
+    "direct": true,
+    "doc": "function(value:number[, palette:boolean]):number, number or nil -- Sets the background color to the specified value. Optionally takes an explicit palette index. Returns the old value and if it was from the palette its palette index.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "setDepth": {
+    "direct": false,
+    "doc": "function(depth:number):number -- Set the color depth. Returns the previous value.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "setForeground": {
+    "direct": true,
+    "doc": "function(value:number[, palette:boolean]):number, number or nil -- Sets the foreground color to the specified value. Optionally takes an explicit palette index. Returns the old value and if it was from the palette its palette index.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "setPaletteColor": {
+    "direct": true,
+    "doc": "function(index:number, color:number):number -- Set the palette color at the specified palette index. Returns the previous value.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "setResolution": {
+    "direct": false,
+    "doc": "function(width:number, height:number):boolean -- Set the screen resolution. Returns true if the resolution changed.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "setViewport": {
+    "direct": false,
+    "doc": "function(width:number, height:number):boolean -- Set the viewport resolution. Cannot exceed the screen resolution. Returns true if the resolution changed.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "totalMemory": {
+    "direct": true,
+    "doc": "function(): number -- returns the total memory size of the gpu vram. This does not include the screen.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   }
+  }
+ },
+ "hologram": {
+  "classes": [
+   "li.cil.oc.common.tileentity.Hologram"
+  ],
+  "methods": {
+   "clear": {
+    "direct": false,
+    "doc": "function() -- Clears the hologram.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "copy": {
+    "direct": false,
+    "doc": "function(x:number, z:number, sx:number, sz:number, tx:number, tz:number) -- Copies an area of columns by the specified translation.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "fill": {
+    "direct": true,
+    "doc": "function(x:number, z:number[, minY:number], maxY:number, value:number or boolean) -- Fills an interval of a column with the specified value.",
+    "getter": false,
+    "limit": 128,
+    "setter": false
+   },
+   "get": {
+    "direct": true,
+    "doc": "function(x:number, y:number, z:number):number -- Returns the value for the specified voxel.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "getDimensions": {
+    "direct": true,
+    "doc": "function():number, number, number -- Get the dimension of the x,y,z axes.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "getPaletteColor": {
+    "direct": false,
+    "doc": "function(index:number):number -- Get the color defined for the specified value.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "getScale": {
+    "direct": true,
+    "doc": "function():number -- Returns the render scale of the hologram.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "getTranslation": {
+    "direct": true,
+    "doc": "function():number, number, number -- Returns the relative render projection offsets of the hologram.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "maxDepth": {
+    "direct": true,
+    "doc": "function():number -- The color depth supported by the hologram.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "set": {
+    "direct": true,
+    "doc": "function(x:number, y:number, z:number, value:number or boolean) -- Set the value for the specified voxel.",
+    "getter": false,
+    "limit": 256,
+    "setter": false
+   },
+   "setPaletteColor": {
+    "direct": false,
+    "doc": "function(index:number, value:number):number -- Set the color defined for the specified value.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "setRaw": {
+    "direct": false,
+    "doc": "function(data:string) -- Set the raw buffer to the specified byte array, where each byte represents a voxel color. Nesting is x,z,y.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "setRotation": {
+    "direct": false,
+    "doc": "function(angle:number, x:number, y:number, z:number):boolean -- Set the base rotation of the displayed hologram.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "setRotationSpeed": {
+    "direct": false,
+    "doc": "function(speed:number, x:number, y:number, z:number):boolean -- Set the rotation speed of the displayed hologram.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "setScale": {
+    "direct": false,
+    "doc": "function(value:number) -- Set the render scale. A larger scale consumes more energy.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "setTranslation": {
+    "direct": false,
+    "doc": "function(tx:number, ty:number, tz:number) -- Sets the relative render projection offsets of the hologram.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   }
+  }
+ },
+ "internet": {
+  "classes": [
+   "li.cil.oc.server.component.InternetCard"
+  ],
+  "methods": {
+   "connect": {
+    "direct": false,
+    "doc": "function(address:string[, port:number]):userdata -- Opens a new TCP connection. Returns the handle of the connection.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "isHttpEnabled": {
+    "direct": true,
+    "doc": "function():boolean -- Returns whether HTTP requests can be made (config setting).",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "isTcpEnabled": {
+    "direct": true,
+    "doc": "function():boolean -- Returns whether TCP connections can be made (config setting).",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "request": {
+    "direct": false,
+    "doc": "function(url:string[, postData:string[, headers:table[, method:string]]]):userdata -- Starts an HTTP request. If this returns true, further results will be pushed using `http_response` signals.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   }
+  }
+ },
+ "inventory": {
+  "classes": [
+   "li.cil.oc.integration.minecraft.DriverInventory$Environment"
+  ],
+  "methods": {
+   "compareStacks": {
+    "direct": false,
+    "doc": "function(slotA:number, slotB:number):boolean -- Compare the two item stacks in the specified slots for equality.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "getAllStacks": {
+    "direct": false,
+    "doc": "function():table -- Get a list of descriptions for all item stacks in this inventory.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "getInventoryName": {
+    "direct": false,
+    "doc": "function():string -- Get the name of this inventory.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "getInventorySize": {
+    "direct": false,
+    "doc": "function():number -- Get the number of slots in this inventory.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "getSlotMaxStackSize": {
+    "direct": false,
+    "doc": "function(slot:number):number -- Get the maximum stack size of the item stack in the specified slot.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "getSlotStackSize": {
+    "direct": false,
+    "doc": "function(slot:number):number -- Get the stack size of the item stack in the specified slot.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "getStackInSlot": {
+    "direct": false,
+    "doc": "function(slot:number):table -- Get a description of the item stack in the specified slot.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "transferStack": {
+    "direct": false,
+    "doc": "function(slotA:number, slotB:number[, count:number=math.huge]):boolean -- Move up to the specified number of items from the first specified slot to the second.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   }
+  }
+ },
+ "inventory_controller": {
+  "classes": [
+   "li.cil.oc.server.component.UpgradeInventoryController$Adapter",
+   "li.cil.oc.server.component.UpgradeInventoryController$Drone",
+   "li.cil.oc.server.component.UpgradeInventoryController$Robot"
+  ],
+  "methods": {
+   "areStacksEquivalent": {
+    "direct": false,
+    "doc": "function(side:number, slotA:number, slotB:number):boolean -- Get whether the items in the two specified slots of the inventory on the specified side of the device are equivalent (have shared OreDictionary IDs).",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "compareStackToDatabase": {
+    "direct": false,
+    "doc": "function(side:number, slot:number, dbAddress:string, dbSlot:number[, checkNBT:boolean=false]):boolean -- Compare an item in the specified slot in the inventory on the specified side with one in the database with the specified address.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "compareStacks": {
+    "direct": false,
+    "doc": "function(side:number, slotA:number, slotB:number[, checkNBT:boolean=false]):boolean -- Get whether the items in the two specified slots of the inventory on the specified side of the device are of the same type.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "compareToDatabase": {
+    "direct": false,
+    "doc": "function(slot:number, dbAddress:string, dbSlot:number[, checkNBT:boolean=false]):boolean -- Compare an item in the specified slot with one in the database with the specified address.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "dropIntoItemInventory": {
+    "direct": false,
+    "doc": "function(inventorySlot:number, slot:number[, count:number=64]):number -- Drops an item from the selected slot into the specified slot in the item inventory.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "dropIntoSlot": {
+    "direct": false,
+    "doc": "function(facing:number, slot:number[, count:number[, fromSide:number]]):boolean -- Drops the selected item stack into the specified slot of an inventory.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "equip": {
+    "direct": false,
+    "doc": "function():boolean -- Swaps the equipped tool with the content of the currently selected inventory slot.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "getAllStacks": {
+    "direct": false,
+    "doc": "function(side:number):userdata -- Get a description of all stacks in the inventory on the specified side of the device.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "getInventoryName": {
+    "direct": false,
+    "doc": "function(side:number):string -- Get the the name of the inventory on the specified side of the device.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "getInventorySize": {
+    "direct": false,
+    "doc": "function(side:number):number -- Get the number of slots in the inventory on the specified side of the device.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "getItemInventorySize": {
+    "direct": false,
+    "doc": "function(slot:number):number -- The size of an item inventory in the specified slot.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "getSlotMaxStackSize": {
+    "direct": false,
+    "doc": "function(side:number, slot:number):number -- Get the maximum number of items in the specified slot of the inventory on the specified side of the device.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "getSlotStackSize": {
+    "direct": false,
+    "doc": "function(side:number, slot:number):number -- Get number of items in the specified slot of the inventory on the specified side of the device.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "getStackInInternalSlot": {
+    "direct": false,
+    "doc": "function([slot:number]):table -- Get a description of the stack in the specified slot or the selected slot.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "getStackInSlot": {
+    "direct": false,
+    "doc": "function(side:number, slot:number):table -- Get a description of the stack in the inventory on the specified side of the device.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "isEquivalentTo": {
+    "direct": false,
+    "doc": "function(otherSlot:number):boolean -- Get whether the stack in the selected slot is equivalent to the item in the specified slot (have shared OreDictionary IDs).",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "store": {
+    "direct": false,
+    "doc": "function(side:number, slot:number, dbAddress:string, dbSlot:number):boolean -- Store an item stack description in the specified slot of the database with the specified address.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "storeInternal": {
+    "direct": false,
+    "doc": "function(slot:number, dbAddress:string, dbSlot:number):boolean -- Store an item stack description in the specified slot of the database with the specified address.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "suckFromItemInventory": {
+    "direct": false,
+    "doc": "function(inventorySlot:number, slot:number[, count:number=64]):number -- Sucks an item out of the specified slot in the item inventory.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "suckFromSlot": {
+    "direct": false,
+    "doc": "function(facing:number, slot:number[, count:number[, fromSide:number]]):boolean -- Sucks items from the specified slot of an inventory.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   }
+  }
+ },
+ "jukebox": {
+  "classes": [
+   "li.cil.oc.integration.minecraft.DriverRecordPlayer$Environment"
+  ],
+  "methods": {
+   "getRecord": {
+    "direct": false,
+    "doc": "function():string -- Get the title of the record currently in the jukebox.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "play": {
+    "direct": false,
+    "doc": "function() -- Start playing the record currently in the jukebox.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "stop": {
+    "direct": false,
+    "doc": "function() -- Stop playing the record currently in the jukebox.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   }
+  }
+ },
+ "keyboard": {
+  "classes": [
+   "li.cil.oc.server.component.Keyboard"
+  ],
+  "methods": {}
+ },
+ "leash": {
+  "classes": [
+   "li.cil.oc.server.component.UpgradeLeash"
+  ],
+  "methods": {
+   "leash": {
+    "direct": false,
+    "doc": "function(side:number):boolean -- Tries to put an entity on the specified side of the device onto a leash.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "unleash": {
+    "direct": false,
+    "doc": "function() -- Unleashes all currently leashed entities.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   }
+  }
+ },
+ "microcontroller": {
+  "classes": [
+   "li.cil.oc.common.tileentity.Microcontroller",
+   "li.cil.oc.common.tileentity.Microcontroller$$anonfun$2"
+  ],
+  "methods": {
+   "isRunning": {
+    "direct": true,
+    "doc": "function():boolean -- Returns whether the microcontroller is running.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "isSideOpen": {
+    "direct": true,
+    "doc": "function(side:number):boolean -- Get whether network messages are sent via the specified side.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "lastError": {
+    "direct": true,
+    "doc": "function():string -- Returns the reason the microcontroller crashed, if applicable.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "setSideOpen": {
+    "direct": false,
+    "doc": "function(side:number, open:boolean):boolean -- Set whether network messages are sent via the specified side.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "start": {
+    "direct": false,
+    "doc": "function():boolean -- Starts the microcontroller. Returns true if the state changed.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "stop": {
+    "direct": false,
+    "doc": "function():boolean -- Stops the microcontroller. Returns true if the state changed.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   }
+  }
+ },
+ "mob_spawner": {
+  "classes": [
+   "li.cil.oc.integration.minecraft.DriverMobSpawner$Environment"
+  ],
+  "methods": {
+   "getSpawningMobName": {
+    "direct": false,
+    "doc": "function():string -- Get the name of the entity that is being spawned by this spawner.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   }
+  }
+ },
+ "modem": {
+  "classes": [
+   "li.cil.oc.server.component.NetworkCard",
+   "li.cil.oc.server.component.WirelessNetworkCard",
+   "li.cil.oc.server.component.WirelessNetworkCard$Tier1",
+   "li.cil.oc.server.component.WirelessNetworkCard$Tier2"
+  ],
+  "methods": {
+   "broadcast": {
+    "direct": false,
+    "doc": "function(port:number, data...) -- Broadcasts the specified data on the specified port.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "close": {
+    "direct": false,
+    "doc": "function([port:number]):boolean -- Closes the specified port (default: all ports). Returns true if ports were closed.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "getStrength": {
+    "direct": true,
+    "doc": "function():number -- Get the signal strength (range) used when sending messages.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "getWakeMessage": {
+    "direct": true,
+    "doc": "function():string, boolean -- Get the current wake-up message.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "isOpen": {
+    "direct": true,
+    "doc": "function(port:number):boolean -- Whether the specified port is open.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "isWired": {
+    "direct": true,
+    "doc": "function():boolean -- Whether this card has wired networking capability.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "isWireless": {
+    "direct": true,
+    "doc": "function():boolean -- Whether this card has wireless networking capability.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "open": {
+    "direct": false,
+    "doc": "function(port:number):boolean -- Opens the specified port. Returns true if the port was opened.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "send": {
+    "direct": false,
+    "doc": "function(address:string, port:number, data...) -- Sends the specified data to the specified target.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "setStrength": {
+    "direct": false,
+    "doc": "function(strength:number):number -- Set the signal strength (range) used when sending messages.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "setWakeMessage": {
+    "direct": false,
+    "doc": "function(message:string[, fuzzy:boolean]):string -- Set the wake-up message and whether to ignore additional data/parameters.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   }
+  }
+ },
+ "motion_sensor": {
+  "classes": [
+   "li.cil.oc.server.component.MotionSensor"
+  ],
+  "methods": {
+   "getSensitivity": {
+    "direct": true,
+    "doc": "function():number -- Gets the current sensor sensitivity.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "setSensitivity": {
+    "direct": true,
+    "doc": "function(value:number):number -- Sets the sensor's sensitivity. Returns the old value.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   }
+  }
+ },
+ "navigation": {
+  "classes": [
+   "li.cil.oc.server.component.UpgradeNavigation"
+  ],
+  "methods": {
+   "findWaypoints": {
+    "direct": false,
+    "doc": "function(range:number):table -- Find waypoints in the specified range.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "getFacing": {
+    "direct": false,
+    "doc": "function():number -- Get the current orientation of the robot.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "getPosition": {
+    "direct": false,
+    "doc": "function():number, number, number -- Get the current relative position of the robot.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "getRange": {
+    "direct": false,
+    "doc": "function():number -- Get the operational range of the navigation upgrade.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   }
+  }
+ },
+ "net_splitter": {
+  "classes": [
+   "li.cil.oc.common.tileentity.NetSplitter"
+  ],
+  "methods": {
+   "close": {
+    "direct": false,
+    "doc": "function(side: number):boolean -- Close the side, returns true if it changed to close.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "getSides": {
+    "direct": true,
+    "doc": "function():table -- Returns current open/close state of all sides in an array, indexed by direction.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "open": {
+    "direct": false,
+    "doc": "function(side: number):boolean -- Open the side, returns true if it changed to open.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "setSides": {
+    "direct": false,
+    "doc": "function(settings:table):table -- set open state (true/false) of all sides in an array; index by direction. Returns previous states",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   }
+  }
+ },
+ "note_block": {
+  "classes": [
+   "li.cil.oc.integration.minecraft.DriverNoteBlock$Environment"
+  ],
+  "methods": {
+   "getPitch": {
+    "direct": true,
+    "doc": "function():number -- Get the currently set pitch on this note block.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "setPitch": {
+    "direct": false,
+    "doc": "function(value:number) -- Set the pitch for this note block. Must be in the interval [1, 25].",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "trigger": {
+    "direct": false,
+    "doc": "function([pitch:number]):boolean -- Triggers the note block if possible. Allows setting the pitch for to save a tick.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   }
+  }
+ },
+ "piston": {
+  "classes": [
+   "li.cil.oc.server.component.UpgradePiston",
+   "li.cil.oc.server.component.UpgradePiston$Drone",
+   "li.cil.oc.server.component.UpgradePiston$Rotatable",
+   "li.cil.oc.server.component.UpgradePiston$Tablet",
+   "li.cil.oc.server.component.UpgradeStickyPiston",
+   "li.cil.oc.server.component.UpgradeStickyPiston$Drone",
+   "li.cil.oc.server.component.UpgradeStickyPiston$Rotatable",
+   "li.cil.oc.server.component.UpgradeStickyPiston$Tablet"
+  ],
+  "methods": {
+   "isSticky": {
+    "direct": false,
+    "doc": "function():boolean -- Returns true if the piston is sticky, i.e. it can also pull.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "pull": {
+    "direct": false,
+    "doc": "function([side:number]):boolean -- Tries to reach out to the side given (default front) and pull a block similar to a vanilla sticky piston.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "push": {
+    "direct": false,
+    "doc": "function([side:number]):boolean -- Tries to push the block on the specified side of the container of the upgrade. Defaults to front.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   }
+  }
+ },
+ "printer3d": {
+  "classes": [
+   "li.cil.oc.common.tileentity.Printer"
+  ],
+  "methods": {
+   "addShape": {
+    "direct": false,
+    "doc": "function(minX:number, minY:number, minZ:number, maxX:number, maxY:number, maxZ:number, texture:string[, state:boolean=false][,tint:number]) -- Adds a shape to the printers configuration, optionally specifying whether it is for the off or on state.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "commit": {
+    "direct": false,
+    "doc": "function([count:number]):boolean -- Commit and begin printing the current configuration.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "getLabel": {
+    "direct": false,
+    "doc": "function():string -- Get the current label for the block being printed.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "getLightLevel": {
+    "direct": false,
+    "doc": "function():number -- Get which light level the printed block should have.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "getMaxShapeCount": {
+    "direct": false,
+    "doc": "function():number -- Get the maximum allowed number of shapes.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "getShapeCount": {
+    "direct": false,
+    "doc": "function():number -- Get the number of shapes in the current configuration.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "getTooltip": {
+    "direct": false,
+    "doc": "function():string -- Get the current tooltip for the block being printed.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "isButtonMode": {
+    "direct": false,
+    "doc": "function():boolean -- Get whether the printed block should automatically return to its off state.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "isCollidable": {
+    "direct": false,
+    "doc": "function():boolean, boolean -- Get whether the printed block should be collidable or not.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "isRedstoneEmitter": {
+    "direct": false,
+    "doc": "function():boolean, number -- Get whether the printed block should emit redstone when in its active state.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "reset": {
+    "direct": false,
+    "doc": "function() -- Resets the configuration of the printer and stop printing (current job will finish).",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "setButtonMode": {
+    "direct": false,
+    "doc": "function(value:boolean) -- Set whether the printed block should automatically return to its off state.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "setCollidable": {
+    "direct": false,
+    "doc": "function(collideOff:boolean, collideOn:boolean) -- Set whether the printed block should be collidable or not.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "setLabel": {
+    "direct": false,
+    "doc": "function(value:string) -- Set a label for the block being printed.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "setLightLevel": {
+    "direct": false,
+    "doc": "function(value:number) -- Set what light level the printed block should have.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "setRedstoneEmitter": {
+    "direct": false,
+    "doc": "function(value:boolean or number) -- Set whether the printed block should emit redstone when in its active state.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "setTooltip": {
+    "direct": false,
+    "doc": "function(value:string) -- Set a tooltip for the block being printed.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "status": {
+    "direct": false,
+    "doc": "function(): string, number or boolean -- The current state of the printer, `busy' or `idle', followed by the progress or model validity, respectively.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   }
+  }
+ },
+ "redstone": {
+  "classes": [
+   "li.cil.oc.server.component.Redstone$Bundled",
+   "li.cil.oc.server.component.Redstone$BundledWireless",
+   "li.cil.oc.server.component.Redstone$Vanilla",
+   "li.cil.oc.server.component.Redstone$VanillaWireless",
+   "li.cil.oc.server.component.Redstone$Wireless",
+   "li.cil.oc.server.component.RedstoneBundled",
+   "li.cil.oc.server.component.RedstoneSignaller",
+   "li.cil.oc.server.component.RedstoneVanilla",
+   "li.cil.oc.server.component.RedstoneWireless"
+  ],
+  "methods": {
+   "getBundledInput": {
+    "direct": true,
+    "doc": "function([side:number[, color:number]]):number or table -- Fewer params returns set of inputs",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "getBundledOutput": {
+    "direct": true,
+    "doc": "function([side:number[, color:number]]):number or table -- Fewer params returns set of outputs",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "getComparatorInput": {
+    "direct": true,
+    "doc": "function(side:number):number -- Get the comparator input on the specified side.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "getInput": {
+    "direct": true,
+    "doc": "function([side:number]):number or table -- Get the redstone input (all sides, or optionally on the specified side)",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "getOutput": {
+    "direct": true,
+    "doc": "function([side:number]):number or table -- Get the redstone output (all sides, or optionally on the specified side)",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "getWakeThreshold": {
+    "direct": true,
+    "doc": "function():number -- Get the current wake-up threshold.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "getWirelessFrequency": {
+    "direct": true,
+    "doc": "function():number -- Get the currently set wireless redstone frequency.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "getWirelessInput": {
+    "direct": false,
+    "doc": "function():number -- Get the wireless redstone input.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "getWirelessOutput": {
+    "direct": true,
+    "doc": "function():boolean -- Get the wireless redstone output.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "setBundledOutput": {
+    "direct": false,
+    "doc": "function([side:number[, color:number,]] value:number or table):number or table --  Fewer params to assign set of outputs. Returns previous values",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "setOutput": {
+    "direct": false,
+    "doc": "function([side:number, ]value:number or table):number or table --  Set the redstone output (all sides, or optionally on the specified side). Returns previous values",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "setWakeThreshold": {
+    "direct": false,
+    "doc": "function(threshold:number):number -- Set the wake-up threshold.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "setWirelessFrequency": {
+    "direct": false,
+    "doc": "function(frequency:number):number -- Set the wireless redstone frequency to use.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "setWirelessOutput": {
+    "direct": false,
+    "doc": "function(value:boolean):boolean -- Set the wireless redstone output.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   }
+  }
+ },
+ "relay": {
+  "classes": [
+   "li.cil.oc.common.tileentity.Relay$$anonfun$3"
+  ],
+  "methods": {}
+ },
+ "robot": {
+  "classes": [
+   "li.cil.oc.common.tileentity.RobotProxy",
+   "li.cil.oc.server.component.Robot"
+  ],
+  "methods": {
+   "compare": {
+    "direct": false,
+    "doc": "function(side:number[, fuzzy:boolean=false]):boolean -- Compare the block on the specified side with the one in the selected slot. Returns true if equal.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "compareFluid": {
+    "direct": false,
+    "doc": "function(side:number [, tank:number]):boolean -- Compare the fluid in the selected tank with the fluid in the specified tank on the specified side. Returns true if equal.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "compareFluidTo": {
+    "direct": false,
+    "doc": "function(index:number):boolean -- Compares the fluids in the selected and the specified tank. Returns true if equal.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "compareTo": {
+    "direct": false,
+    "doc": "function(otherSlot:number[, checkNBT:boolean=false]):boolean -- Compare the contents of the selected slot to the contents of the specified slot.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "count": {
+    "direct": true,
+    "doc": "function([slot:number]):number -- Get the number of items in the specified slot, otherwise in the selected slot.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "detect": {
+    "direct": false,
+    "doc": "function(side:number):boolean, string -- Checks the contents of the block on the specified sides and returns the findings.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "drain": {
+    "direct": false,
+    "doc": "function(side:boolean[, amount:number=1000]):boolean, number or string -- Drains the specified amount of fluid from the specified side. Returns the amount drained, or an error message.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "drop": {
+    "direct": false,
+    "doc": "function(side:number[, count:number=64]):boolean -- Drops items from the selected slot towards the specified side.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "durability": {
+    "direct": false,
+    "doc": "function():number -- Get the durability of the currently equipped tool.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "fill": {
+    "direct": false,
+    "doc": "function(side:number[, amount:number=1000]):boolean, number of string -- Eject the specified amount of fluid to the specified side. Returns the amount ejected or an error message.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "getLightColor": {
+    "direct": false,
+    "doc": "function():number -- Get the current color of the activity light as an integer encoded RGB value (0xRRGGBB).",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "getName": {
+    "direct": false,
+    "doc": "function():string -- Returns the robot name.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "inventorySize": {
+    "direct": false,
+    "doc": "function():number -- The size of this device's internal inventory.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "isRunning": {
+    "direct": true,
+    "doc": "function():boolean -- Returns whether the robot is running.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "move": {
+    "direct": false,
+    "doc": "function(direction:number):boolean -- Move in the specified direction.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "name": {
+    "direct": false,
+    "doc": "function():string -- Get the name of the agent.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "place": {
+    "direct": false,
+    "doc": "function(side:number[, face:number=side[, sneaky:boolean=false]]):boolean -- Place a block towards the specified side. The `face' allows a more precise click calibration, and is relative to the targeted blockspace.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "select": {
+    "direct": false,
+    "doc": "function([slot:number]):number -- Get the currently selected slot; set the selected slot if specified.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "selectTank": {
+    "direct": false,
+    "doc": "function([index:number]):number -- Select a tank and/or get the number of the currently selected tank.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "setLightColor": {
+    "direct": false,
+    "doc": "function(value:number):number -- Set the color of the activity light to the specified integer encoded RGB value (0xRRGGBB).",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "setName": {
+    "direct": false,
+    "doc": "function(name: string):string -- Sets a new name and returns the old name. Robot must not be running",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "space": {
+    "direct": true,
+    "doc": "function([slot:number]):number -- Get the remaining space in the specified slot, otherwise in the selected slot.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "start": {
+    "direct": false,
+    "doc": "function():boolean -- Starts the robot. Returns true if the state changed.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "stop": {
+    "direct": false,
+    "doc": "function():boolean -- Stops the robot. Returns true if the state changed.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "suck": {
+    "direct": false,
+    "doc": "function(side:number[, count:number=64]):boolean -- Suck up items from the specified side.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "swing": {
+    "direct": false,
+    "doc": "function(side:number[, face:number=side[, sneaky:boolean=false]]):boolean, string -- Perform a 'left click' towards the specified side. The `face' allows a more precise click calibration, and is relative to the targeted blockspace.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "tankCount": {
+    "direct": false,
+    "doc": "function():number -- The number of tanks installed in the device.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "tankLevel": {
+    "direct": true,
+    "doc": "function([index:number]):number -- Get the fluid amount in the specified or selected tank.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "tankSpace": {
+    "direct": true,
+    "doc": "function([index:number]):number -- Get the remaining fluid capacity in the specified or selected tank.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "transferFluidTo": {
+    "direct": false,
+    "doc": "function(index:number[, count:number=1000]):boolean -- Move the specified amount of fluid from the selected tank into the specified tank.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "transferTo": {
+    "direct": false,
+    "doc": "function(toSlot:number[, amount:number]):boolean -- Move up to the specified amount of items from the selected slot into the specified slot.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "turn": {
+    "direct": false,
+    "doc": "function(clockwise:boolean):boolean -- Rotate in the specified direction.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "use": {
+    "direct": false,
+    "doc": "function(side:number[, face:number=side[, sneaky:boolean=false[, duration:number=0]]]):boolean, string -- Perform a 'right click' towards the specified side. The `face' allows a more precise click calibration, and is relative to the targeted blockspace.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   }
+  }
+ },
+ "screen": {
+  "classes": [
+   "li.cil.oc.common.component.Screen",
+   "li.cil.oc.common.component.TextBuffer"
+  ],
+  "methods": {
+   "getAspectRatio": {
+    "direct": true,
+    "doc": "function():number, number -- The aspect ratio of the screen. For multi-block screens this is the number of blocks, horizontal and vertical.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "getKeyboards": {
+    "direct": false,
+    "doc": "function():table -- The list of keyboards attached to the screen.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "isOn": {
+    "direct": true,
+    "doc": "function():boolean -- Returns whether the screen is currently on.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "isPrecise": {
+    "direct": true,
+    "doc": "function():boolean -- Returns whether the screen is in high precision mode (sub-pixel mouse event positions).",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "isTouchModeInverted": {
+    "direct": true,
+    "doc": "function():boolean -- Whether touch mode is inverted (sneak-activate opens GUI, instead of normal activate).",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "setPrecise": {
+    "direct": false,
+    "doc": "function(enabled:boolean):boolean -- Set whether to use high precision mode (sub-pixel mouse event positions).",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "setTouchModeInverted": {
+    "direct": false,
+    "doc": "function(value:boolean):boolean -- Sets whether to invert touch mode (sneak-activate opens GUI, instead of normal activate).",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "turnOff": {
+    "direct": false,
+    "doc": "function():boolean -- Turns off the screen. Returns true if it was on.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "turnOn": {
+    "direct": false,
+    "doc": "function():boolean -- Turns the screen on. Returns true if it was off.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   }
+  }
+ },
+ "sign": {
+  "classes": [
+   "li.cil.oc.server.component.UpgradeSignInAdapter",
+   "li.cil.oc.server.component.UpgradeSignInRotatable"
+  ],
+  "methods": {
+   "getValue": {
+    "direct": false,
+    "doc": "function(side:number):string -- Get the text on the sign on the specified side of the adapter.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "setValue": {
+    "direct": false,
+    "doc": "function(side:number, value:string):string -- Set the text on the sign on the specified side of the adapter.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   }
+  }
+ },
+ "tablet": {
+  "classes": [
+   "li.cil.oc.server.component.Tablet"
+  ],
+  "methods": {
+   "getPitch": {
+    "direct": false,
+    "doc": "function():number -- Gets the pitch of the player holding the tablet.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "getYaw": {
+    "direct": false,
+    "doc": "function():number -- Gets the yaw of the player holding the tablet.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   }
+  }
+ },
+ "tank_controller": {
+  "classes": [
+   "li.cil.oc.server.component.UpgradeTankController$Adapter",
+   "li.cil.oc.server.component.UpgradeTankController$Drone",
+   "li.cil.oc.server.component.UpgradeTankController$Robot"
+  ],
+  "methods": {
+   "drain": {
+    "direct": false,
+    "doc": "function([amount:number]):boolean -- Transfers fluid from a tank in the selected inventory slot to the selected tank.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "fill": {
+    "direct": false,
+    "doc": "function([amount:number]):boolean -- Transfers fluid from the selected tank to a tank in the selected inventory slot.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "getFluidInInternalTank": {
+    "direct": false,
+    "doc": "function([tank:number]):table -- Get a description of the fluid in the tank in the specified slot or the selected slot.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "getFluidInTank": {
+    "direct": false,
+    "doc": "function(side:number [, tank:number]):table -- Get a description of the fluid in the the tank on the specified side.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "getFluidInTankInSlot": {
+    "direct": false,
+    "doc": "function([slot:number]):table -- Get a description of the fluid in the tank item in the specified slot or the selected slot.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "getTankCapacity": {
+    "direct": false,
+    "doc": "function(side:number [, tank:number]):number -- Get the capacity of the tank on the specified side.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "getTankCapacityInSlot": {
+    "direct": false,
+    "doc": "function([slot:number]):number -- Get the capacity of the tank item in the specified slot of the robot or the selected slot.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "getTankLevel": {
+    "direct": false,
+    "doc": "function(side:number [, tank:number]):number -- Get the amount of fluid in the tank on the specified side.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "getTankLevelInSlot": {
+    "direct": false,
+    "doc": "function([slot:number]):number -- Get the amount of fluid in the tank item in the specified slot or the selected slot.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   }
+  }
+ },
+ "tractor_beam": {
+  "classes": [
+   "li.cil.oc.server.component.UpgradeTractorBeam$Common",
+   "li.cil.oc.server.component.UpgradeTractorBeam$Drone",
+   "li.cil.oc.server.component.UpgradeTractorBeam$Player"
+  ],
+  "methods": {
+   "suck": {
+    "direct": false,
+    "doc": "function():boolean -- Tries to pick up a random item in the robots' vicinity.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   }
+  }
+ },
+ "trading": {
+  "classes": [
+   "li.cil.oc.server.component.UpgradeTrading"
+  ],
+  "methods": {
+   "getTrades": {
+    "direct": false,
+    "doc": "function():table -- Returns a table of trades in range as userdata objects.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   }
+  }
+ },
+ "transposer": {
+  "classes": [
+   "li.cil.oc.server.component.Transposer$Block",
+   "li.cil.oc.server.component.Transposer$Common",
+   "li.cil.oc.server.component.Transposer$Upgrade"
+  ],
+  "methods": {
+   "areStacksEquivalent": {
+    "direct": false,
+    "doc": "function(side:number, slotA:number, slotB:number):boolean -- Get whether the items in the two specified slots of the inventory on the specified side of the device are equivalent (have shared OreDictionary IDs).",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "compareStackToDatabase": {
+    "direct": false,
+    "doc": "function(side:number, slot:number, dbAddress:string, dbSlot:number[, checkNBT:boolean=false]):boolean -- Compare an item in the specified slot in the inventory on the specified side with one in the database with the specified address.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "compareStacks": {
+    "direct": false,
+    "doc": "function(side:number, slotA:number, slotB:number[, checkNBT:boolean=false]):boolean -- Get whether the items in the two specified slots of the inventory on the specified side of the device are of the same type.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "getAllStacks": {
+    "direct": false,
+    "doc": "function(side:number):userdata -- Get a description of all stacks in the inventory on the specified side of the device.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "getFluidInTank": {
+    "direct": false,
+    "doc": "function(side:number [, tank:number]):table -- Get a description of the fluid in the the tank on the specified side.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "getInventoryName": {
+    "direct": false,
+    "doc": "function(side:number):string -- Get the the name of the inventory on the specified side of the device.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "getInventorySize": {
+    "direct": false,
+    "doc": "function(side:number):number -- Get the number of slots in the inventory on the specified side of the device.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "getSlotMaxStackSize": {
+    "direct": false,
+    "doc": "function(side:number, slot:number):number -- Get the maximum number of items in the specified slot of the inventory on the specified side of the device.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "getSlotStackSize": {
+    "direct": false,
+    "doc": "function(side:number, slot:number):number -- Get number of items in the specified slot of the inventory on the specified side of the device.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "getStackInSlot": {
+    "direct": false,
+    "doc": "function(side:number, slot:number):table -- Get a description of the stack in the inventory on the specified side of the device.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "getTankCapacity": {
+    "direct": false,
+    "doc": "function(side:number [, tank:number]):number -- Get the capacity of the tank on the specified side.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "getTankLevel": {
+    "direct": false,
+    "doc": "function(side:number [, tank:number]):number -- Get the amount of fluid in the tank on the specified side.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "store": {
+    "direct": false,
+    "doc": "function(side:number, slot:number, dbAddress:string, dbSlot:number):boolean -- Store an item stack description in the specified slot of the database with the specified address.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "transferFluid": {
+    "direct": false,
+    "doc": "function(sourceSide:number, sinkSide:number[, count:number]):number -- Transfer some items between two inventories.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "transferItem": {
+    "direct": false,
+    "doc": "function(sourceSide:number, sinkSide:number[, count:number[, sourceSlot:number[, sinkSlot:number]]]):boolean -- Transfer some items between two inventories.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   }
+  }
+ },
+ "tunnel": {
+  "classes": [
+   "li.cil.oc.server.component.LinkedCard"
+  ],
+  "methods": {
+   "getChannel": {
+    "direct": true,
+    "doc": "function():string -- Gets this link card's shared channel address",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "getWakeMessage": {
+    "direct": true,
+    "doc": "function():string, boolean -- Get the current wake-up message.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "maxPacketSize": {
+    "direct": true,
+    "doc": "function():number -- Gets the maximum packet size (config setting).",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "send": {
+    "direct": false,
+    "doc": "function(data...) -- Sends the specified data to the card this one is linked to.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "setWakeMessage": {
+    "direct": false,
+    "doc": "function(message:string[, fuzzy:boolean]):string -- Set the wake-up message and whether to ignore additional data/parameters.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   }
+  }
+ },
+ "waypoint": {
+  "classes": [
+   "li.cil.oc.common.tileentity.Waypoint"
+  ],
+  "methods": {
+   "getLabel": {
+    "direct": false,
+    "doc": "function(): string -- Get the current label of this waypoint.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   },
+   "setLabel": {
+    "direct": false,
+    "doc": "function(value:string) -- Set the label for this waypoint.",
+    "getter": false,
+    "limit": 2147483647,
+    "setter": false
+   }
+  }
+ }
+}

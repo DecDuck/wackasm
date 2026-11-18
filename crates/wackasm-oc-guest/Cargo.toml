@@ -1,0 +1,23 @@
+[package]
+name = "wackasm-oc-guest"
+version = "0.1.0"
+edition = "2024"
+description = "Example OpenComputers guest for the wackasm architecture; bundled as the mod's default boot.wasm"
+
+# Built only for wasm32-unknown-unknown, so it lives outside the host workspace.
+[workspace]
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+# Needed by the shared value codec (../wackasm-oc/src/value.rs).
+anyhow = "1.0.104"
+serde = { version = "1.0.229", features = ["derive"] }
+
+[profile.release]
+opt-level = "s"
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true

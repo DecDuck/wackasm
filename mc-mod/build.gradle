@@ -1,0 +1,158 @@
+plugins {
+    id 'java'
+    id 'com.gtnewhorizons.retrofuturagradle' version '2.0.3'
+}
+
+group = 'dev.wackasm'
+version = mod_version
+base { archivesName = 'wackasm-oc' }
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(8)
+        // Azul ships Java 8 for every platform, including macOS arm64.
+        vendor = JvmVendorSpec.AZUL
+    }
+}
+
+tasks.withType(JavaCompile).configureEach { options.encoding = 'UTF-8' }
+
+minecraft {
+    mcVersion = '1.12.2'
+    mcpMappingChannel = 'stable'
+    mcpMappingVersion = '39'
+    username = 'Developer'
+}
+
+repositories {
+    maven {
+        name = 'OpenComputers'
+        url = 'https://maven.cil.li/'
+        content { includeGroup 'li.cil.oc' }
+    }
+}
+
+dependencies {
+    // The full mod (not just the API), so runClient/runServer have OpenComputers loaded.
+    implementation(rfg.deobf("li.cil.oc:OpenComputers:${oc_version}")) { transitive = false }
+
+    testImplementation platform('org.junit:junit-bom:5.10.2')
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+test {
+    useJUnitPlatform()
+    javaLauncher = javaToolchains.launcherFor { languageVersion = JavaLanguageVersion.of(8) }
+}
+
+// ---------------------------------------------------------------------------
+// Native side, all built with cargo and packaged into the jar:
+//   natives/<os>-<arch>/   wackasm_oc, the JNI library
+//   assets/wackasm/bios.wasm               the EEPROM (WebAssembly BIOS) code
+//   assets/wackasm/loot/shell/init.wasm    the "wackasm shell" loot floppy
+//   assets/wackasm/loot/shell/bin/*.wasm   example WASI programs on it
+// ---------------------------------------------------------------------------
+
+def repoRoot = rootProject.projectDir.parentFile
+def guestDir = new File(repoRoot, 'crates/wackasm-oc-guest')
+def biosDir = new File(repoRoot, 'crates/wackasm-oc-bios')
+def programsDir = new File(repoRoot, 'crates/wackasm-oc-programs')
+def wasmOut = 'target/wasm32-unknown-unknown/release'
+// OpenComputers' default eepromSize.
+def eepromSize = 4096
+def skipCargo = providers.gradleProperty('skip_cargo').map { it.toBoolean() }.getOrElse(false)
+
+static String hostPlatform() {
+    def os = System.getProperty('os.name').toLowerCase(Locale.ROOT)
+    def arch = System.getProperty('os.arch').toLowerCase(Locale.ROOT)
+    def osName = os.contains('win') ? 'windows' : os.contains('mac') ? 'macos' : 'linux'
+    def archName = arch in ['amd64', 'x86_64'] ? 'x86_64' : arch in ['aarch64', 'arm64'] ? 'aarch64' : arch
+    return "${osName}-${archName}"
+}
+
+def cargoNative = tasks.register('cargoNative', Exec) {
+    group = 'wackasm'
+    description = 'Builds the wackasm_oc JNI library (cargo build --release)'
+    enabled = !skipCargo
+    workingDir = repoRoot
+    commandLine 'cargo', 'build', '-p', 'wackasm-oc', '--release'
+    // cargo does its own up-to-date checking.
+    outputs.upToDateWhen { false }
+}
+
+def cargoBios = tasks.register('cargoBios', Exec) {
+    group = 'wackasm'
+    description = 'Builds the WebAssembly BIOS for wasm32-unknown-unknown'
+    enabled = !skipCargo
+    workingDir = biosDir
+    commandLine 'cargo', 'build', '--release', '--target', 'wasm32-unknown-unknown'
+    outputs.upToDateWhen { false }
+}
+
+def cargoGuest = tasks.register('cargoGuest', Exec) {
+    group = 'wackasm'
+    description = 'Builds init.wasm for the shell floppy (wasm32-unknown-unknown)'
+    enabled = !skipCargo
+    workingDir = guestDir
+    commandLine 'cargo', 'build', '--release', '--target', 'wasm32-unknown-unknown'
+    outputs.upToDateWhen { false }
+}
+
+def cargoPrograms = tasks.register('cargoPrograms', Exec) {
+    group = 'wackasm'
+    description = 'Builds the example WASI programs for the shell floppy (wasm32-wasip1)'
+    enabled = !skipCargo
+    workingDir = programsDir
+    commandLine 'cargo', 'build', '--release', '--target', 'wasm32-wasip1'
+    outputs.upToDateWhen { false }
+}
+
+def stageNatives = tasks.register('stageNatives', Sync) {
+    group = 'wackasm'
+    description = 'Collects the native library, BIOS and shell into a resource directory'
+    dependsOn cargoNative, cargoBios, cargoGuest, cargoPrograms
+    into layout.buildDirectory.dir('generated/wackasm-resources')
+    from(new File(repoRoot, 'target/release')) {
+        include 'wackasm_oc.dll', 'libwackasm_oc.so', 'libwackasm_oc.dylib'
+        into "natives/${hostPlatform()}"
+    }
+    // Libraries cross-built for other platforms can be dropped in
+    // natives-extra/<os>-<arch>/ to ship a multi-platform jar.
+    from(file('natives-extra')) { into 'natives' }
+    from(new File(biosDir, "${wasmOut}/wackasm_oc_bios.wasm")) {
+        rename { 'bios.wasm' }
+        into 'assets/wackasm'
+    }
+    from(new File(guestDir, "${wasmOut}/wackasm_oc_guest.wasm")) {
+        rename { 'init.wasm' }
+        into 'assets/wackasm/loot/shell'
+    }
+    from(new File(programsDir, 'target/wasm32-wasip1/release')) {
+        include '*.wasm'
+        into 'assets/wackasm/loot/shell/bin'
+    }
+    doLast {
+        def lib = fileTree(destinationDir) { include 'natives/**' }.files
+        if (lib.isEmpty()) throw new GradleException("No wackasm_oc library found in ${repoRoot}/target/release")
+        def bios = new File(destinationDir, 'assets/wackasm/bios.wasm')
+        if (!bios.isFile()) throw new GradleException("BIOS was not built: ${bios}")
+        if (bios.length() > eepromSize) {
+            throw new GradleException("bios.wasm is ${bios.length()} bytes; an EEPROM holds ${eepromSize}")
+        }
+        if (!new File(destinationDir, 'assets/wackasm/loot/shell/init.wasm').isFile()) {
+            throw new GradleException('Shell init.wasm was not built')
+        }
+    }
+}
+
+sourceSets.main.resources.srcDir(stageNatives)
+
+processResources {
+    inputs.property 'version', project.version
+    filesMatching('mcmod.info') { expand('version': project.version) }
+}
+
+// Dev runs keep their world in mc-mod/run/, so the work dir lands in
+// run/saves/<world>/wackasm (client) or run/world/wackasm (server).
+tasks.named('runServer', JavaExec).configure { args '--nogui' }

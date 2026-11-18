@@ -1,6 +1,5 @@
 package dev.wackasm.oc;
 
-import java.io.File;
 import java.nio.charset.StandardCharsets;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -23,7 +22,8 @@ import net.minecraft.nbt.NBTTagCompound;
 /**
  * An OpenComputers architecture that runs WebAssembly on wackasm.
  *
- * <p>Register it during mod init with {@code li.cil.oc.api.Machine.add(WackasmArchitecture.class)}.
+ * <p>{@link WackasmMod} registers it with OpenComputers. Any CPU can switch to
+ * it: sneak and right-click the CPU item to cycle architectures.
  *
  * <p>Execution model: {@link #runThreaded} calls {@code run()} in a loop. When
  * the guest needs the game, the native side suspends the guest with its import
@@ -34,18 +34,14 @@ import net.minecraft.nbt.NBTTagCompound;
  * suspended guest, including any pending request, is serialized into the
  * native work dir on save, and NBT only stores the key that names it.
  *
- * <p>System properties:
+ * <p>Settings live in {@link WackasmConfig} ({@code config/wackasm.cfg}). System properties:
  * <ul>
- *   <li>{@code wackasm.workdir}: native work dir (default {@code ./wackasm}). Holds snapshots, logs and an optional {@code boot.wasm}.</li>
- *   <li>{@code wackasm.fuel}: instructions per {@code runThreaded} slice (default 5,000,000).</li>
+ *   <li>{@code wackasm.workdir}: native work dir (default {@code <world>/wackasm}); see {@link WackasmPaths}.</li>
  * </ul>
  */
 @Architecture.Name("WebAssembly (wackasm)")
 public final class WackasmArchitecture implements Architecture {
     private static final String NBT_KEY = "wackasm:key";
-    private static final String WORK_DIR =
-            new File(System.getProperty("wackasm.workdir", "wackasm")).getAbsolutePath();
-    private static final long FUEL_PER_SLICE = Long.getLong("wackasm.fuel", 5_000_000L);
 
     private final Machine machine;
     /** Names this machine's snapshot. It is stable across reloads, unlike the handle. */
@@ -53,6 +49,10 @@ public final class WackasmArchitecture implements Architecture {
     private long handle;
     private boolean initialized;
     private long memoryBytes;
+    /** Host objects (file handles and so on) the guest holds by id. */
+    private final UserdataTable userdata = new UserdataTable();
+    /** Why the last boot failed. Reported from runThreaded, where OC shows it to the player. */
+    private String bootError;
 
     public WackasmArchitecture(Machine machine) {
         this.machine = machine;
@@ -84,20 +84,23 @@ public final class WackasmArchitecture implements Architecture {
         close();
         try {
             // Reuse the key across reboots. boot() deletes the stale snapshot.
-            handle = WackasmNative.create(WORK_DIR, key, machine.node().address());
+            handle = WackasmNative.create(WackasmPaths.workDir(), key, machine.node().address());
             WackasmNative.setMemoryLimit(handle, memoryBytes);
             WackasmNative.boot(handle, readEeprom());
-            initialized = true;
-            return true;
         } catch (Throwable t) {
-            machine.crash("wackasm: " + t.getMessage());
-            close();
-            return false;
+            // Like a missing Lua BIOS: start, then halt with the reason (for
+            // example "no bios found; install a configured EEPROM"), so the
+            // player sees it in the computer's GUI.
+            bootError = t.getMessage();
         }
+        initialized = true;
+        return true;
     }
 
     @Override
     public void close() {
+        userdata.disposeAll(machine);
+        bootError = null;
         if (handle != 0) {
             WackasmNative.destroy(handle);
             handle = 0;
@@ -111,6 +114,10 @@ public final class WackasmArchitecture implements Architecture {
         try {
             WackasmNative.save(handle);
             nbt.setString(NBT_KEY, key);
+            // Saved together with the snapshot, so the ids in it stay valid.
+            NBTTagCompound values = new NBTTagCompound();
+            userdata.save(values);
+            nbt.setTag("wackasm:userdata", values);
         } catch (IllegalStateException e) {
             // Without a snapshot the machine restarts after the next load.
             machine.crash("wackasm: failed to save: " + e.getMessage());
@@ -123,9 +130,10 @@ public final class WackasmArchitecture implements Architecture {
         if (!nbt.hasKey(NBT_KEY)) return;
         key = nbt.getString(NBT_KEY);
         try {
-            handle = WackasmNative.create(WORK_DIR, key, machine.node().address());
+            handle = WackasmNative.create(WackasmPaths.workDir(), key, machine.node().address());
             WackasmNative.setMemoryLimit(handle, memoryBytes);
             initialized = WackasmNative.load(handle);
+            if (initialized) userdata.load(nbt.getCompoundTag("wackasm:userdata"));
         } catch (IllegalStateException e) {
             initialized = false;
         }
@@ -145,10 +153,11 @@ public final class WackasmArchitecture implements Architecture {
 
     @Override
     public ExecutionResult runThreaded(boolean isSynchronizedReturn) {
+        if (bootError != null) return new ExecutionResult.Error(bootError);
         if (handle == 0) return new ExecutionResult.Error("wackasm: machine state was lost");
         try {
             while (true) {
-                int code = WackasmNative.run(handle, machine.upTime(), FUEL_PER_SLICE);
+                int code = WackasmNative.run(handle, machine.upTime(), WackasmConfig.fuelPerSlice);
                 switch (code) {
                     case WackasmNative.RUN_YIELD:
                         return new ExecutionResult.Sleep(0);
@@ -232,6 +241,16 @@ public final class WackasmArchitecture implements Architecture {
                         respondOk(null);
                         break;
                     }
+                    case WackasmNative.RUN_DEFAULT_DISK: {
+                        String disk;
+                        try {
+                            disk = defaultDisk();
+                        } catch (LimitReachedException e) {
+                            return new ExecutionResult.Sleep(0); // retried next tick
+                        }
+                        respondOk(disk == null ? new Object[0] : new Object[] {disk});
+                        break;
+                    }
                     default:
                         return new ExecutionResult.Error("wackasm: unknown run code " + code);
                 }
@@ -261,11 +280,11 @@ public final class WackasmArchitecture implements Architecture {
     private Object[] payload() {
         byte[] bytes = WackasmNative.payload(handle);
         if (bytes == null) throw new IllegalStateException("no pending request");
-        return OcValueCodec.decodeArray(bytes);
+        return OcValueCodec.decodeArray(bytes, userdata);
     }
 
     private void respondOk(Object value) {
-        WackasmNative.respond(handle, WackasmNative.STATUS_OK, value == null ? null : OcValueCodec.encode(value));
+        WackasmNative.respond(handle, WackasmNative.STATUS_OK, value == null ? null : OcValueCodec.encode(value, userdata));
     }
 
     private void respondStatus(int status, String message) {
@@ -275,7 +294,7 @@ public final class WackasmArchitecture implements Architecture {
     /** Performs a component call and responds with its results or its error. */
     private void invoke(String address, String method, Object[] args) throws LimitReachedException {
         try {
-            respondOk(machine.invoke(address, method, args));
+            respondOk(call(address, method, args));
         } catch (LimitReachedException e) {
             throw e;
         } catch (NoSuchMethodException e) {
@@ -285,6 +304,91 @@ public final class WackasmArchitecture implements Architecture {
             respondStatus(missing ? WackasmNative.STATUS_NO_SUCH_COMPONENT : WackasmNative.STATUS_ERROR,
                     missing ? "no such component" : String.valueOf(t.getMessage()));
         }
+    }
+
+    /**
+     * The filesystem WASI programs see as {@code /}, the first usable disk:
+     * <ol>
+     *   <li>the boot disk (the BIOS records it in the EEPROM's data), if writable;</li>
+     *   <li>else the first writable filesystem. When booting from the read-only
+     *       shell floppy, that is usually the hard drive;</li>
+     *   <li>else the boot disk, read-only;</li>
+     *   <li>else the first filesystem at all.</li>
+     * </ol>
+     * The computer's tmpfs is never chosen. Filesystems are taken in address
+     * order, so the choice is stable while the same disks are installed.
+     */
+    private String defaultDisk() throws LimitReachedException {
+        Map<String, String> components = machine.components();
+        String tmp = machine.tmpAddress();
+        java.util.List<String> disks = new java.util.ArrayList<>();
+        for (Map.Entry<String, String> e : components.entrySet()) {
+            if ("filesystem".equals(e.getValue()) && !e.getKey().equals(tmp)) disks.add(e.getKey());
+        }
+        java.util.Collections.sort(disks);
+
+        String boot = bootAddress(components);
+        if (boot != null && disks.remove(boot)) disks.add(0, boot);
+        for (String disk : disks) {
+            if (!readOnly(disk)) return disk;
+        }
+        return disks.isEmpty() ? null : disks.get(0);
+    }
+
+    private String bootAddress(Map<String, String> components) throws LimitReachedException {
+        for (Map.Entry<String, String> e : components.entrySet()) {
+            if (!"eeprom".equals(e.getValue())) continue;
+            try {
+                Object[] data = call(e.getKey(), "getData", new Object[0]);
+                if (data != null && data.length > 0 && data[0] instanceof byte[]) {
+                    return new String((byte[]) data[0], StandardCharsets.UTF_8);
+                }
+            } catch (LimitReachedException limit) {
+                throw limit;
+            } catch (Exception ignored) {
+                // No usable boot address.
+            }
+        }
+        return null;
+    }
+
+    private boolean readOnly(String disk) throws LimitReachedException {
+        try {
+            Object[] result = call(disk, "isReadOnly", new Object[0]);
+            return result != null && result.length > 0 && Boolean.TRUE.equals(result[0]);
+        } catch (LimitReachedException limit) {
+            throw limit;
+        } catch (Exception e) {
+            return true;
+        }
+    }
+
+    /**
+     * {@link Machine#invoke}, but direct calls draw on the call budget at
+     * {@link WackasmConfig#callBudgetMultiplier} times the usual rate. This
+     * does what OpenComputers' {@code Machine.invoke} does for a component
+     * address: refuse while disconnected, require the component to be visible
+     * to this machine, charge direct callbacks {@code 1/limit} of the budget,
+     * and call {@link Component#invoke}. The only difference is the charge.
+     */
+    Object[] call(String address, String method, Object[] args) throws Exception {
+        double multiplier = WackasmConfig.callBudgetMultiplier;
+        if (multiplier == 1.0) return machine.invoke(address, method, args);
+
+        Node self = machine.node();
+        if (self == null || self.network() == null) throw new LimitReachedException();
+        Node node = self.network().node(address);
+        if (!(node instanceof Component)) throw new IllegalArgumentException("no such component");
+        Component component = (Component) node;
+        if (!component.canBeSeenFrom(self) && component != self) {
+            throw new IllegalArgumentException("no such component");
+        }
+        Callback callback = component.annotation(method);
+        if (callback != null && callback.direct()) {
+            // Throws LimitReachedException once the tick's budget is spent.
+            machine.consumeCallBudget(1.0 / callback.limit() / multiplier);
+        }
+        return component.invoke(method, machine, args);
     }
 
     private Component component(String address) {
@@ -300,15 +404,15 @@ public final class WackasmArchitecture implements Architecture {
         return cb == null || cb.direct(); // unknown methods also fail inline
     }
 
-    /** Fetches the EEPROM contents (OC's {@code eeprom.get}, a direct callback). */
+    /** The first EEPROM's code (OC's {@code eeprom.get}, a direct callback), or null if there is none. */
     private byte[] readEeprom() {
         for (Map.Entry<String, String> e : machine.components().entrySet()) {
             if (!"eeprom".equals(e.getValue())) continue;
             try {
-                Object[] result = machine.invoke(e.getKey(), "get", new Object[0]);
+                Object[] result = call(e.getKey(), "get", new Object[0]);
                 if (result != null && result.length > 0 && result[0] instanceof byte[]) return (byte[]) result[0];
             } catch (Exception ignored) {
-                // Fall through to the work-dir boot image.
+                // Unreadable EEPROM: boot fails with "no bios found".
             }
         }
         return null;

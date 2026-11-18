@@ -118,6 +118,10 @@ ops!(|ctx, pc, stack, locals| match op {
         let result = ctx.memories.grow(*mem, amount)?;
         stack.push(Value(result as u64));
     }
+    memory_size @ MemorySize { mem } => {
+        let pages = ctx.memories.size(*mem)?;
+        stack.push(Value(pages as u64));
+    }
     memory_copy @ MemoryCopy { dst_mem, src_mem } => {
         let length = stack.pop_i32() as u32 as usize;
         let source = stack.pop_i32() as u32 as usize;
@@ -352,6 +356,37 @@ ops!(|ctx, pc, stack, locals| match op {
             .checked_div(rhs)
             .ok_or_else(|| trap!("integer divide by zero"))?)
     }
+    i32_div_s @ I32DivS => {
+        i32_binop!(stack, i32, |lhs, rhs| lhs.checked_div(rhs).ok_or_else(|| {
+            if rhs == 0 {
+                trap!("integer divide by zero")
+            } else {
+                trap!("integer overflow")
+            }
+        })?)
+    }
+    i32_popcnt @ I32Popcnt => {
+        let value = stack.pop_i32();
+        stack.push(Value(value.count_ones() as u64));
+    }
+    // rem: dividing by zero traps; MIN % -1 is 0 rather than an overflow.
+    i32_rem_s @ I32RemS => {
+        i32_binop!(stack, i32, |lhs, rhs| {
+            if rhs == 0 {
+                Err(trap!("integer divide by zero"))?
+            }
+            lhs.wrapping_rem(rhs)
+        })
+    }
+    i32_rem_u @ I32RemU => {
+        i32_binop!(stack, u32, |lhs, rhs| lhs
+            .checked_rem(rhs)
+            .ok_or_else(|| trap!("integer divide by zero"))?)
+    }
+    i32_clz @ I32Clz => {
+        let value = stack.pop_i32();
+        stack.push(Value(value.leading_zeros() as u64));
+    }
     i32_shr_s @ I32ShrS => {
         i32_binop!(stack, i32, |lhs, rhs| lhs.wrapping_shr(rhs as u32))
     }
@@ -430,6 +465,40 @@ ops!(|ctx, pc, stack, locals| match op {
     i64_sub @ I64Sub => {
         i64_binop!(stack, i64, |lhs, rhs| lhs.wrapping_sub(rhs))
     }
+    i64_shr_s @ I64ShrS => {
+        i64_binop!(stack, i64, |lhs, rhs| lhs.wrapping_shr(rhs as u32))
+    }
+    i64_div_u @ I64DivU => {
+        i64_binop!(stack, u64, |lhs, rhs| lhs
+            .checked_div(rhs)
+            .ok_or_else(|| trap!("integer divide by zero"))?)
+    }
+    i64_div_s @ I64DivS => {
+        i64_binop!(stack, i64, |lhs, rhs| lhs.checked_div(rhs).ok_or_else(|| {
+            if rhs == 0 {
+                trap!("integer divide by zero")
+            } else {
+                trap!("integer overflow")
+            }
+        })?)
+    }
+    i64_rem_s @ I64RemS => {
+        i64_binop!(stack, i64, |lhs, rhs| {
+            if rhs == 0 {
+                Err(trap!("integer divide by zero"))?
+            }
+            lhs.wrapping_rem(rhs)
+        })
+    }
+    i64_rem_u @ I64RemU => {
+        i64_binop!(stack, u64, |lhs, rhs| lhs
+            .checked_rem(rhs)
+            .ok_or_else(|| trap!("integer divide by zero"))?)
+    }
+    i64_clz @ I64Clz => {
+        let value = stack.pop_i64();
+        stack.push(Value(value.leading_zeros() as u64));
+    }
     i64_shr_u @ I64ShrU => {
         i64_binop!(stack, u64, |lhs, rhs| lhs.wrapping_shr(rhs as u32))
     }
@@ -507,6 +576,331 @@ ops!(|ctx, pc, stack, locals| match op {
         let value = stack.pop_i64();
         stack.push(Value(value as i32 as u64));
     }
+    i32_extend_16_s @ I32Extend16S => {
+        let value = stack.pop_i32();
+        stack.push(Value(value as i16 as u64));
+    }
+    i64_extend_i32_s @ I64ExtendI32S => {
+        let value = stack.pop_i32();
+        stack.push(Value(value as i64 as u64));
+    }
+    f64_convert_i64_s @ F64ConvertI64S => {
+        let value = stack.pop_i64();
+        stack.push(Value::from_f64(value as f64));
+    }
+    // f64 comparisons, sign operations and bit casts: exact, no rounding.
+    f64_eq @ F64Eq => {
+        let rhs = stack.pop_f64();
+        let lhs = stack.pop_f64();
+        stack.push(Value((lhs == rhs) as u64));
+    }
+    f64_ne @ F64Ne => {
+        let rhs = stack.pop_f64();
+        let lhs = stack.pop_f64();
+        stack.push(Value((lhs != rhs) as u64));
+    }
+    f64_lt @ F64Lt => {
+        let rhs = stack.pop_f64();
+        let lhs = stack.pop_f64();
+        stack.push(Value((lhs < rhs) as u64));
+    }
+    f64_gt @ F64Gt => {
+        let rhs = stack.pop_f64();
+        let lhs = stack.pop_f64();
+        stack.push(Value((lhs > rhs) as u64));
+    }
+    f64_le @ F64Le => {
+        let rhs = stack.pop_f64();
+        let lhs = stack.pop_f64();
+        stack.push(Value((lhs <= rhs) as u64));
+    }
+    f64_ge @ F64Ge => {
+        let rhs = stack.pop_f64();
+        let lhs = stack.pop_f64();
+        stack.push(Value((lhs >= rhs) as u64));
+    }
+    f64_abs @ F64Abs => {
+        let value = stack.pop_f64();
+        stack.push(Value::from_f64(value.abs()));
+    }
+    f64_neg @ F64Neg => {
+        let value = stack.pop_f64();
+        stack.push(Value::from_f64(-value));
+    }
+    f64_copysign @ F64Copysign => {
+        let sign = stack.pop_f64();
+        let magnitude = stack.pop_f64();
+        stack.push(Value::from_f64(magnitude.copysign(sign)));
+    }
+    f64_reinterpret_i64 @ F64ReinterpretI64 => {
+        let value = stack.pop_i64();
+        stack.push(Value(value as u64));
+    }
+    // Scalar float arithmetic and conversions (IEEE 754, as wasm specifies).
+    f32_add @ F32Add => {
+        let rhs = stack.pop_f32();
+        let lhs = stack.pop_f32();
+        stack.push(Value::from_f32(lhs + rhs));
+    }
+    f32_sub @ F32Sub => {
+        let rhs = stack.pop_f32();
+        let lhs = stack.pop_f32();
+        stack.push(Value::from_f32(lhs - rhs));
+    }
+    f32_mul @ F32Mul => {
+        let rhs = stack.pop_f32();
+        let lhs = stack.pop_f32();
+        stack.push(Value::from_f32(lhs * rhs));
+    }
+    f32_div @ F32Div => {
+        let rhs = stack.pop_f32();
+        let lhs = stack.pop_f32();
+        stack.push(Value::from_f32(lhs / rhs));
+    }
+    f32_min @ F32Min => {
+        let rhs = stack.pop_f32();
+        let lhs = stack.pop_f32();
+        stack.push(Value::from_f32(wasm_min_f32(lhs, rhs)));
+    }
+    f32_max @ F32Max => {
+        let rhs = stack.pop_f32();
+        let lhs = stack.pop_f32();
+        stack.push(Value::from_f32(wasm_max_f32(lhs, rhs)));
+    }
+    f32_sqrt @ F32Sqrt => {
+        let value = stack.pop_f32();
+        stack.push(Value::from_f32(quiet_f32(value.sqrt())));
+    }
+    f32_ceil @ F32Ceil => {
+        let value = stack.pop_f32();
+        stack.push(Value::from_f32(quiet_f32(value.ceil())));
+    }
+    f32_floor @ F32Floor => {
+        let value = stack.pop_f32();
+        stack.push(Value::from_f32(quiet_f32(value.floor())));
+    }
+    f32_trunc @ F32Trunc => {
+        let value = stack.pop_f32();
+        stack.push(Value::from_f32(quiet_f32(value.trunc())));
+    }
+    f32_nearest @ F32Nearest => {
+        let value = stack.pop_f32();
+        stack.push(Value::from_f32(quiet_f32(value.round_ties_even())));
+    }
+    f64_add @ F64Add => {
+        let rhs = stack.pop_f64();
+        let lhs = stack.pop_f64();
+        stack.push(Value::from_f64(lhs + rhs));
+    }
+    f64_sub @ F64Sub => {
+        let rhs = stack.pop_f64();
+        let lhs = stack.pop_f64();
+        stack.push(Value::from_f64(lhs - rhs));
+    }
+    f64_mul @ F64Mul => {
+        let rhs = stack.pop_f64();
+        let lhs = stack.pop_f64();
+        stack.push(Value::from_f64(lhs * rhs));
+    }
+    f64_div @ F64Div => {
+        let rhs = stack.pop_f64();
+        let lhs = stack.pop_f64();
+        stack.push(Value::from_f64(lhs / rhs));
+    }
+    f64_min @ F64Min => {
+        let rhs = stack.pop_f64();
+        let lhs = stack.pop_f64();
+        stack.push(Value::from_f64(wasm_min_f64(lhs, rhs)));
+    }
+    f64_max @ F64Max => {
+        let rhs = stack.pop_f64();
+        let lhs = stack.pop_f64();
+        stack.push(Value::from_f64(wasm_max_f64(lhs, rhs)));
+    }
+    f64_sqrt @ F64Sqrt => {
+        let value = stack.pop_f64();
+        stack.push(Value::from_f64(quiet_f64(value.sqrt())));
+    }
+    f64_ceil @ F64Ceil => {
+        let value = stack.pop_f64();
+        stack.push(Value::from_f64(quiet_f64(value.ceil())));
+    }
+    f64_floor @ F64Floor => {
+        let value = stack.pop_f64();
+        stack.push(Value::from_f64(quiet_f64(value.floor())));
+    }
+    f64_trunc @ F64Trunc => {
+        let value = stack.pop_f64();
+        stack.push(Value::from_f64(quiet_f64(value.trunc())));
+    }
+    f64_nearest @ F64Nearest => {
+        let value = stack.pop_f64();
+        stack.push(Value::from_f64(quiet_f64(value.round_ties_even())));
+    }
+    f32_eq @ F32Eq => {
+        let rhs = stack.pop_f32();
+        let lhs = stack.pop_f32();
+        stack.push(Value((lhs == rhs) as u64));
+    }
+    f32_ne @ F32Ne => {
+        let rhs = stack.pop_f32();
+        let lhs = stack.pop_f32();
+        stack.push(Value((lhs != rhs) as u64));
+    }
+    f32_lt @ F32Lt => {
+        let rhs = stack.pop_f32();
+        let lhs = stack.pop_f32();
+        stack.push(Value((lhs < rhs) as u64));
+    }
+    f32_gt @ F32Gt => {
+        let rhs = stack.pop_f32();
+        let lhs = stack.pop_f32();
+        stack.push(Value((lhs > rhs) as u64));
+    }
+    f32_le @ F32Le => {
+        let rhs = stack.pop_f32();
+        let lhs = stack.pop_f32();
+        stack.push(Value((lhs <= rhs) as u64));
+    }
+    f32_ge @ F32Ge => {
+        let rhs = stack.pop_f32();
+        let lhs = stack.pop_f32();
+        stack.push(Value((lhs >= rhs) as u64));
+    }
+    f32_abs @ F32Abs => {
+        let value = stack.pop_f32();
+        stack.push(Value::from_f32(value.abs()));
+    }
+    f32_neg @ F32Neg => {
+        let value = stack.pop_f32();
+        stack.push(Value::from_f32(-value));
+    }
+    f32_copysign @ F32Copysign => {
+        let sign = stack.pop_f32();
+        let magnitude = stack.pop_f32();
+        stack.push(Value::from_f32(magnitude.copysign(sign)));
+    }
+    f32_demote_f64 @ F32DemoteF64 => {
+        let value = stack.pop_f64();
+        stack.push(Value::from_f32(value as f32));
+    }
+    f64_promote_f32 @ F64PromoteF32 => {
+        let value = stack.pop_f32();
+        stack.push(Value::from_f64(value as f64));
+    }
+    i32_reinterpret_f32 @ I32ReinterpretF32 => {
+        let value = stack.pop_f32();
+        stack.push(Value(value.to_bits() as i32 as u64));
+    }
+    f32_reinterpret_i32 @ F32ReinterpretI32 => {
+        let value = stack.pop_i32();
+        stack.push(Value::from_f32(f32::from_bits(value as u32)));
+    }
+    f32_convert_i32s @ F32ConvertI32S => {
+        let value = stack.pop_i32();
+        stack.push(Value::from_f32((value) as f32));
+    }
+    f32_convert_i32u @ F32ConvertI32U => {
+        let value = stack.pop_i32();
+        stack.push(Value::from_f32((value as u32) as f32));
+    }
+    f32_convert_i64s @ F32ConvertI64S => {
+        let value = stack.pop_i64();
+        stack.push(Value::from_f32((value) as f32));
+    }
+    f32_convert_i64u @ F32ConvertI64U => {
+        let value = stack.pop_i64();
+        stack.push(Value::from_f32((value as u64) as f32));
+    }
+    f64_convert_i32s @ F64ConvertI32S => {
+        let value = stack.pop_i32();
+        stack.push(Value::from_f64((value) as f64));
+    }
+    f64_convert_i32u @ F64ConvertI32U => {
+        let value = stack.pop_i32();
+        stack.push(Value::from_f64((value as u32) as f64));
+    }
+    f64_convert_i64u @ F64ConvertI64U => {
+        let value = stack.pop_i64();
+        stack.push(Value::from_f64((value as u64) as f64));
+    }
+    i32_trunc_f32_s @ I32TruncF32S => {
+        let value = stack.pop_f32() as f64;
+        let truncated = trunc_checked(value, -2147483649.0, 2147483648.0)?;
+        stack.push(Value(truncated as i32 as i32 as u64));
+    }
+    i32_trunc_f64_s @ I32TruncF64S => {
+        let value = stack.pop_f64();
+        let truncated = trunc_checked(value, -2147483649.0, 2147483648.0)?;
+        stack.push(Value(truncated as i32 as i32 as u64));
+    }
+    i32_trunc_sat_f32_s @ I32TruncSatF32S => {
+        let value = stack.pop_f32();
+        stack.push(Value(value as i32 as i32 as u64));
+    }
+    i32_trunc_sat_f64_s @ I32TruncSatF64S => {
+        let value = stack.pop_f64();
+        stack.push(Value(value as i32 as i32 as u64));
+    }
+    i32_trunc_f32_u @ I32TruncF32U => {
+        let value = stack.pop_f32() as f64;
+        let truncated = trunc_checked(value, -1.0, 4294967296.0)?;
+        stack.push(Value(truncated as u32 as u64));
+    }
+    i32_trunc_f64_u @ I32TruncF64U => {
+        let value = stack.pop_f64();
+        let truncated = trunc_checked(value, -1.0, 4294967296.0)?;
+        stack.push(Value(truncated as u32 as u64));
+    }
+    i32_trunc_sat_f32_u @ I32TruncSatF32U => {
+        let value = stack.pop_f32();
+        stack.push(Value(value as u32 as u64));
+    }
+    i64_trunc_f32_s @ I64TruncF32S => {
+        let value = stack.pop_f32() as f64;
+        let truncated = trunc_checked(value, -9223372036854777856.0, 9223372036854775808.0)?;
+        stack.push(Value(truncated as i64 as u64));
+    }
+    i64_trunc_f64_s @ I64TruncF64S => {
+        let value = stack.pop_f64();
+        let truncated = trunc_checked(value, -9223372036854777856.0, 9223372036854775808.0)?;
+        stack.push(Value(truncated as i64 as u64));
+    }
+    i64_trunc_sat_f32_s @ I64TruncSatF32S => {
+        let value = stack.pop_f32();
+        stack.push(Value(value as i64 as u64));
+    }
+    i64_trunc_f32_u @ I64TruncF32U => {
+        let value = stack.pop_f32() as f64;
+        let truncated = trunc_checked(value, -1.0, 18446744073709551616.0)?;
+        stack.push(Value(truncated as u64 as u64));
+    }
+    i64_trunc_f64_u @ I64TruncF64U => {
+        let value = stack.pop_f64();
+        let truncated = trunc_checked(value, -1.0, 18446744073709551616.0)?;
+        stack.push(Value(truncated as u64 as u64));
+    }
+    i64_trunc_sat_f32_u @ I64TruncSatF32U => {
+        let value = stack.pop_f32();
+        stack.push(Value(value as u64 as u64));
+    }
+    i64_trunc_sat_f64_u @ I64TruncSatF64U => {
+        let value = stack.pop_f64();
+        stack.push(Value(value as u64 as u64));
+    }
+    i64_reinterpret_f64 @ I64ReinterpretF64 => {
+        let value = stack.pop_f64();
+        stack.push(Value(value.to_bits()));
+    }
+    // Rust's float-to-int `as` saturates and maps NaN to 0, which is exactly trunc_sat.
+    i32_trunc_sat_f64_u @ I32TruncSatF64U => {
+        let value = stack.pop_f64();
+        stack.push(Value(value as u32 as u64));
+    }
+    i64_trunc_sat_f64_s @ I64TruncSatF64S => {
+        let value = stack.pop_f64();
+        stack.push(Value(value as i64 as u64));
+    }
 
     unreachable @ Unreachable => {
         Err(trap!("unreachable"))?;
@@ -523,4 +917,65 @@ pub fn dispatch<'a>(
     locals: LocalsHandle<'a>,
 ) -> Result<(), HaltError> {
     dispatch!(ctx, pc, stack, locals);
+}
+
+/// wasm `fmin`/`fmax`: NaN if either side is NaN (propagated, so it stays an
+/// arithmetic NaN), and -0 orders below +0, unlike `f64::min`/`max`.
+macro_rules! wasm_min_max {
+    ($t:ty, $min:ident, $max:ident) => {
+        #[inline(always)]
+        fn $min(lhs: $t, rhs: $t) -> $t {
+            if lhs.is_nan() || rhs.is_nan() {
+                lhs + rhs
+            } else if lhs == rhs {
+                <$t>::from_bits(lhs.to_bits() | rhs.to_bits())
+            } else if lhs < rhs {
+                lhs
+            } else {
+                rhs
+            }
+        }
+
+        #[inline(always)]
+        fn $max(lhs: $t, rhs: $t) -> $t {
+            if lhs.is_nan() || rhs.is_nan() {
+                lhs + rhs
+            } else if lhs == rhs {
+                <$t>::from_bits(lhs.to_bits() & rhs.to_bits())
+            } else if lhs > rhs {
+                lhs
+            } else {
+                rhs
+            }
+        }
+    };
+}
+wasm_min_max!(f32, wasm_min_f32, wasm_max_f32);
+wasm_min_max!(f64, wasm_min_f64, wasm_max_f64);
+
+/// Truncates toward zero for the trapping `iNN.trunc_fMM` operators: NaN and
+/// values outside the open interval `(low, high)` trap.
+#[inline(always)]
+fn trunc_checked(value: f64, low: f64, high: f64) -> Result<f64, HaltError> {
+    if value.is_nan() {
+        return Err(trap!("invalid conversion to integer"));
+    }
+    let truncated = value.trunc();
+    if truncated <= low || truncated >= high {
+        return Err(trap!("integer overflow"));
+    }
+    Ok(truncated)
+}
+
+/// Rust's rounding functions may return a signalling NaN input unchanged;
+/// wasm requires NaN results to be quiet ("arithmetic"). Sets the quiet bit,
+/// keeping the payload.
+#[inline(always)]
+fn quiet_f32(value: f32) -> f32 {
+    if value.is_nan() { f32::from_bits(value.to_bits() | 0x0040_0000) } else { value }
+}
+
+#[inline(always)]
+fn quiet_f64(value: f64) -> f64 {
+    if value.is_nan() { f64::from_bits(value.to_bits() | 0x0008_0000_0000_0000) } else { value }
 }

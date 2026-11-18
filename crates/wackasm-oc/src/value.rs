@@ -15,6 +15,10 @@
 //! | 6   | bytes  | `u32` byte length + raw bytes             |
 //! | 7   | array  | `u32` element count + values              |
 //! | 8   | map    | `u32` entry count + alternating key/value |
+//! | 9   | userdata | `u32` id of a host object (a file handle, say) |
+//!
+//! Userdata ids are opaque to the guest and to Rust. The Java side owns the
+//! objects they name, persists them in NBT, and disposes of them on shutdown.
 //!
 //! `OcValueCodec.java` is the Java twin of this module; keep them in sync.
 
@@ -30,6 +34,7 @@ pub const TAG_STRING: u8 = 5;
 pub const TAG_BYTES: u8 = 6;
 pub const TAG_ARRAY: u8 = 7;
 pub const TAG_MAP: u8 = 8;
+pub const TAG_USERDATA: u8 = 9;
 
 /// Nesting limit when decoding, so a hostile guest can't blow the host stack.
 pub const MAX_DEPTH: usize = 64;
@@ -46,6 +51,8 @@ pub enum OcValue {
     Bytes(Vec<u8>),
     Array(Vec<OcValue>),
     Map(Vec<(OcValue, OcValue)>),
+    /// A host object such as `filesystem.open`'s handle, by id.
+    Userdata(u32),
 }
 
 impl OcValue {
@@ -96,6 +103,10 @@ impl OcValue {
                     k.encode_into(out);
                     v.encode_into(out);
                 }
+            }
+            OcValue::Userdata(id) => {
+                out.push(TAG_USERDATA);
+                out.extend_from_slice(&id.to_le_bytes());
             }
         }
     }
@@ -202,6 +213,7 @@ impl<'a> Reader<'a> {
                 }
                 OcValue::Map(entries)
             }
+            TAG_USERDATA => OcValue::Userdata(self.u32()? as u32),
             other => bail!("unknown value tag {other}"),
         })
     }
@@ -222,8 +234,32 @@ mod tests {
             OcValue::str("héllo"),
             OcValue::Bytes(vec![0, 255, 7]),
             OcValue::Map(vec![(OcValue::str("k"), OcValue::Int(1))]),
+            OcValue::Userdata(7),
         ]);
         assert_eq!(OcValue::decode(&value.encode()).unwrap(), value);
+    }
+
+    /// The same bytes are asserted by `OcValueCodecTest.java` in the mod,
+    /// which pins the two codecs together.
+    #[test]
+    fn matches_java_vector() {
+        let vector: &[u8] = &[
+            7, 5, 0, 0, 0, // array of 5
+            0, // nil
+            2, // true
+            3, 7, 0, 0, 0, 0, 0, 0, 0, // int 7
+            5, 2, 0, 0, 0, b'h', b'i', // "hi"
+            9, 1, 0, 0, 0, // userdata #1
+        ];
+        let value = OcValue::Array(vec![
+            OcValue::Nil,
+            OcValue::Bool(true),
+            OcValue::Int(7),
+            OcValue::str("hi"),
+            OcValue::Userdata(1),
+        ]);
+        assert_eq!(value.encode(), vector);
+        assert_eq!(OcValue::decode(vector).unwrap(), value);
     }
 
     #[test]

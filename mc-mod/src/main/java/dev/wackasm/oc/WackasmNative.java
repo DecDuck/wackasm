@@ -20,6 +20,7 @@ public final class WackasmNative {
     public static final int RUN_COMPONENTS = 7;
     public static final int RUN_METHODS = 8;
     public static final int RUN_BEEP = 9;
+    public static final int RUN_DEFAULT_DISK = 10;
 
     // respond() statuses
     public static final int STATUS_OK = 0;
@@ -30,13 +31,7 @@ public final class WackasmNative {
     public static final int STATUS_NO_SUCH_METHOD = -4;
 
     static {
-        // -Dwackasm.native=/abs/path/wackasm_oc.dll overrides the library path lookup.
-        String explicit = System.getProperty("wackasm.native");
-        if (explicit != null) {
-            System.load(explicit);
-        } else {
-            System.loadLibrary("wackasm_oc");
-        }
+        NativeLoader.load();
     }
 
     private WackasmNative() {}
@@ -53,7 +48,7 @@ public final class WackasmNative {
 
     public static native void setMemoryLimit(long handle, long bytes);
 
-    /** Starts a fresh program from the EEPROM if it holds wasm, otherwise from {@code <workDir>/boot.wasm}. */
+    /** Starts the EEPROM's wasm code. Throws "no bios found; ..." if there is none, as Lua does. */
     public static native void boot(long handle, byte[] eepromOrNull);
 
     /** Runs up to {@code fuel} instructions. Returns a {@code RUN_*} code. */

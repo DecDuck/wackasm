@@ -4,7 +4,6 @@
 //!
 //! ```text
 //! <work_dir>/
-//!   boot.wasm            optional fallback image when the EEPROM isn't wasm
 //!   machines/<key>.state suspended executor snapshots
 //!   logs/<key>.log       output of the guest's `oc.log` import
 //! ```
@@ -102,13 +101,5 @@ impl WorkDir {
         let mut file = OpenOptions::new().create(true).append(true).open(&path)?;
         writeln!(file, "{line}")?;
         Ok(())
-    }
-
-    pub fn default_boot_image(&self) -> Result<Option<Vec<u8>>> {
-        match fs::read(self.root.join("boot.wasm")) {
-            Ok(bytes) => Ok(Some(bytes)),
-            Err(e) if e.kind() == io::ErrorKind::NotFound => Ok(None),
-            Err(e) => Err(e).context("reading boot.wasm"),
-        }
     }
 }

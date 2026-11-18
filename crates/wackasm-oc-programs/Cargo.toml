@@ -1,0 +1,18 @@
+[package]
+name = "wackasm-oc-programs"
+version = "0.1.0"
+edition = "2024"
+description = "Example WASI programs that the wackasm shell runs from /bin on its floppy"
+
+# Built only for wasm32-wasip1, so it lives outside the host workspace.
+[workspace]
+
+[dependencies]
+opencomputers = { path = "../opencomputers" }
+
+[profile.release]
+opt-level = "s"
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true

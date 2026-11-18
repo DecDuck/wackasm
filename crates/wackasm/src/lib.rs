@@ -4,6 +4,8 @@
 #![feature(try_trait_v2)]
 #![feature(macro_metavar_expr)]
 #![deny(unused_must_use)]
+// The `ops!` dispatch macro recurses once per operator.
+#![recursion_limit = "512"]
 
 mod blocks;
 mod compiler;

@@ -1,6 +1,6 @@
 [workspace]
-members = ["crates/wackasm", "crates/wackasm-cli", "crates/wackasm-spec-tests", "crates/wackasm-wasi", "crates/wackasm-oc", "wasi"]
-exclude = ["compute"]
+members = ["crates/wackasm", "crates/wackasm-cli", "crates/wackasm-spec-tests", "crates/wackasm-wasi", "crates/wackasm-oc", "crates/opencomputers", "wasi"]
+exclude = ["compute", "crates/wackasm-oc-guest"]
 resolver = "3"
 
 [profile.release]

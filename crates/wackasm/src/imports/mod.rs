@@ -23,6 +23,16 @@ pub struct WackasmHostBridge<Ctx, I: WackasmImports<Ctx, R>, R: WackasmResource>
     resources: WackasmLinkerResources<R>,
 }
 
+/// An empty resource table, for calling imports directly through
+/// [`WackasmUntypedCall::call`] without a [`WackasmHostBridge`].
+impl<R: WackasmResource> Default for WackasmLinkerResources<R> {
+    fn default() -> Self {
+        Self {
+            resources: HashMap::new(),
+        }
+    }
+}
+
 impl<R: WackasmResource> WackasmLinkerResources<R> {
     pub(crate) fn get_opaque_resource<'a>(&'a self, key: &Value) -> Option<&'a R> {
         self.resources.get(key)
