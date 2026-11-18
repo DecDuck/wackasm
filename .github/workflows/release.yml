@@ -35,10 +35,10 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # Directory names match NativeLoader.platform(). linux-x86_64 is
-          # built by the jar job itself.
+          # Directory names match NativeLoader.platform().
           - { platform: windows-x86_64, runner: windows-latest, target: x86_64-pc-windows-msvc, file: wackasm_oc.dll }
           # Ubuntu 22.04 for an older glibc (2.35), so more servers can load it.
+          - { platform: linux-x86_64, runner: ubuntu-22.04, target: x86_64-unknown-linux-gnu, file: libwackasm_oc.so }
           - { platform: linux-aarch64, runner: ubuntu-22.04-arm, target: aarch64-unknown-linux-gnu, file: libwackasm_oc.so }
           - { platform: macos-aarch64, runner: macos-latest, target: aarch64-apple-darwin, file: libwackasm_oc.dylib }
           - { platform: macos-x86_64, runner: macos-latest, target: x86_64-apple-darwin, file: libwackasm_oc.dylib }
@@ -101,7 +101,9 @@ jobs:
         with:
           pattern: native-*
           path: natives
-      - name: Stage the other platforms' libraries
+      # Every platform, this one included, comes from the matrix; Gradle
+      # skips its own native build when natives-extra/ has this platform.
+      - name: Stage the native libraries
         run: |
           for dir in natives/native-*; do
             platform="${dir#natives/native-}"

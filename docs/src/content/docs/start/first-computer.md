@@ -9,8 +9,8 @@ A wasm computer is built like a Lua one. The EEPROM holds a BIOS, and the
 BIOS boots an operating system from a disk.
 
 1. **Build a computer as usual:** a case, CPU, RAM, GPU, screen and keyboard.
-   For running programs from the shell, use at least **384 KiB of RAM** (one
-   tier 2 stick). See [Hardware](/wackasm/reference/hardware/).
+   One tier 1 stick runs the shell and a program; programs that run other
+   programs need more. See [Hardware](/wackasm/reference/hardware/).
 2. **Switch the CPU to WebAssembly.** Sneak and right-click the CPU item
    until its tooltip says **WebAssembly (wackasm)**, then put it in the case.
 3. **Insert an EEPROM (WebAssembly BIOS).** Craft a blank EEPROM with a piece

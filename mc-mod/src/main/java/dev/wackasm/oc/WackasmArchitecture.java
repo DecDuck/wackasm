@@ -75,9 +75,19 @@ public final class WackasmArchitecture implements Architecture {
                 bytes += (long) (((Memory) driver).amount(stack) * 1024);
             }
         }
-        memoryBytes = bytes;
-        if (handle != 0) WackasmNative.setMemoryLimit(handle, bytes);
+        memoryBytes = memoryLimit(bytes, WackasmConfig.memoryMultiplier);
+        if (handle != 0) WackasmNative.setMemoryLimit(handle, memoryBytes);
         return bytes > 0;
+    }
+
+    /**
+     * The guest's memory budget for {@code installed} bytes of RAM, scaled by
+     * {@link WackasmConfig#memoryMultiplier} (clamped to its 1.0 to 4.0 range).
+     * Left in bytes: the guest can grow by whole 64 KiB pages that fit.
+     */
+    static long memoryLimit(long installed, double multiplier) {
+        double scale = Double.isNaN(multiplier) ? 1.0 : Math.max(1.0, Math.min(4.0, multiplier));
+        return (long) (installed * scale);
     }
 
     @Override

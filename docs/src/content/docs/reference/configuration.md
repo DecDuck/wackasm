@@ -12,6 +12,7 @@ Created on first start.
 | setting | default | meaning |
 |---|---|---|
 | `callBudgetMultiplier` | 1.0 | how much further the per-tick direct-call budget goes for wasm computers. OpenComputers charges each direct call `1/limit` of the budget (`filesystem.read` has limit 15); wasm computers pay that divided by this, so 2.0 gives them twice the direct calls per tick of a Lua computer with the same parts. Lua computers are unaffected. Range 0.1 to 16 |
+| `memoryMultiplier` | 1.8 | memory for wasm computers, as a multiple of installed RAM. 1.8 is what OpenComputers gives Lua on a 64-bit server. Lua computers are unaffected. Takes effect when a computer's parts change or it restarts. Range 1.0 to 4.0 |
 | `fuelPerSlice` | 5,000,000 | wasm instructions per execution slice before the computer yields to the next tick |
 
 The budget itself is still OpenComputers' `callBudgets` (by CPU and memory

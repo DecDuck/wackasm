@@ -7,28 +7,38 @@ sidebar:
 
 ## RAM
 
-RAM sticks give a wasm computer the same amounts as OpenComputers' `ramSizes`
-config. Installed sticks add up, and the total is the memory budget for every
-program on the computer. A wasm page is 64 KiB.
+Installed sticks add up, using OpenComputers' `ramSizes`, and the total is
+multiplied by `memoryMultiplier` (default **1.8**, the same factor
+OpenComputers gives Lua on a 64-bit server). The result is the memory budget
+for every program on the computer. Memory comes in 64 KiB wasm pages, so the
+usable amount is the budget rounded down to whole pages.
 
-| stick | KiB | wasm pages |
-|---|---|---|
-| Tier 1 | 192 | 3 |
-| Tier 1.5 | 256 | 4 |
-| Tier 2 | 384 | 6 |
-| Tier 2.5 | 512 | 8 |
-| Tier 3 | 768 | 12 |
-| Tier 3.5 | 1024 | 16 |
+| stick | installed KiB | at 1.8x | whole pages |
+|---|---|---|---|
+| Tier 1 | 192 | 345 | 5 (320 KiB) |
+| Tier 1.5 | 256 | 460 | 7 (448 KiB) |
+| Tier 2 | 384 | 691 | 10 (640 KiB) |
+| Tier 2.5 | 512 | 921 | 14 (896 KiB) |
+| Tier 3 | 768 | 1382 | 21 (1344 KiB) |
+| Tier 3.5 | 1024 | 1843 | 28 (1792 KiB) |
 
-Unlike Lua, no 1.8x "64-bit" scaling is applied: wasm memory is the same size
-on every server.
+Sticks add up before the multiplier, so two tier 1 sticks give 691 KiB.
 
-All processes share the RAM, and each can use what the others don't. The BIOS
-and the shell run on one tier 1 stick, but running programs from the shell
-needs about **384 KiB** (one tier 2 stick). That covers the shell (128 KiB),
-a program's file while it loads, and the program itself (128 KiB for the
-included programs). A program that asks for more memory than is free gets an
-allocation failure, not a crashed computer.
+All processes share the memory, and each can use what the others don't. Each
+running program needs its own stack and data, about **128 KiB** for the
+included programs, and the shell takes 128 KiB too. So a tier 1 stick runs
+the shell plus one program, and running a program under another (`time cat
+notes.txt`) needs a tier 1.5 stick or two tier 1s. A program that asks for
+more memory than is free gets an allocation failure, not a crashed computer.
+
+### How this compares to Lua
+
+Lua programs share one VM, so a running Lua program costs only what it
+allocates. A wasm program has fixed costs (its stack, static data and
+allocator), but its code costs no RAM (it is compiled on the server), and its
+data is compact: 4-byte pointers, and no per-value overhead like Lua's tables
+and strings. So a data-heavy program fits in less memory than in Lua, while
+running many small programs at once takes more.
 
 ## CPU and call budget
 

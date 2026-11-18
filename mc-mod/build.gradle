@@ -71,10 +71,14 @@ static String hostPlatform() {
     return "${osName}-${archName}"
 }
 
+// A library for this platform in natives-extra/ (as CI provides, built on
+// its own runner) is used instead of building one here.
+def hostNativeProvided = new File(projectDir, "natives-extra/${hostPlatform()}").isDirectory()
+
 def cargoNative = tasks.register('cargoNative', Exec) {
     group = 'wackasm'
     description = 'Builds the wackasm_oc JNI library (cargo build --release)'
-    enabled = !skipCargo
+    enabled = !skipCargo && !hostNativeProvided
     workingDir = repoRoot
     commandLine 'cargo', 'build', '-p', 'wackasm-oc', '--release'
     // cargo does its own up-to-date checking.
@@ -113,9 +117,11 @@ def stageNatives = tasks.register('stageNatives', Sync) {
     description = 'Collects the native library, BIOS and shell into a resource directory'
     dependsOn cargoNative, cargoBios, cargoGuest, cargoPrograms
     into layout.buildDirectory.dir('generated/wackasm-resources')
-    from(new File(repoRoot, 'target/release')) {
-        include 'wackasm_oc.dll', 'libwackasm_oc.so', 'libwackasm_oc.dylib'
-        into "natives/${hostPlatform()}"
+    if (!hostNativeProvided) {
+        from(new File(repoRoot, 'target/release')) {
+            include 'wackasm_oc.dll', 'libwackasm_oc.so', 'libwackasm_oc.dylib'
+            into "natives/${hostPlatform()}"
+        }
     }
     // Libraries cross-built for other platforms can be dropped in
     // natives-extra/<os>-<arch>/ to ship a multi-platform jar.
@@ -139,7 +145,7 @@ def stageNatives = tasks.register('stageNatives', Sync) {
     }
     doLast {
         def lib = fileTree(destinationDir) { include 'natives/**' }.files
-        if (lib.isEmpty()) throw new GradleException("No wackasm_oc library found in ${repoRoot}/target/release")
+        if (lib.isEmpty()) throw new GradleException("No wackasm_oc library found in ${repoRoot}/target/release or natives-extra/")
         def bios = new File(destinationDir, 'assets/wackasm/bios.wasm')
         if (!bios.isFile()) throw new GradleException("BIOS was not built: ${bios}")
         if (bios.length() > eepromSize) {

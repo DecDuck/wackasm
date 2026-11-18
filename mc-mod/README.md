@@ -164,9 +164,10 @@ binary exporting `oc_main` can also replace the shell as a disk's `/init.wasm`.
 
 ### RAM
 
-RAM sticks give the guest the same amounts as OpenComputers' `ramSizes`
-config. Installed sticks add up, and the total is the guest's linear-memory
-budget (a wasm page is 64 KiB). `memory.grow` past it returns `-1`.
+Installed RAM (OpenComputers' `ramSizes`, added up) times `memoryMultiplier`
+(default 1.8, the factor OpenComputers gives Lua on 64-bit servers) is the
+guest's linear-memory budget. A wasm page is 64 KiB, and `memory.grow` past
+the budget returns `-1`. The table shows installed amounts:
 
 | stick | KiB | wasm pages |
 |---|---|---|
@@ -177,11 +178,9 @@ budget (a wasm page is 64 KiB). `memory.grow` past it returns `-1`.
 | Tier 3 | 768 | 12 |
 | Tier 3.5 | 1024 | 16 |
 
-Unlike Lua, no 1.8x "64-bit" scaling is applied: wasm memory is the same size
-on every host. All processes share it: the BIOS and the shell run on one tier
-1 stick, but running programs from the shell needs about **384 KiB** (one tier
-2 stick). That covers the shell (128 KiB), the program's file while it loads,
-and the program itself (128 KiB for the examples).
+All processes share the budget. The shell takes 128 KiB, and so does each
+running example program, so at 1.8x one tier 1 stick (5 usable pages) runs
+the shell plus one program.
 
 ## Files the mod writes
 
@@ -200,6 +199,7 @@ under `-Dwackasm.workdir`):
 | setting | default | meaning |
 |---|---|---|
 | `callBudgetMultiplier` | 1.0 | how much further the per-tick direct-call budget goes for wasm computers. OpenComputers charges each direct call `1/limit` of the budget (`filesystem.read` has limit 15). Wasm computers pay that divided by this, so 2.0 gives them twice the direct calls per tick of a Lua computer with the same parts. Lua computers are unaffected. Range 0.1 to 16 |
+| `memoryMultiplier` | 1.8 | memory for wasm computers, as a multiple of installed RAM. Lua computers are unaffected. Range 1.0 to 4.0 |
 | `fuelPerSlice` | 5,000,000 | wasm instructions per execution slice before the machine yields to the next tick |
 
 The budget itself is still OpenComputers' own `callBudgets` (by CPU and

@@ -16,6 +16,17 @@ public final class WackasmConfig {
     public static double callBudgetMultiplier = 1.0;
 
     @Config.Comment({
+        "How much memory WebAssembly computers get, as a multiple of their installed RAM.",
+        "1.8 matches what OpenComputers gives Lua on a 64-bit server (its ramScaleFor64Bit), so",
+        "a wasm computer gets the same memory as a Lua computer with the same parts. Each running",
+        "wasm program needs its own stack and data (about 128 KiB), where Lua programs share one",
+        "VM. Lua computers are never affected. Takes effect when a computer's parts change or it",
+        "restarts."
+    })
+    @Config.RangeDouble(min = 1.0, max = 4.0)
+    public static double memoryMultiplier = 1.8;
+
+    @Config.Comment({
         "WebAssembly instructions per execution slice. A machine that uses up its slice",
         "continues on the next tick."
     })
