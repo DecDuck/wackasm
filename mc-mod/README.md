@@ -6,6 +6,9 @@ guests on the wackasm interpreter. Machines are fully suspendable: a computer
 can be saved and reloaded mid-instruction, even in the middle of a component
 call.
 
+Player and programmer documentation: <https://decduck.github.io/wackasm/>
+(source in [`docs/`](../docs)). This file covers building the mod.
+
 ```
 mc-mod/                     this Forge mod (Java)
 crates/wackasm-oc/          JNI library: suspension, snapshots, guest ABI
@@ -89,8 +92,8 @@ The computer's tmpfs is never used. The shell's `cd` and `ls` work on that
 same disk.
 
 A program starts in the directory it was run from (it's passed as `PWD`) if
-it links the [`opencomputers`](../crates/opencomputers) crate, which changes
-into it before `main`. `use opencomputers as _;` is enough. A program that
+it links the [`wackasm-opencomputers`](../crates/wackasm-opencomputers) crate, which changes
+into it before `main`. `use wackasm_opencomputers as _;` is enough. A program that
 doesn't link the crate starts in `/`.
 
 The floppy ships examples
@@ -103,7 +106,7 @@ and `nc [-C] [-w SECS] HOST PORT` (sends the lines you type, then prints
 replies until the connection closes or goes quiet), and three that run other programs:
 `time PROGRAM ARGS...`, `env [NAME=VALUE...] [PROGRAM ARGS...]` and
 `lines PROGRAM ARGS...` (numbers a program's output). Programs start with
-`PATH=/bin` and can run others through `opencomputers::process::Command`.
+`PATH=/bin` and can run others through `wackasm_opencomputers::process::Command`.
 
 ```powershell
 cargo new --bin mytool; cd mytool
@@ -139,8 +142,8 @@ program instead, make it a disk's `/init.wasm`: the stock BIOS boots that,
 with no size limit.
 
 Limits for now:
-* no SIMD, and a few `i64` operations (`i64.rotl`, `i64.popcnt`, ...) are
-  missing in wackasm; floats work fully;
+* no SIMD, reference types or tail calls in wackasm yet; every scalar
+  integer and float instruction works;
 * `poll_oneoff` (so `std::thread::sleep`), sockets, symlinks and
   `fd_pread`/`fd_pwrite` return `ENOSYS`;
 * OpenComputers file handles are read-only, truncating or appending. So
@@ -152,7 +155,7 @@ Limits for now:
   shell; power-cycle the computer.
 
 To talk to components (GPU, robot, modem, redstone, ...), use the
-[`opencomputers`](../crates/opencomputers) crate. It has a typed wrapper for
+[`wackasm-opencomputers`](../crates/wackasm-opencomputers) crate. It has a typed wrapper for
 every OpenComputers component, typed signals, and this computer's uptime,
 memory and power; `demo` on the floppy shows it in use. The raw `oc` import
 ABI underneath is in

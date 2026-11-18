@@ -1,10 +1,10 @@
-//! `demo`: the `opencomputers` crate in action. It lists components, draws a
+//! `demo`: the `wackasm-opencomputers` crate in action. It lists components, draws a
 //! box straight onto the screen through the GPU, and waits five seconds for
 //! a key.
 
 use std::time::Duration;
 
-use opencomputers::{component, prelude::*};
+use wackasm_opencomputers::{component, prelude::*};
 
 fn main() -> Result<()> {
     println!(

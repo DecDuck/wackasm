@@ -1,7 +1,7 @@
 //! `lines PROGRAM [ARGS...]`: runs a program, capturing its output, and
 //! prints it with line numbers (like `PROGRAM | nl`).
 
-use opencomputers::process::Command;
+use wackasm_opencomputers::process::Command;
 
 fn main() {
     let mut args = std::env::args().skip(1);

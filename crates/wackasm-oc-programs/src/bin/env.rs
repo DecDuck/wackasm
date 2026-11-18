@@ -1,7 +1,7 @@
 //! `env [NAME=VALUE...] [PROGRAM [ARGS...]]`: prints the environment, or runs
 //! a program with those variables added.
 
-use opencomputers::process::Command;
+use wackasm_opencomputers::process::Command;
 
 fn main() {
     let mut args = std::env::args().skip(1).peekable();

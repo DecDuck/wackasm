@@ -16,7 +16,7 @@ use std::{
     process::exit,
 };
 
-use opencomputers::{computer, internet::Request};
+use wackasm_opencomputers::{computer, internet::Request};
 
 fn usage() -> ! {
     eprintln!("usage: curl [-i] [-I] [-f] [-X METHOD] [-H \"Name: value\"] [-d DATA|@FILE] [-o FILE | -O] URL");

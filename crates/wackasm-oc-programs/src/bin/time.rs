@@ -1,7 +1,7 @@
 //! `time PROGRAM [ARGS...]`: runs a program with this terminal, then reports
 //! how it exited and how long it took (in game time).
 
-use opencomputers::{computer, process::Command};
+use wackasm_opencomputers::{computer, process::Command};
 
 fn main() {
     let mut args = std::env::args().skip(1);

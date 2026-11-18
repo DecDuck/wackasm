@@ -1,7 +1,0 @@
-[package]
-name = "opencomputers"
-version = "0.1.0"
-edition = "2024"
-description = "Typed Rust bindings to OpenComputers components, for WASI programs running on the wackasm architecture"
-
-[dependencies]

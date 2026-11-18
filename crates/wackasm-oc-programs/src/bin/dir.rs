@@ -1,7 +1,7 @@
 //! `dir [PATH]`: lists a directory with sizes, via ordinary `std::fs`.
 
-// Starts the program in the directory it was run from (see `opencomputers::process`).
-use opencomputers as _;
+// Starts the program in the directory it was run from (see `wackasm_opencomputers::process`).
+use wackasm_opencomputers as _;
 
 fn main() {
     let path = std::env::args().nth(1).unwrap_or_else(|| ".".into());

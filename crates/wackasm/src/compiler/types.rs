@@ -369,4 +369,14 @@ pub enum WackasmOperator {
     Unsupported {
         description: Box<String>,
     },
+
+    // Added after `Unsupported` so existing variants keep their indices in
+    // serialized (snapshotted) code.
+    I64Rotl,
+    I64Rotr,
+    I64Popcnt,
+    I64Ctz,
+    I64Extend8S,
+    I64Extend16S,
+    I64Extend32S,
 }

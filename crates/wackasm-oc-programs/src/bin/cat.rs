@@ -1,7 +1,7 @@
 //! `cat FILE...`: prints files from the disk, via ordinary `std::fs`.
 
-// Starts the program in the directory it was run from (see `opencomputers::process`).
-use opencomputers as _;
+// Starts the program in the directory it was run from (see `wackasm_opencomputers::process`).
+use wackasm_opencomputers as _;
 
 use std::io::Write;
 

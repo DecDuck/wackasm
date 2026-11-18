@@ -2,6 +2,7 @@
 name = "wackasm-oc-guest"
 version = "0.1.0"
 edition = "2024"
+publish = false
 description = "Example OpenComputers guest for the wackasm architecture; bundled as the mod's default boot.wasm"
 
 # Built only for wasm32-unknown-unknown, so it lives outside the host workspace.

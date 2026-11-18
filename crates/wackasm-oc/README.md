@@ -74,7 +74,7 @@ its parent, an *event*. The child then pauses, and the parent's `spawn` or
 
 The parent is the terminal: the shell prints `OUTPUT` and collects a typed
 line for `INPUT`. A middle process can relay its child's events to its own
-parent (that is what `opencomputers::process::Command::status` does), so the
+parent (that is what `wackasm_opencomputers::process::Command::status` does), so the
 running process is always the highest one that isn't paused. The stack is part of the snapshot, so a world can be saved
 mid-program. A child's trap or bad import ends only that child, with
 `CRASHED`. All processes share the machine's RAM: each is capped at the total
@@ -114,7 +114,7 @@ by [`wackasm-wasi`](../wackasm-wasi)'s marshalling over per-process stdio
 * Working directory: WASI has none. wasi-libc keeps one in the guest
   (`chdir`/`getcwd`) and resolves relative paths against it before they reach
   the host, so a program always starts in `/`. The host passes the working
-  directory as `PWD` (set by `spawn_with`'s `cwd`), and the `opencomputers`
+  directory as `PWD` (set by `spawn_with`'s `cwd`), and the `wackasm-opencomputers`
   crate changes into it before `main`.
 * Anything else returns `ENOSYS`.
 
@@ -219,10 +219,11 @@ cargo run -p wackasm-oc --example headless -- --eeprom bios.wasm --disk ./disk -
 
 ## Known limitations
 
-* wackasm doesn't implement SIMD (`v128` arithmetic) or a few `i64` ops
-  (`i64.rotl`/`rotr`, `i64.popcnt`, `i64.ctz`, `i64.extend8_s`/`16_s`/`32_s`)
-  yet. A guest that executes one crashes with "unsupported operator". All
-  scalar `f32`/`f64` operations work and pass the spec test suite.
+* wackasm doesn't implement SIMD (`v128` arithmetic), reference-type and
+  table instructions (`table.get`, `ref.null`, ...), or tail calls yet. A
+  guest that executes one crashes with "unsupported operator". Every scalar
+  integer and float instruction is implemented and passes the spec tests
+  (`i32.wast`, `i64.wast`, `int_exprs.wast`, `f32.wast`, `f64.wast`, ...).
 * The memory limit (installed RAM, from `recomputeMemory`) is enforced by
   wackasm's `MemoryManager`. A `memory.grow` past it returns `-1`, so the
   guest's allocator sees out-of-memory instead of the machine being killed. A

@@ -5,7 +5,7 @@
 //! components directly:
 //!
 //! ```no_run
-//! use opencomputers::prelude::*;
+//! use wackasm_opencomputers::prelude::*;
 //!
 //! let gpu = Gpu::first().expect("no GPU");
 //! let (w, h) = gpu.get_resolution()?;
@@ -14,7 +14,7 @@
 //!
 //! // Wait for a key.
 //! let key = signal::pull_filtered(None, |s| matches!(s, Signal::KeyDown { .. }));
-//! # Ok::<(), opencomputers::Error>(())
+//! # Ok::<(), wackasm_opencomputers::Error>(())
 //! ```
 //!
 //! * [`components`]: a generated struct per component type (`Gpu`,
@@ -50,7 +50,7 @@ pub use signal::Signal;
 pub use types::{Color, Side, keys};
 pub use value::{Handle, Number, OcString, Value};
 
-/// Everything a typical program needs: `use opencomputers::prelude::*;`
+/// Everything a typical program needs: `use wackasm_opencomputers::prelude::*;`
 pub mod prelude {
     pub use crate::{
         Address, Color, Component, Error, Handle, Number, OcString, Proxy, Result, Side, Signal, Value,

@@ -2,6 +2,7 @@
 name = "wackasm-oc-bios"
 version = "0.1.0"
 edition = "2024"
+publish = false
 description = "The WebAssembly BIOS flashed onto the mod's EEPROM; boots /init.wasm like OpenComputers' Lua BIOS boots /init.lua"
 
 # Built only for wasm32-unknown-unknown, so it lives outside the host workspace.

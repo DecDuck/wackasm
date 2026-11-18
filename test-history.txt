@@ -19,3 +19,4 @@
 - total: 19799 passed, 865 failed, 44195 unsupported
 - total: 20194 passed, 757 failed, 43908 unsupported
 - total: 20216 passed, 687 failed, 43956 unsupported
+- total: 33277 passed, 667 failed, 30924 unsupported

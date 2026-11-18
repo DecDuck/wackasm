@@ -1,0 +1,41 @@
+---
+title: WebAssembly computers for OpenComputers
+description: A Minecraft mod that adds a WebAssembly architecture to OpenComputers, so you can write computer programs in Rust or any other language that compiles to wasm.
+template: splash
+hero:
+  tagline: Write OpenComputers programs in Rust (or anything that compiles to WebAssembly) and run them next to Lua computers, robots and drones.
+  actions:
+    - text: Get started
+      link: /wackasm/start/installing/
+      icon: right-arrow
+    - text: Write a program
+      link: /wackasm/programs/first-program/
+      variant: minimal
+---
+
+import { Card, CardGrid } from '@astrojs/starlight/components';
+
+wackasm is a WebAssembly interpreter written in Rust. This mod plugs it into
+[OpenComputers](https://github.com/MightyPirates/OpenComputers) for Minecraft
+1.12.2 as a new CPU architecture, next to Lua. A wasm computer boots from an
+EEPROM, runs a shell from a floppy disk, and runs ordinary **WASI** programs
+that read files, talk to components and use the internet.
+
+<CardGrid>
+  <Card title="Plays like a Lua computer" icon="laptop">
+    Same parts, same EEPROM-and-disk boot, same errors. Switch a CPU to
+    WebAssembly and insert the shell floppy.
+  </Card>
+  <Card title="Ordinary Rust programs" icon="seti:rust">
+    Build with `--target wasm32-wasip1`. `std::fs`, `println!` and reading
+    stdin just work; the shell passes arguments and a working directory.
+  </Card>
+  <Card title="Every component, typed" icon="puzzle">
+    The `wackasm-opencomputers` crate wraps all 52 component types and 375
+    methods, plus signals, processes and the internet card.
+  </Card>
+  <Card title="Saves mid-instruction" icon="setting">
+    Machines are fully suspendable: a world can be saved and reloaded in the
+    middle of a component call, a file read or a running child program.
+  </Card>
+</CardGrid>

@@ -20,7 +20,7 @@ use std::{
     time::Duration,
 };
 
-use opencomputers::{computer, internet::TcpStream};
+use wackasm_opencomputers::{computer, internet::TcpStream};
 
 fn usage() -> ! {
     eprintln!("usage: nc [-C] [-w SECS] HOST PORT");

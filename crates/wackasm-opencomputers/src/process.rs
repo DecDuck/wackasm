@@ -9,7 +9,7 @@
 //! run by a program run from the shell reaches the screen.
 //!
 //! ```no_run
-//! use opencomputers::process::Command;
+//! use wackasm_opencomputers::process::Command;
 //!
 //! // Run with this program's stdin and stdout.
 //! let status = Command::new("hello").arg("world").status()?;
@@ -18,7 +18,7 @@
 //! // Capture the output instead.
 //! let output = Command::new("cat").arg("notes.txt").output()?;
 //! println!("{} bytes", output.stdout.len());
-//! # Ok::<(), opencomputers::Error>(())
+//! # Ok::<(), wackasm_opencomputers::Error>(())
 //! ```
 //!
 //! Children start with this program's environment (plus changes made with

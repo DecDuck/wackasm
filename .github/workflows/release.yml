@@ -1,0 +1,220 @@
+name: Build and release
+
+# Every push and pull request: native libraries for every platform, tests,
+# the mod jar (as a workflow artifact) and the docs.
+# Pushes to master: also deploy the docs to GitHub Pages.
+# Tags v*: also a GitHub release with the jar, and wackasm-opencomputers on
+# crates.io (if that version isn't published yet).
+#
+# One-time setup: an environment named `release` (Settings > Environments)
+# holding a crates.io token as the CARGO_REGISTRY_TOKEN secret, with `v*` tags
+# allowed to deploy to it; and Settings > Pages > Source set to
+# "GitHub Actions".
+
+on:
+  push:
+    branches: [master]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  # The workspace's release profile keeps debug info for profiling; release
+  # jars don't need it.
+  CARGO_PROFILE_RELEASE_DEBUG: 'false'
+  CARGO_PROFILE_RELEASE_STRIP: symbols
+
+jobs:
+  natives:
+    name: Native library (${{ matrix.platform }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Directory names match NativeLoader.platform(). linux-x86_64 is
+          # built by the jar job itself.
+          - { platform: windows-x86_64, runner: windows-latest, target: x86_64-pc-windows-msvc, file: wackasm_oc.dll }
+          # Ubuntu 22.04 for an older glibc (2.35), so more servers can load it.
+          - { platform: linux-aarch64, runner: ubuntu-22.04-arm, target: aarch64-unknown-linux-gnu, file: libwackasm_oc.so }
+          - { platform: macos-aarch64, runner: macos-latest, target: aarch64-apple-darwin, file: libwackasm_oc.dylib }
+          - { platform: macos-x86_64, runner: macos-latest, target: x86_64-apple-darwin, file: libwackasm_oc.dylib }
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@nightly
+        with:
+          targets: ${{ matrix.target }}
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-patch-crate
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.target }}
+      - name: Apply the wasmparser patch
+        run: cargo patch-crate
+      - name: Build
+        run: cargo build -p wackasm-oc --release --target ${{ matrix.target }}
+      - uses: actions/upload-artifact@v7
+        with:
+          name: native-${{ matrix.platform }}
+          path: target/${{ matrix.target }}/release/${{ matrix.file }}
+          if-no-files-found: error
+
+  mod:
+    name: Tests and mod jar
+    needs: natives
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@nightly
+        with:
+          targets: wasm32-unknown-unknown, wasm32-wasip1
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-patch-crate
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            .
+            crates/wackasm-oc-bios
+            crates/wackasm-oc-guest
+            crates/wackasm-oc-programs
+      - name: Apply the wasmparser patch
+        run: cargo patch-crate
+      - name: Rust tests
+        run: cargo test -p wackasm-oc -p wackasm-opencomputers -p wackasm-wasi
+      # Java 8 for Minecraft, 21 to run Gradle (the last one is the default).
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: |
+            8
+            21
+      - uses: gradle/actions/setup-gradle@v6
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: native-*
+          path: natives
+      - name: Stage the other platforms' libraries
+        run: |
+          for dir in natives/native-*; do
+            platform="${dir#natives/native-}"
+            mkdir -p "mc-mod/natives-extra/$platform"
+            cp "$dir"/* "mc-mod/natives-extra/$platform/"
+          done
+          find mc-mod/natives-extra -type f
+      - name: Build the jar
+        working-directory: mc-mod
+        run: |
+          args=()
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            args+=("-Pmod_version=${GITHUB_REF_NAME#v}")
+          fi
+          chmod +x gradlew
+          ./gradlew build "${args[@]}"
+      - name: Check the jar has every platform
+        run: |
+          jar=$(ls mc-mod/build/libs/wackasm-oc-*.jar | grep -v -- '-dev\.jar$')
+          echo "$jar"
+          unzip -l "$jar" | grep 'natives/'
+          for platform in windows-x86_64 linux-x86_64 linux-aarch64 macos-x86_64 macos-aarch64; do
+            unzip -l "$jar" | grep -q "natives/$platform/" || { echo "::error::$platform is missing from the jar"; exit 1; }
+          done
+      - uses: actions/upload-artifact@v7
+        with:
+          name: wackasm-oc-jar
+          path: |
+            mc-mod/build/libs/wackasm-oc-*.jar
+            !mc-mod/build/libs/*-dev.jar
+          if-no-files-found: error
+
+  docs:
+    name: Docs
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # Full history, for the "last updated" dates.
+          fetch-depth: 0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: docs/package-lock.json
+      - name: Build
+        working-directory: docs
+        run: |
+          npm ci
+          npm run build
+      - if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: docs/dist
+
+  pages:
+    name: Deploy docs
+    needs: docs
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    concurrency:
+      group: pages
+      cancel-in-progress: false
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v5
+
+  release:
+    name: GitHub release
+    needs: [mod, docs]
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: wackasm-oc-jar
+          path: dist
+      - uses: softprops/action-gh-release@v3
+        with:
+          files: dist/*.jar
+          generate_release_notes: true
+
+  crates:
+    name: Publish to crates.io
+    needs: mod
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    # CARGO_REGISTRY_TOKEN is a secret of the `release` environment.
+    environment: release
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-patch-crate
+      # Cargo loads the whole workspace, and its [patch] points into target/.
+      - name: Apply the wasmparser patch
+        run: cargo patch-crate
+      - name: Publish wackasm-opencomputers
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+        run: |
+          crate=wackasm-opencomputers
+          version=$(sed -n 's/^version = "\(.*\)"/\1/p' "crates/$crate/Cargo.toml" | head -n1)
+          status=$(curl -s -o /dev/null -w '%{http_code}' -A 'wackasm-release-workflow' "https://crates.io/api/v1/crates/$crate/$version")
+          if [ "$status" = 200 ]; then
+            echo "$crate $version is already on crates.io; skipping."
+            exit 0
+          fi
+          cargo publish -p "$crate"

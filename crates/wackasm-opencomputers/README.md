@@ -1,16 +1,19 @@
-# opencomputers
+# wackasm-opencomputers
 
 Typed Rust bindings to every OpenComputers component, for WASI programs
 running on the WebAssembly (wackasm) architecture.
 
-```toml
-[dependencies]
-opencomputers = { path = "../opencomputers" }
+```sh
+cargo add wackasm-opencomputers
+cargo build --release --target wasm32-wasip1
 ```
+
+Full documentation, including how to get programs onto a computer:
+<https://decduck.github.io/wackasm/>.
 
 ```rust
 use std::time::Duration;
-use opencomputers::prelude::*;
+use wackasm_opencomputers::prelude::*;
 
 fn main() -> Result<()> {
     let gpu = Gpu::first().ok_or(Error::NoSuchComponent)?;
@@ -71,7 +74,7 @@ has a worked example (`demo`).
 * **Working directory**: `std::env::current_dir`/`set_current_dir` and
   relative `std::fs` paths work. A program starts in the directory it was run
   from because the crate changes into `PWD` before `main`. That happens
-  whenever the program links the crate, which can take a `use opencomputers
+  whenever the program links the crate, which can take a `use wackasm_opencomputers
   as _;`. In a build without LTO, call `process::enter_working_dir()` at the
   top of `main` to be sure.
 * `Side`, `Color` and `keys`: the codes robots, redstone and keyboards use.

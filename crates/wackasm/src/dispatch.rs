@@ -499,6 +499,35 @@ ops!(|ctx, pc, stack, locals| match op {
         let value = stack.pop_i64();
         stack.push(Value(value.leading_zeros() as u64));
     }
+    i64_ctz @ I64Ctz => {
+        let value = stack.pop_i64();
+        stack.push(Value(value.trailing_zeros() as u64));
+    }
+    i64_popcnt @ I64Popcnt => {
+        let value = stack.pop_i64();
+        stack.push(Value(value.count_ones() as u64));
+    }
+    // The rotation count is taken modulo 64, as `rotate_*` does; truncating it
+    // to u32 first keeps the same remainder.
+    i64_rotl @ I64Rotl => {
+        i64_binop!(stack, u64, |lhs, rhs| lhs.rotate_left(rhs as u32))
+    }
+    i64_rotr @ I64Rotr => {
+        i64_binop!(stack, u64, |lhs, rhs| lhs.rotate_right(rhs as u32))
+    }
+    // Sign-extend the low 8, 16 or 32 bits to all 64.
+    i64_extend_8_s @ I64Extend8S => {
+        let value = stack.pop_i64();
+        stack.push(Value(value as i8 as i64 as u64));
+    }
+    i64_extend_16_s @ I64Extend16S => {
+        let value = stack.pop_i64();
+        stack.push(Value(value as i16 as i64 as u64));
+    }
+    i64_extend_32_s @ I64Extend32S => {
+        let value = stack.pop_i64();
+        stack.push(Value(value as i32 as i64 as u64));
+    }
     i64_shr_u @ I64ShrU => {
         i64_binop!(stack, u64, |lhs, rhs| lhs.wrapping_shr(rhs as u32))
     }

@@ -1,0 +1,17 @@
+[package]
+name = "wackasm-opencomputers"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+description = "Typed Rust bindings to OpenComputers components, for WASI programs running on the wackasm architecture"
+license = "MIT"
+repository = "https://github.com/DecDuck/wackasm"
+homepage = "https://decduck.github.io/wackasm/"
+documentation = "https://docs.rs/wackasm-opencomputers"
+readme = "README.md"
+keywords = ["opencomputers", "minecraft", "wasi", "webassembly", "wackasm"]
+categories = ["api-bindings", "wasm", "game-development"]
+# The generator and its OpenComputers callback dump aren't needed to build.
+exclude = ["tools/"]
+
+[dependencies]

@@ -562,6 +562,12 @@ fn step(state: &mut State, work_dir: &WorkDir, key: &str, total: Option<u64>) ->
                     // Show output as soon as it is written, like a terminal.
                     let output = std::mem::take(&mut process.io.output);
                     state.pause(active, Event::Output(output))?;
+                } else if !process.io.output.is_empty() {
+                    // The first process has no terminal: its stdout and
+                    // stderr go to the machine's log (best-effort).
+                    let output = std::mem::take(&mut process.io.output);
+                    let text = String::from_utf8_lossy(&output);
+                    let _ = work_dir.append_log(key, text.trim_end_matches('\n'));
                 }
             }
             ImportAction::Suspend(request) => return Ok(RunOutcome::Request(request)),

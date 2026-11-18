@@ -4,6 +4,6 @@ target
 /perf.data*
 /profile.json.gz
 *.tsv
-/tmp/crates/wackasm-oc-guest/target
+/tmp
 /crates/wackasm-oc-bios/target
 /crates/wackasm-oc-programs/target

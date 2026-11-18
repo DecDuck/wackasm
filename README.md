@@ -4,6 +4,14 @@ A deliciously slow and excitingly unconformant WASM interpreter with only one go
 
 In more words, `wackasm` was built so that you could run a WASM module that uses typical blocking code, but lets you suspend the entire interpreter, including call stack, function frames, etc etc to any medium, like disk, over the network (or you could even put it in a database, if you're insane), and then read it back and resume executing, completely transparently to the guest.
 
+## OpenComputers
+
+wackasm also powers a WebAssembly architecture for the OpenComputers
+Minecraft mod (`mc-mod/`), with a Rust library for programs,
+[`wackasm-opencomputers`](https://crates.io/crates/wackasm-opencomputers).
+Documentation: <https://decduck.github.io/wackasm/>. Release jars are on the
+[releases page](https://github.com/DecDuck/wackasm/releases).
+
 ## performance
 
 I am not good at writing WASM interpreters, so for this reason, the interpreter is slow. It benchmarks against `wasmi`, probably the fastest WASM interpreter, and gets about **30-50%** of that performance... which is not *prohibitively* slow, especially for my intended use case, but there is definitely performance headroom not taken advantage of.

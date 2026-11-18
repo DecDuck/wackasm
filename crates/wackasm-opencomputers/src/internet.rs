@@ -2,7 +2,7 @@
 //!
 //! ```no_run
 //! use std::io::Read;
-//! use opencomputers::internet;
+//! use wackasm_opencomputers::internet;
 //!
 //! let mut response = internet::get("https://example.com/")?;
 //! println!("{} {}", response.status(), response.message());

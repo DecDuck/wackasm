@@ -1,8 +1,8 @@
 //! `write FILE [TEXT...]`: writes TEXT to FILE, or, without TEXT, the lines
 //! typed until Ctrl+D.
 
-// Starts the program in the directory it was run from (see `opencomputers::process`).
-use opencomputers as _;
+// Starts the program in the directory it was run from (see `wackasm_opencomputers::process`).
+use wackasm_opencomputers as _;
 
 use std::io::Read;
 

@@ -21,7 +21,7 @@ use std::{
     process::exit,
 };
 
-use opencomputers::{Component, components::Eeprom};
+use wackasm_opencomputers::{Component, components::Eeprom};
 
 fn usage() -> ! {
     eprintln!("usage: flash [-y] FILE [LABEL] | flash -r FILE | flash -i");
