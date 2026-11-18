@@ -165,7 +165,7 @@ jobs:
       - name: Install cargo patch-crate
         run: cargo install patch-crate --version 0.1.13 --locked
       - name: Apply the wasmparser patch
-        run: cargo patch-crate
+        run: cargo patch-crate --force
       - name: Build the Rust API docs
         env:
           # An index page listing the crates (nightly only).
