@@ -43,6 +43,11 @@ repositories {
         url = 'https://habzg.github.io/OpenComputers-Modernized/'
         content { includeGroup 'li.cil.oc' }
     }
+    maven {
+        name = 'ModMaven (Applied Energistics 2)'
+        url = 'https://modmaven.dev/'
+        content { includeGroup 'org.appliedenergistics' }
+    }
 }
 
 dependencies {
@@ -50,6 +55,10 @@ dependencies {
     // OpenComputers loaded. NeoForge runs on Mojang's names, so the jar is
     // used as is.
     implementation "li.cil.oc:opencomputers-neoforge:${ocm_version}"
+    // Optional at runtime: the AE2 pattern provider (dev.wackasm.oc.ae2) is
+    // only registered when AE2 is installed. Compiled against, and loaded in
+    // the dev runs so the block can be tried out.
+    implementation "org.appliedenergistics:appliedenergistics2:${ae2_version}"
 
     testImplementation platform('org.junit:junit-bom:5.10.2')
     testImplementation 'org.junit.jupiter:junit-jupiter'
@@ -106,6 +115,7 @@ sourceSets.main.resources.srcDir(generateRecipes)
 
 processResources {
     def props = [version: project.version, minecraft_version: minecraft_version, neo_version: neo_version,
+                 ae2_version: ae2_version,
                  ocm_version: ocm_version]
     inputs.properties props
     filesMatching('META-INF/neoforge.mods.toml') { expand(props) }

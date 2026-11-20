@@ -1,0 +1,11 @@
+{
+  "neoforge:conditions": [{ "type": "neoforge:mod_loaded", "modid": "ae2" }],
+  "type": "minecraft:crafting_shapeless",
+  "category": "misc",
+  "ingredients": [
+    { "item": "ae2:pattern_provider" },
+    { "item": "opencomputers:chip1" },
+    { "item": "opencomputers:cable" }
+  ],
+  "result": { "id": "wackasm:pattern_provider", "count": 1 }
+}

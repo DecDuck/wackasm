@@ -1,5 +1,23 @@
 # Changelog
 
+## Unreleased
+
+### Mod
+
+- With **Applied Energistics 2** (19.2.17 or newer) installed: the
+  **Computer Pattern Provider**, an ME device and OpenComputers component
+  (`pattern_provider`). Computers declare processing patterns, which AE2
+  autocrafting uses like any others; the computer gets each job's inputs and
+  does the processing, and the outputs are imported into the network as for
+  any processing pattern. Crafted from an AE2 Pattern Provider, a tier 1
+  microchip and a cable. AE2 remains optional.
+
+### `wackasm-opencomputers` crate
+
+- `pattern_provider`: typed bindings for the Computer Pattern Provider, and a
+  `Signal::PatternRequest` variant (code matching `Signal` exhaustively needs
+  a new arm).
+
 ## 0.3.0
 
 ### Mod

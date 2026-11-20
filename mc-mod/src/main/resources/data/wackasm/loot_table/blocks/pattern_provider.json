@@ -1,0 +1,12 @@
+{
+  "neoforge:conditions": [{ "type": "neoforge:mod_loaded", "modid": "ae2" }],
+  "type": "minecraft:block",
+  "pools": [
+    {
+      "rolls": 1,
+      "entries": [{ "type": "minecraft:item", "name": "wackasm:pattern_provider" }],
+      "conditions": [{ "condition": "minecraft:survives_explosion" }]
+    }
+  ],
+  "random_sequence": "wackasm:blocks/pattern_provider"
+}

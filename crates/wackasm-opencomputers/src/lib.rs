@@ -27,6 +27,8 @@
 //! * [`draw`]: a framebuffer with text, half-block pixels, braille and
 //!   shapes, sent to the GPU with as few calls as possible.
 //! * [`internet`]: HTTP requests and TCP connections through an internet card.
+//! * [`pattern_provider`]: autocrafting patterns for Applied Energistics 2
+//!   that the program fulfils (with AE2 installed).
 //! * `task` (with the `async` feature): an async executor, so programs can
 //!   wait on several component calls, timers and signals at once. Every
 //!   component method then has an `_async` twin.
@@ -44,6 +46,7 @@ pub mod computer;
 pub mod draw;
 mod error;
 pub mod internet;
+pub mod pattern_provider;
 pub mod process;
 pub mod signal;
 mod sys;
@@ -64,6 +67,7 @@ pub mod prelude {
         Address, Color, Component, Error, Handle, Number, OcString, Proxy, Result, Side, Signal, Value,
         components::*, computer, keys,
         internet,
+        pattern_provider::{self, PatternProvider},
         process::{self, Command},
         signal,
     };

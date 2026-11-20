@@ -28,6 +28,9 @@ pub enum Signal {
     Motion { address: Address, x: Number, y: Number, z: Number, entity: Option<String> },
     ModemMessage { receiver: Address, sender: Address, port: i64, distance: Number, data: Vec<Value> },
     InventoryChanged { slot: i64 },
+    /// A Computer Pattern Provider (AE2) was handed the inputs for a job;
+    /// see [`crate::pattern_provider`]. `pattern` is the pattern's index, from 1.
+    PatternRequest { provider: Address, job: i64, pattern: i64 },
     /// Anything else, as sent.
     Other { name: String, args: Vec<Value> },
 }
@@ -73,6 +76,7 @@ impl Signal {
                 data: a.get(4..).unwrap_or_default().to_vec(),
             },
             "inventory_changed" => Signal::InventoryChanged { slot: int(0)? },
+            "pattern_request" => Signal::PatternRequest { provider: addr(0)?, job: int(1)?, pattern: int(2)? },
             _ => return None,
         })
     }

@@ -8,6 +8,7 @@ import li.cil.oc.api.Items;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.world.item.DyeColor;
 import net.neoforged.bus.api.IEventBus;
+import net.neoforged.fml.ModList;
 import net.neoforged.fml.common.Mod;
 import net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent;
 import net.neoforged.neoforge.common.NeoForge;
@@ -31,6 +32,9 @@ import org.slf4j.LoggerFactory;
  * items as the registrations here. OpenComputers puts both items in its
  * creative tab.
  *
+ * <p>With Applied Energistics 2 installed, it also adds a pattern provider
+ * that computers control (see {@code dev.wackasm.oc.ae2}).
+ *
  * <p>OpenComputers sets up its API in its common setup handler. Those run in
  * parallel across mods, so registration is queued with
  * {@link FMLCommonSetupEvent#enqueueWork}, which runs on the main thread once
@@ -53,6 +57,10 @@ public final class WackasmMod {
 
     public WackasmMod(IEventBus modBus) {
         WackasmConfig.load();
+        // The AE2 classes are only loaded when this branch runs.
+        if (ModList.get().isLoaded(dev.wackasm.oc.ae2.Ae2Integration.MOD_ID)) {
+            dev.wackasm.oc.ae2.Ae2Integration.register(modBus);
+        }
         modBus.addListener(FMLCommonSetupEvent.class, event -> event.enqueueWork(WackasmMod::registerWithOpenComputers));
         NeoForge.EVENT_BUS.addListener(ServerStartingEvent.class, event -> {
             server = event.getServer();

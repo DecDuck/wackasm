@@ -38,3 +38,12 @@ Adds a WebAssembly architecture to OpenComputers: Modernized, powered by the wac
     versionRange = "[${ocm_version},)"
     ordering = "AFTER"
     side = "BOTH"
+
+# Optional: with AE2 installed, adds the computer-controlled pattern
+# provider. The same oldest version OpenComputers: Modernized accepts.
+[[dependencies.wackasm]]
+    modId = "ae2"
+    type = "optional"
+    versionRange = "[${ae2_version},)"
+    ordering = "NONE"
+    side = "BOTH"

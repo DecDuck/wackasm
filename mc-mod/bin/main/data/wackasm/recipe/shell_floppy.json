@@ -1,0 +1,19 @@
+{
+    "type": "minecraft:crafting_shapeless",
+    "category": "misc",
+    "ingredients": [
+        {
+            "item": "opencomputers:floppy"
+        },
+        {
+            "item": "minecraft:paper"
+        }
+    ],
+    "result": {
+        "id": "opencomputers:floppy",
+        "count": 1,
+        "components": {
+            "minecraft:custom_data": "{\"oc:data\":{\"oc:fs.label\":\"wackasm shell\"},\"oc:lootFactory\":\"wackasm:wackasm shell\",\"oc:color\":5}"
+        }
+    }
+}

@@ -1,0 +1,49 @@
+modLoader = "javafml"
+loaderVersion = "[1,)"
+license = "MIT"
+issueTrackerURL = "https://github.com/DecDuck/wackasm/issues"
+
+[[mods]]
+modId = "wackasm"
+version = "${version}"
+displayName = "Wackasm for OpenComputers"
+displayURL = "https://decduck.github.io/wackasm/"
+logoFile = "assets/wackasm/icon.png"
+authors = "DecDuck"
+credits = "OpenComputers by Sangar and contributors; OpenComputers: Modernized by habzg and contributors"
+description = '''
+Adds a WebAssembly architecture to OpenComputers: Modernized, powered by the wackasm interpreter. Machines can be suspended mid-call and survive world reloads.
+'''
+
+# The oldest NeoForge OpenComputers: Modernized 1.10.7 accepts; this mod
+# builds against a newer one but uses nothing it added.
+[[dependencies.wackasm]]
+    modId = "neoforge"
+    type = "required"
+    versionRange = "[21.1.249,)"
+    ordering = "NONE"
+    side = "BOTH"
+
+[[dependencies.wackasm]]
+    modId = "minecraft"
+    type = "required"
+    versionRange = "[${minecraft_version}]"
+    ordering = "NONE"
+    side = "BOTH"
+
+# AFTER: OpenComputers sets up its API in its own common setup, before ours.
+[[dependencies.wackasm]]
+    modId = "opencomputers"
+    type = "required"
+    versionRange = "[${ocm_version},)"
+    ordering = "AFTER"
+    side = "BOTH"
+
+# Optional: with AE2 installed, adds the computer-controlled pattern
+# provider. The same oldest version OpenComputers: Modernized accepts.
+[[dependencies.wackasm]]
+    modId = "ae2"
+    type = "optional"
+    versionRange = "[${ae2_version},)"
+    ordering = "NONE"
+    side = "BOTH"

@@ -1,0 +1,10 @@
+<?xml version="1.0" ?>
+<launchConfiguration type="org.eclipse.jdt.launching.localJavaApplication">
+    <stringAttribute key="org.eclipse.jdt.launching.PROJECT_ATTR" value="wackasm-oc"></stringAttribute>
+    <stringAttribute key="org.eclipse.jdt.launching.MAIN_TYPE" value="net.neoforged.devlaunch.Main"></stringAttribute>
+    <stringAttribute key="org.eclipse.jdt.launching.PROGRAM_ARGUMENTS" value=" @C:\\Users\\DecDuck\\Dev\\wackasm\\mc-mod\\build\\moddev\\clientRunProgramArgs.txt"></stringAttribute>
+    <stringAttribute key="org.eclipse.jdt.launching.VM_ARGUMENTS" value=" @C:\\Users\\DecDuck\\Dev\\wackasm\\mc-mod\\build\\moddev\\clientRunVmArgs.txt -Dfml.modFolders=wackasm%%C:\\Users\\DecDuck\\Dev\\wackasm\\mc-mod\\bin\\main"></stringAttribute>
+    <stringAttribute key="org.eclipse.jdt.launching.WORKING_DIRECTORY" value="C:\Users\DecDuck\Dev\wackasm\mc-mod\runs\client"></stringAttribute>
+    <booleanAttribute key="org.eclipse.jdt.launching.STOP_IN_MAIN" value="false"></booleanAttribute>
+    <booleanAttribute key="org.eclipse.jdt.launching.ATTR_ATTR_USE_ARGFILE" value="false"></booleanAttribute>
+</launchConfiguration>
